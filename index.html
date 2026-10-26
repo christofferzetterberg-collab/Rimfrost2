@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rimfrost 2</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Alegreya+Sans:wght@400;700;800&display=swap">
+<style>
+  :root{--frost:#9fd6e8;--text:#e8eef1;--mute:#93a4ad;--panel:rgba(16,22,27,.9);--line:#2c3a43}
+  html,body{margin:0;height:100%;background:#0b1013;color:var(--text);font:14px 'Alegreya Sans',system-ui,sans-serif;overflow:hidden}
+  canvas{display:block}
+  #hud{position:fixed;inset:0;pointer-events:none}
+  .frame{position:absolute;top:12px;left:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:220px}
+  .frame .n{display:flex;justify-content:space-between;font-weight:800}
+  .bar{position:relative;height:14px;background:#0d1216;border:1px solid var(--line);border-radius:3px;margin-top:4px;overflow:hidden}
+  .bar i{position:absolute;inset:0 auto 0 0;background:#3fbf5a}
+  .bar b{position:absolute;inset:0;text-align:center;font-size:11px;line-height:14px}
+  #title{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:'Uncial Antiqua',serif;font-size:26px;color:var(--frost);text-shadow:0 2px 8px #000}
+  #zone{position:absolute;top:44px;left:50%;transform:translateX(-50%);color:var(--mute);font-size:13px;text-shadow:0 1px 4px #000}
+  #help{position:absolute;bottom:12px;left:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;color:var(--mute);font-size:12.5px;line-height:1.5}
+  #help b{color:var(--text)}
+  #fps{position:absolute;bottom:12px;right:12px;color:var(--mute);font-size:11px}
+  #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b1013;font-family:'Uncial Antiqua',serif;font-size:32px;color:var(--frost);z-index:5}
+  #load[hidden]{display:none}
+</style>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js" } }</script>
+</head>
+<body>
+<div id="load">Rimfrost 2</div>
+<div id="hud">
+  <div class="frame"><div class="n"><span id="pname">Adventurer</span><span>Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt">100 / 100</b></div></div>
+  <div id="title">Rimfrost 2</div>
+  <div id="zone">Frost Meadows</div>
+  <div id="help"><b>Move:</b> W A S D or arrow keys, or left-click the ground<br><b>Camera:</b> mouse wheel to zoom, Q / E to turn<br><b>Prototype</b> – stage 1: walking around the world</div>
+  <div id="fps"></div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
