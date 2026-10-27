@@ -6,34 +6,167 @@
 <title>Rimfrost 2</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Alegreya+Sans:wght@400;700;800&display=swap">
 <style>
-  :root{--frost:#9fd6e8;--text:#e8eef1;--mute:#93a4ad;--panel:rgba(16,22,27,.9);--line:#2c3a43}
-  html,body{margin:0;height:100%;background:#0b1013;color:var(--text);font:14px 'Alegreya Sans',system-ui,sans-serif;overflow:hidden}
+  :root{--frost:#9fd6e8;--text:#e8eef1;--mute:#93a4ad;--panel:rgba(16,22,27,.9);--line:#2c3a43;--mana:#3f7fe0;--rage:#d0453a;--focus:#d8963a;--energy:#e2c63e}
+  html,body{margin:0;height:100%;background:#0b1013;color:var(--text);font:14px 'Alegreya Sans',system-ui,sans-serif;overflow:hidden;user-select:none}
   canvas{display:block}
   #hud{position:fixed;inset:0;pointer-events:none}
-  .frame{position:absolute;top:12px;left:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:220px}
+  .frame{position:absolute;top:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:220px}
+  #pframe{left:12px} #tframe{left:250px} #tframe[hidden]{display:none}
   .frame .n{display:flex;justify-content:space-between;font-weight:800}
+  .frame .s{color:var(--mute);font-size:12px;margin-top:2px}
   .bar{position:relative;height:14px;background:#0d1216;border:1px solid var(--line);border-radius:3px;margin-top:4px;overflow:hidden}
   .bar i{position:absolute;inset:0 auto 0 0;background:#3fbf5a}
-  .bar b{position:absolute;inset:0;text-align:center;font-size:11px;line-height:14px}
+  .bar b{position:absolute;inset:0;text-align:center;font-size:11px;line-height:14px;text-shadow:0 1px 2px #000}
+  #tframe .bar i{background:#d84a42}
+  #xpbar{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);width:min(520px,70vw);height:8px}
+  #xpbar i{background:#8a6fd8} #xpbar b{font-size:9px;line-height:8px}
   #title{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:'Uncial Antiqua',serif;font-size:26px;color:var(--frost);text-shadow:0 2px 8px #000}
   #zone{position:absolute;top:44px;left:50%;transform:translateX(-50%);color:var(--mute);font-size:13px;text-shadow:0 1px 4px #000}
-  #help{position:absolute;bottom:12px;left:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;color:var(--mute);font-size:12.5px;line-height:1.5}
+  #banner{position:absolute;top:22%;left:50%;transform:translateX(-50%);font-family:'Uncial Antiqua',serif;font-size:40px;color:#ffd36b;text-shadow:0 2px 10px #000;opacity:0;transition:opacity .4s}
+  #help{position:absolute;top:12px;right:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;color:var(--mute);font-size:12.5px;line-height:1.5;max-width:300px}
   #help b{color:var(--text)}
-  #fps{position:absolute;bottom:12px;right:12px;color:var(--mute);font-size:11px}
+  #log{position:absolute;bottom:22px;left:12px;width:340px;font-size:13px;text-shadow:0 1px 3px #000}
+  #bar{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto}
+  .slot{position:relative;width:52px;height:52px;border:1px solid #4a5a64;border-radius:6px;background:linear-gradient(#3a2c22,#1b1410);color:#fff;font:800 13px 'Alegreya Sans';cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.05}
+  .slot .k{position:absolute;top:2px;left:4px;font-size:11px;color:#ddd}
+  .slot .cd{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:20px;background:rgba(0,0,0,.0)}
+  .slot .cd:not(:empty){background:rgba(0,0,0,.6)}
+  .slot.oor{color:#ff6b5e} .slot.on{box-shadow:0 0 0 2px #ffd36b inset}
+  #fps{position:absolute;bottom:4px;right:10px;color:var(--mute);font-size:11px}
+  .plate{position:absolute;transform:translate(-50%,-100%);text-align:center;font:700 12px 'Alegreya Sans';text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}
+  .plate .hb{width:52px;height:5px;margin:2px auto 0;background:rgba(0,0,0,.7);border-radius:2px;overflow:hidden}
+  .plate .hb i{display:block;height:100%;background:#d84a42}
+  .plate.sel span{text-decoration:underline}
+  .ft{position:absolute;transform:translate(-50%,-50%);font:800 16px 'Alegreya Sans';text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}
+  .ft.big{font-size:22px}
+  #dead{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(40,46,52,.5);backdrop-filter:grayscale(1);z-index:4}
+  #dead[hidden]{display:none}
+  #dead .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 26px;text-align:center}
+  #dead h2{font-family:'Uncial Antiqua',serif;font-weight:400;color:#ff6b5e;margin:0 0 12px}
+  #dead button{font:800 15px 'Alegreya Sans';padding:8px 18px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer}
+  #pframe .bar.res i{background:var(--mana)}
+  #pcp{display:flex;gap:3px;margin-top:4px} #pcp i{width:12px;height:6px;border-radius:2px;background:#3a2a20} #pcp i.on{background:#ffcf4a} #pcp:empty{display:none}
+  #pbuffs{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;font-size:11px;color:var(--mute)} #pbuffs span{background:#0d1216;border:1px solid var(--line);border-radius:3px;padding:0 4px} #pbuffs:empty{display:none}
+  #bar{flex-wrap:nowrap} .slot canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:5px}
+  .slot .k{z-index:2;text-shadow:0 1px 2px #000} .slot .cd{z-index:3;border-radius:5px} .slot.nores canvas{filter:saturate(.3) brightness(.6)} .slot.oor .k{color:#ff6b5e}
+  .slot.atk{font-size:12px}
+  #cast{position:absolute;bottom:92px;left:50%;transform:translateX(-50%);width:260px;height:16px} #cast[hidden]{display:none} #cast i{background:#e0b84a} #cast b{font-size:11.5px;line-height:16px}
+  #tip{position:fixed;max-width:280px;background:rgba(10,14,17,.96);border:1px solid #4a5a64;border-radius:6px;padding:8px 10px;font-size:13px;line-height:1.35;pointer-events:none;z-index:6}
+  #tip[hidden]{display:none} #tip h4{margin:0 0 3px;font-size:15px} #tip .m{color:var(--mute);font-size:12px;margin-bottom:4px}
+  #chars{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(#1a2a33,#0b1013);z-index:5;overflow:auto}
+  #chars[hidden]{display:none}
+  #chars .box{width:min(560px,92vw);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px}
+  #chars h1{font-family:'Uncial Antiqua',serif;font-weight:400;color:var(--frost);margin:0 0 12px;text-align:center}
+  #chars h3{margin:12px 0 6px;font-size:13px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+  #clist .c{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:6px;margin-bottom:6px}
+  #clist .c .n{flex:1} #clist .c .n small{color:var(--mute);display:block}
+  .btn{font:800 14px 'Alegreya Sans';padding:7px 14px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer}
+  .btn.ghost{background:transparent;color:var(--mute);border:1px solid var(--line)} .btn:disabled{opacity:.35;cursor:default}
+  .pick{display:flex;flex-wrap:wrap;gap:6px} .pick button{font:700 13.5px 'Alegreya Sans';padding:6px 11px;border-radius:6px;border:1px solid var(--line);background:#141c22;color:var(--text);cursor:pointer}
+  .pick button.on{border-color:#ffd36b;box-shadow:0 0 0 1px #ffd36b inset} .pick button:disabled{opacity:.3;cursor:default}
+  #cname{width:100%;box-sizing:border-box;font:700 15px 'Alegreya Sans';padding:7px 10px;border-radius:6px;border:1px solid var(--line);background:#0d1216;color:var(--text)}
+  #cdesc{color:var(--mute);font-size:13px;margin-top:8px;min-height:36px} #cerr{color:#ff8a7a;font-size:13px;min-height:16px}
+  #menu{position:absolute;left:12px;bottom:160px;width:360px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:auto}
+  #menu button{font:800 12.5px 'Alegreya Sans';padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer}
+  #menu button.glow{border-color:#ffd36b;color:#ffd36b}
+  #panel{position:fixed;top:12px;right:12px;width:min(440px,94vw);max-height:calc(100vh - 110px);overflow:auto;background:#10161b;border:1px solid var(--line);border-radius:8px;z-index:3;padding:0 0 10px}
+  #panel[hidden]{display:none}
+  #panel .tabs{display:flex;gap:4px;padding:8px 8px 0;position:sticky;top:0;background:#10161b;z-index:1;border-bottom:1px solid var(--line)}
+  #panel .tabs button{font:800 13px 'Alegreya Sans';padding:6px 10px;border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0;background:#141c22;color:var(--mute);cursor:pointer}
+  #panel .tabs button.on{color:var(--text);background:#1c262d} #panel .tabs .x{margin-left:auto;border:0;background:none}
+  #pbody{padding:8px 12px} #pbody h3{margin:12px 0 6px;font-size:12.5px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+  .muted{color:var(--mute)} .row{display:flex;align-items:center;gap:8px}
+  .it{display:flex;align-items:center;gap:8px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;margin-bottom:4px;background:#0f151a}
+  .it .nm{flex:1;min-width:0} .it .nm small{display:block;color:var(--mute);font-size:11.5px}
+  .it img{width:32px;height:32px;border-radius:4px;border:1px solid #4a5a64;flex:none}
+  .sbtn{font:800 12px 'Alegreya Sans';padding:4px 9px;border-radius:5px;border:1px solid var(--line);background:#1c262d;color:var(--text);cursor:pointer}
+  .sbtn:disabled{opacity:.35;cursor:default}
+  .stats{display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:13px} .stats b{text-align:right}
+  .tier{display:grid;grid-template-columns:repeat(auto-fill,minmax(124px,1fr));gap:5px}
+  .tal{text-align:left;font:13px 'Alegreya Sans';padding:6px 7px;border-radius:6px;border:1px solid var(--line);background:#0f151a;color:var(--mute);cursor:default}
+  .tal .n{display:flex;justify-content:space-between;font-weight:800;color:var(--text)} .tal .d{font-size:11.5px;margin-top:2px;line-height:1.25}
+  .tal.can{cursor:pointer;border-color:#7a9a4a} .tal.can:hover{background:#18221a} .tal.max{border-color:#ffd36b} .tal.max .r{color:#ffd36b}
+  .plate.npc{color:#7be08a} .plate.npc small{display:block;font-size:11px;color:#b8d8c0} .plate .mk{font:800 28px 'Alegreya Sans';color:#ffd84a;line-height:1;text-shadow:0 2px 4px #000} .plate .mk.gray{color:#a8b0b4}
+  .qc{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:6px;background:#0f151a} .qt{font-size:13.5px;line-height:1.4;margin:4px 0;color:#d8e2e6} .qo{font-size:12.5px;margin:4px 0 6px;color:#ffd36b}
+  .sbtn.pri{background:#9fd6e8;color:#0b1013;border-color:#9fd6e8}
+  #pbody canvas{width:32px;height:32px;border-radius:4px;flex:none}
+  #tracker{position:absolute;right:12px;top:226px;width:250px;font-size:13px;text-shadow:0 1px 3px #000,0 0 2px #000} #tracker .tq{margin-bottom:8px} #tracker b{color:#ffd36b} #tracker .ok{color:#7be08a}
+  #barwrap{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
+  #barwrap #cast{position:relative;bottom:auto;left:auto;transform:none;width:280px;height:18px;margin-bottom:6px}
+  .abar{display:flex;gap:4px;pointer-events:auto;background:rgba(10,14,17,.55);padding:3px;border-radius:8px}
+  .abar .slot{width:48px;height:48px} .slot.empty{background:rgba(20,28,34,.6);border-style:dashed;border-color:#34444e;cursor:default}
+  .slot.drop{box-shadow:0 0 0 2px #9fd6e8 inset} .slot .n{position:absolute;right:3px;bottom:1px;z-index:2;font-size:12px;text-shadow:0 1px 2px #000}
+  .book{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:5px}
+  .bk{display:flex;align-items:center;gap:6px;padding:4px;border:1px solid var(--line);border-radius:6px;background:#0f151a;cursor:grab;font-size:12.5px;font-weight:700}
+  .bk canvas{width:36px!important;height:36px!important}
+  .kb{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:13px} .kb span{flex:1} .kb .sbtn{min-width:86px}
+  #mini{position:absolute;top:12px;right:12px;width:180px;text-align:center}
+  #minimap{width:180px;height:180px;border-radius:50%;border:2px solid #4a5a64;box-shadow:0 2px 10px rgba(0,0,0,.5);background:#1a2a20;display:block}
+  #mini #zone{position:static;transform:none;margin-top:4px;color:var(--text);font-weight:700}
+  #gmenu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.45);z-index:4}
+  #gmenu[hidden]{display:none}
+  #gmenu .box{width:240px;background:#10161b;border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+  #gmenu h2{margin:0 0 6px;text-align:center;font-family:'Uncial Antiqua',serif;font-weight:400;color:var(--frost)}
+  #gmenu button{font:800 14px 'Alegreya Sans';padding:8px;border-radius:6px;border:1px solid var(--line);background:#1c262d;color:var(--text);cursor:pointer;text-align:left}
+  #gmenu button:hover{background:#25323b} #gmenu button.lo{color:#ff9a7a} #gmenu button.ghost{background:transparent;color:var(--mute);text-align:center}
+  #gmenu button small{float:right;color:var(--mute)} #gmenu button.glow{color:#ffd36b;border-color:#ffd36b}
+  .auras{display:flex;gap:3px;flex-wrap:wrap;margin-top:5px;pointer-events:auto} .auras:empty{display:none}
+  .aura{position:relative;width:26px;height:26px} .aura img{width:26px;height:26px;border-radius:4px;border:1px solid #6a9a5a;display:block} .aura.bad img{border-color:#c0443a}
+  .aura b{position:absolute;left:0;right:0;bottom:-2px;text-align:center;font-size:10.5px;text-shadow:0 0 2px #000,0 1px 2px #000}
+  .frame,#mini,#barwrap,#tracker,#log{z-index:2}
+  #party{position:absolute;left:12px;top:150px;width:220px;display:flex;flex-direction:column;gap:5px;pointer-events:auto;z-index:2}
+  .pmem{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px;cursor:pointer} .pmem.sel{border-color:#7fc4ff;box-shadow:0 0 0 1px #7fc4ff inset}
+  .pmem .n{display:flex;justify-content:space-between;font-size:12.5px} .pmem .n span{color:var(--mute);font-size:11.5px} .pmem .bar{height:11px;margin-top:3px} .pmem .bar b{font-size:9.5px;line-height:11px}
+  .plate.sign span{color:#f2ead8;font:italic 700 12px 'Alegreya Sans'}
+  .plate.friend span{color:#7fc4ff} .plate.friend .hb i{background:#3fbf5a} .plate.friend.sel span{text-decoration:underline}
+  #bigmap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.55);z-index:4}
+  #bigmap[hidden]{display:none}
+  #bigmap .mbox{background:#10161b;border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+  #bigmap .mhead{display:flex;justify-content:space-between;gap:20px;align-items:baseline} #bigmap .mhead b{font-family:'Uncial Antiqua',serif;font-weight:400;font-size:20px;color:var(--frost)}
+  #mapcv{display:block;border-radius:6px;background:#0a0806}
   #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b1013;font-family:'Uncial Antiqua',serif;font-size:32px;color:var(--frost);z-index:5}
   #load[hidden]{display:none}
 </style>
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js" } }</script>
+<!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261028a", "./src/dungeon.js": "./src/dungeon.js?v=20261028a", "./src/coop.js": "./src/coop.js?v=20261028a", "./src/content.js": "./src/content.js?v=20261028a", "./src/engine.js": "./src/engine.js?v=20261028a", "./src/items.js": "./src/items.js?v=20261028a", "./src/keys.js": "./src/keys.js?v=20261028a", "./src/main.js": "./src/main.js?v=20261028a", "./src/models.js": "./src/models.js?v=20261028a", "./src/nav.js": "./src/nav.js?v=20261028a", "./src/quests.js": "./src/quests.js?v=20261028a", "./src/rimdata.js": "./src/rimdata.js?v=20261028a", "./src/state.js": "./src/state.js?v=20261028a", "./src/util.js": "./src/util.js?v=20261028a", "./src/world.js": "./src/world.js?v=20261028a", "./src/worlddata.js": "./src/worlddata.js?v=20261028a", "./src/mobs.js": "./src/mobs.js?v=20261028a" } }</script>
+<script>
+  // if something goes wrong while the game starts, show the error instead of a stuck loading screen
+  addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Cmd+Shift+R.</div>`; });
+</script>
 </head>
 <body>
 <div id="load">Rimfrost 2</div>
 <div id="hud">
-  <div class="frame"><div class="n"><span id="pname">Adventurer</span><span>Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt">100 / 100</b></div></div>
+  <div class="frame" id="pframe"><div class="n"><span id="pname">Adventurer</span><span id="plvl">Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt"></b></div><div class="bar res"><i id="presi"></i><b id="prest"></b></div><div id="pcp"></div><div class="auras" id="pbuffs"></div></div>
+  <div id="party"></div>
+  <div class="frame" id="tframe" hidden><div class="n"><span id="tname"></span><span id="tlvl"></span></div><div class="bar"><i id="thpi"></i><b id="thpt"></b></div><div class="s" id="tstate"></div><div class="auras" id="tauras"></div></div>
   <div id="title">Rimfrost 2</div>
-  <div id="zone">Frost Meadows</div>
-  <div id="help"><b>Move:</b> W A S D or arrow keys, or left-click the ground<br><b>Camera:</b> mouse wheel to zoom, Q / E to turn<br><b>Prototype</b> – stage 1: walking around the world</div>
+  <div id="mini"><canvas id="minimap" width="180" height="180"></canvas><div id="zone"></div></div>
+  <div id="banner"></div>
+  <div id="log"></div>
+  <div id="tracker"></div>
+  <div id="barwrap"><div class="bar" id="cast" style="visibility:hidden"><i></i><b></b></div><div class="abar" id="bar2"></div><div class="abar" id="bar1"></div></div>
+  <div class="bar" id="xpbar"><i id="xpi"></i><b id="xpt"></b></div>
   <div id="fps"></div>
 </div>
-<script type="module" src="./src/main.js"></script>
+<div id="tip" hidden></div>
+<div id="bigmap" hidden><div class="mbox"><div class="mhead"><b id="mapTitle">World map</b><span class="muted">M or Esc to close · mouse wheel to zoom</span></div><canvas id="mapcv"></canvas></div></div>
+<div id="gmenu" hidden><div class="box"><h2>Menu</h2>
+  <button data-g="map">World map</button><button data-g="quests">Quests</button><button data-g="char">Character</button><button data-g="bag">Bag</button><button data-g="spells">Spellbook</button>
+  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="coop">Co-op</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
+<div id="panel" hidden><div class="tabs"><button data-tab="quests">Quests</button><button data-tab="char">Character</button><button data-tab="bag">Bag</button><button data-tab="spells">Spellbook</button><button data-tab="tal">Talents</button><button data-tab="keys">Keys</button><button data-tab="coop">Co-op</button><button class="x" title="Close (Esc)">✕</button></div><div id="pbody"></div></div>
+<div id="chars" hidden><div class="box">
+  <h1>Rimfrost 2</h1>
+  <div id="clistWrap"><h3>Your characters</h3><div id="clist"></div><button class="btn" id="cnew">New character</button></div>
+  <div id="cform" hidden>
+    <h3>Name</h3><input id="cname" maxlength="16" placeholder="Name your hero">
+    <h3>Race</h3><div class="pick" id="craces"></div>
+    <h3>Class</h3><div class="pick" id="cclasses"></div>
+    <div id="cdesc"></div><div id="cerr"></div>
+    <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="ccreate">Create</button><button class="btn ghost" id="ccancel">Cancel</button></div>
+  </div>
+</div></div>
+<div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button></div></div>
+<script type="module" src="./src/main.js?v=20261028a"></script>
 </body>
 </html>
