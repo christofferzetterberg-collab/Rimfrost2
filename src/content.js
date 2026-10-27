@@ -1,6 +1,6 @@
 // The people of Rimfrost (Rimfrost 1's towns and camps), the quests they give, and the things you pick up for them.
 import {HUBS, TS} from "./worlddata.js";
-import {CLASSES} from "./rimdata.js";
+import {CLASSES, RACE_CLASSES} from "./rimdata.js";
 
 // ---------------------------------------------------------------- people
 // role: "quest" | "vendor" (shop: "goods" = potions and elixirs, "basic" = potions, "smith" = equipment) | "trainer" (trains: the one class they teach)
@@ -8,7 +8,8 @@ const HUB_IL = {frostvik: 5, holgerstuga: 10, lovhem: 5, manglanta: 10, bergsdal
 const CLS = ["mage", "warrior", "hunter", "priest", "druid", "paladin"];
 const list = [];
 const add = (hub, arr) => arr.forEach(n => list.push({...n, hub}));
-const trainers = (hub, race, names) => add(hub, CLS.map((c, i) => ({id: hub + "_t_" + c, name: names[i], title: CLASSES[c].name + " Trainer", color: CLASSES[c].color, trains: c, race})));
+// a race town only has trainers for the classes that race can be (Rimhaven has them all)
+const trainers = (hub, race, names) => add(hub, CLS.map((c, i) => ({id: hub + "_t_" + c, name: names[i], title: CLASSES[c].name + " Trainer", color: CLASSES[c].color, trains: c, race})).filter(t => RACE_CLASSES[race].includes(t.trains)));
 add("frostvik", [{id: "edda", name: "Captain Edda", title: "Quest Giver", color: "#7b8fa8", race: "human"}, {id: "linnea", name: "Herbwife Linnea", title: "Alchemist", color: "#6aa06a", shop: "goods", race: "human"},
   {id: "bror", name: "Bror the Smith", title: "Blacksmith", color: "#a0683a", shop: "smith", race: "human"}, {id: "olle", name: "Olle the Merchant", title: "Merchant", color: "#c09a40", shop: "goods", race: "human"}]);
 trainers("frostvik", "human", ["Archmage Vidar", "Weaponmaster Gunhild", "Huntmaster Arne", "Priestess Sigrid", "Ask the Druid", "Holmfrid the Knight"]);
@@ -43,7 +44,8 @@ add("jarnfastet", [   // Rimhaven: everyone has their own spot (tiles from the c
   {id: "armorer", name: "Gerd the Armorer", title: "Weapons & Armor", color: "#9aa4ad", shop: "smith", city: true, race: "dwarf", at: [-10, -4]},
   {id: "oreman", name: "Hakon the Smith", title: "Blacksmith", color: "#7a5a40", shop: "smith", city: true, race: "human", at: [-11, -1]},
   {id: "apoth", name: "Yrsa the Apothecary", title: "Alchemy & Potions", color: "#6ab08a", shop: "goods", race: "elf", at: [-11, 2]},
-  {id: "arvid", name: "Quartermaster Arvid", title: "Merchant", color: "#c09a40", shop: "goods", race: "dwarf", at: [-9, 5]}]);
+  {id: "arvid", name: "Quartermaster Arvid", title: "Merchant", color: "#c09a40", shop: "goods", race: "dwarf", at: [-9, 5]},
+  {id: "stable", name: "Stablemaster Hrafn", title: "Riding Trainer & Mounts", color: "#8a6a4a", stable: true, race: "human", at: [7, 9]}]);
 add("holgerstuga", [{id: "mattis", name: "Mattis the Peddler", title: "Merchant", color: "#a08a5a", shop: "basic", race: "human"}]);
 add("manglanta", [{id: "sylis", name: "Sylis the Wanderer", title: "Merchant", color: "#6a9a7a", shop: "basic", race: "elf"}]);
 add("snostugan", [{id: "gunnar", name: "Gunnar the Trapper", title: "Merchant", color: "#8a7a6a", shop: "basic", race: "dwarf"}]);
@@ -61,8 +63,8 @@ add("isporten", [{id: "hedda", name: "Hedda the Icewarden", title: "Quest Giver"
     arr.forEach((n, i) => { const a = i / arr.length * Math.PI * 2 - Math.PI / 2 + 0.3; n.x = h.x + Math.cos(a) * rad; n.z = h.z + Math.sin(a) * rad; }); }
   for(const n of list){ const h = HUBS[n.hub]; if(n.at){ n.x = h.x + n.at[0] * TS; n.z = h.z + n.at[1] * TS; } n.rot = Math.atan2(n.x - h.x, n.z - h.z); } }
 const HELLO = {quest: "Well met, traveller. We could use someone like you around here.", goods: "Potions and elixirs – have a look.", basic: "A few potions for the road?", smith: "Weapons and armor, made to last.",
-  aldric: "Rimhaven stands because heroes stand with it.", brenna: "Keep your blade sharp. The Ironclan never sleeps.", halvard: "Heroes from every people come through these gates. Good – we need them all."};
-export const NPCS = list.map(n => ({...n, role: n.trains ? "trainer" : n.shop ? "vendor" : "quest", maxIl: n.city ? null : HUB_IL[n.hub] || 30,
+  aldric: "Rimhaven stands because heroes stand with it.", stable: "Tired feet? Every hero rides sooner or later – learn it here, and pick a good mount.", brenna: "Keep your blade sharp. The Ironclan never sleeps.", halvard: "Heroes from every people come through these gates. Good – we need them all."};
+export const NPCS = list.map(n => ({...n, role: n.stable ? "stable" : n.trains ? "trainer" : n.shop ? "vendor" : "quest", maxIl: n.city ? null : HUB_IL[n.hub] || 30,
   hello: HELLO[n.id] || (n.trains ? `I teach the ways of the ${CLASSES[n.trains].name}. Come back whenever you have grown.` : n.shop ? HELLO[n.shop] : HELLO.quest)}));
 
 // ---------------------------------------------------------------- quest items and things to pick up
@@ -144,7 +146,8 @@ export const QITEMS = {
   silver: {name: "Silverweed"},
   drake: {name: "Dragon's Eye"},
   fireflower: {name: "Fire Bloom"},
-  iceflower: {name: "Ice Bloom"}
+  iceflower: {name: "Ice Bloom"},
+  moonbloom: {name: "Moonbloom"}
 };
 // objects in the world you can pick up for quests: what they look like, the item, which zone, how many (far/d: at least d units from that town)
 export const QOBJECTS = [
@@ -176,8 +179,37 @@ export const QOBJECTS = [
   {kind: "ore", item: "obsidian", name: "Obsidian", zone: "aska", count: 9, color: "#7a55a8"},
   {kind: "herb", item: "fireflower", name: "Fire Bloom", zone: "aska", count: 9, color: "#ff6a2a"},
   {kind: "ore", item: "rimkr", name: "Rime Crystal", zone: "frost", count: 9, color: "#bfeaff"},
-  {kind: "herb", item: "iceflower", name: "Ice Bloom", zone: "frost", count: 9, color: "#9fe0ff"}
+  {kind: "herb", item: "iceflower", name: "Ice Bloom", zone: "frost", count: 9, color: "#9fe0ff"},
+  // more herbs and ore veins, so every zone has something to gather
+  {kind: "herb", item: "ang", name: "Meadow Bloom", zone: "silver", count: 8, color: "#f2e86b"},
+  {kind: "herb", item: "ang", name: "Meadow Bloom", zone: "koppar", count: 8, color: "#f2e86b"},
+  {kind: "herb", item: "ang", name: "Meadow Bloom", zone: "rod", count: 9, color: "#f2e86b"},
+  {kind: "ore", item: "copper", name: "Copper Ore", zone: "rod", count: 9, color: "#c7743d"},
+  {kind: "herb", item: "ang", name: "Meadow Bloom", zone: "gravmark", count: 9, color: "#f2e86b"},
+  {kind: "ore", item: "copper", name: "Copper Ore", zone: "gravmark", count: 9, color: "#c7743d"},
+  {kind: "herb", item: "silver", name: "Silverweed", zone: "skugg", count: 8, color: "#cfe3ea"},
+  {kind: "ore", item: "iron", name: "Iron Ore", zone: "skugg", count: 8, color: "#a6a9b0"},
+  {kind: "ore", item: "iron", name: "Iron Ore", zone: "manskog", count: 8, color: "#a6a9b0"},
+  {kind: "herb", item: "silver", name: "Silverweed", zone: "snodal", count: 8, color: "#cfe3ea"},
+  {kind: "herb", item: "silver", name: "Silverweed", zone: "damm", count: 8, color: "#cfe3ea"},
+  {kind: "ore", item: "iron", name: "Iron Ore", zone: "damm", count: 8, color: "#a6a9b0"},
+  {kind: "herb", item: "silver", name: "Silverweed", zone: "benfalt", count: 8, color: "#cfe3ea"},
+  {kind: "ore", item: "iron", name: "Iron Ore", zone: "benfalt", count: 8, color: "#a6a9b0"},
+  {kind: "herb", item: "silver", name: "Silverweed", zone: "jarn", count: 8, color: "#cfe3ea"},
+  {kind: "ore", item: "goldore", name: "Gold Ore", zone: "dimma", count: 8, color: "#f0c64a"},
+  // Moonbloom: only blooms at night (night: true)
+  {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "jarn", count: 7, color: "#c8d8ff", night: true},
+  {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "manskog", count: 6, color: "#c8d8ff", night: true},
+  {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "benfalt", count: 6, color: "#c8d8ff", night: true},
+  {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "dimma", count: 6, color: "#c8d8ff", night: true}
 ];
+// gathering: herbs need Herbalism and ore veins need Mining, at least this skill (skills go from 1 to 150)
+export const GATHER = {
+  copper: {skill: "mining", req: 1}, iron: {skill: "mining", req: 15}, goldore: {skill: "mining", req: 40}, obsidian: {skill: "mining", req: 80}, rimkr: {skill: "mining", req: 110},
+  ang: {skill: "herb", req: 1}, moonbloom: {skill: "herb", req: 20}, silver: {skill: "herb", req: 15}, drake: {skill: "herb", req: 55}, fireflower: {skill: "herb", req: 80}, iceflower: {skill: "herb", req: 110}
+};
+export const PROF = {mining: "Mining", herb: "Herbalism"};
+export const PROF_MAX = 150;
 
 // ---------------------------------------------------------------- quests (all of Rimfrost 1's)
 // obj: ["kill", monster, n] · ["loot", item, n, monster, chance] · ["collect", item, n] (pick up in the world) · ["explore", place, 1]
@@ -386,7 +418,27 @@ export const QUESTS = [
   {id: "x15", npc: "frode", lvl: 26, name: "Frost Wolf Pelts", text: "Travellers freeze on the road to Icegate. Bring me 6 frost wolf pelts for cloaks.", obj: [["loot", "frostpelt", 6, "frostwolf", 0.5]]},
   {id: "x16", npc: "hedda", lvl: 28, name: "Cores of Living Ice", text: "The ice golems have hearts of pure cold. Bring me 5 cores.", obj: [["loot", "icecore", 5, "icegolem", 0.5]]}
 ];
+// gathering quests: raise your Mining and Herbalism (from the smiths and alchemists of the race towns, then Rimhaven's smith and apothecary)
+for(const [smith, alch] of [["bror", "linnea"], ["elvar", "faelin"], ["torvald", "ingrid"], ["grosh", "urk"], ["knota", "hilde"]]){
+  QUESTS.push({id: "pm_" + smith, npc: smith, lvl: 2, n: true, mult: 0.6, name: "The Miner's Pick", text: "Every adventurer should know how to work a pick. Mine the ore veins around town until your Mining skill reaches 15.", obj: [["skill", "mining", 15]]},
+    {id: "ph_" + alch, npc: alch, lvl: 2, n: true, mult: 0.6, name: "The Herbalist's Eye", text: "Learn to tell a herb from a weed. Pick the herbs that grow around town until your Herbalism skill reaches 15.", obj: [["skill", "herb", 15]], items: {potHp: 1}}); }
+QUESTS.push(
+  {id: "pm40", npc: "oreman", lvl: 11, n: true, mult: 0.7, name: "Deeper Veins", text: "Gold runs through Iron Ridge, but only a skilled miner can work it. Come back when your Mining skill is 40.", obj: [["skill", "mining", 40]]},
+  {id: "pm80", npc: "oreman", lvl: 18, req: ["pm40"], n: true, mult: 0.7, name: "Black Glass and Fire", text: "Obsidian from the Ashfields breaks a careless pick. Raise your Mining skill to 80.", obj: [["skill", "mining", 80]]},
+  {id: "pm110", npc: "oreman", lvl: 24, req: ["pm80"], n: true, mult: 0.8, name: "Master of the Pick", text: "Rime crystal in Frostcrown is the hardest stone there is. Raise your Mining skill to 110.", obj: [["skill", "mining", 110]]},
+  {id: "night1", npc: "apoth", lvl: 10, n: true, mult: 0.8, nightOnly: true, name: "Moonbloom", text: "Moonbloom opens only under the night sky – in daylight you won't even see it. Pick 5 for me some night, in Iron Ridge or out in the wilds. Needs Herbalism 20.", obj: [["collect", "moonbloom", 5]], items: {potMana2: 1, potHp2: 1}},
+  {id: "ph40", npc: "apoth", lvl: 11, n: true, mult: 0.7, name: "Rarer Herbs", text: "The rare herbs of the marsh wilt in clumsy hands. Come back when your Herbalism skill is 40.", obj: [["skill", "herb", 40]], items: {potHp2: 1}},
+  {id: "ph80", npc: "apoth", lvl: 18, req: ["ph40"], n: true, mult: 0.7, name: "Flowers of the Ashfields", text: "Fire blooms burn the fingers of beginners. Raise your Herbalism skill to 80.", obj: [["skill", "herb", 80]], items: {potHp2: 2}},
+  {id: "ph110", npc: "apoth", lvl: 24, req: ["ph80"], n: true, mult: 0.8, name: "Master Herbalist", text: "Ice blooms in Frostcrown can only be picked by a master. Raise your Herbalism skill to 110.", obj: [["skill", "herb", 110]], items: {potHp3: 1}});
 
+// ---------------------------------------------------------------- riding: learn it at level 20 from the stablemaster in Rimhaven, then buy a mount (60% faster)
+export const RIDING_LVL = 20, RIDING_COST = 120, MOUNT_SPEED = 1.6;
+export const MOUNTS = {
+  horse: {name: "Brown Horse", price: 80, color: "#7a4e2e", mane: "#2a1a10"},
+  gray: {name: "Gray Stallion", price: 80, color: "#9aa0a6", mane: "#e8eef2"},
+  ram: {name: "Mountain Ram", price: 90, color: "#c8b898", mane: "#6a5a4a", horns: true},
+  wolf: {name: "Dire Wolf", price: 90, color: "#4a4a52", mane: "#2a2a30", wolf: true}
+};
 // ---------------------------------------------------------------- shops
 export const GOODS = [["potHp", 12], ["potHp2", 35], ["potHp3", 90], ["potMana", 12], ["potMana2", 90], ["elixir", 60], ["elixirIron", 70], ["elixirKeen", 70], ["elixirSage", 70]];
 export const GOODS_BASIC = GOODS.filter(([k]) => k.startsWith("pot"));

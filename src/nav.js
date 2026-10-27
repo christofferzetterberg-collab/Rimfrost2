@@ -2,12 +2,15 @@
 import {B, WATER, height, colliders} from "./world.js";
 import {dgNavGrids} from "./dungeon.js";
 
-const PAD = 0.7;                                     // PAD: body radius used when marking blocked cells
+const PAD = 0.7, NAV_SLOPE = 1.0;                                     // PAD: body radius used when marking blocked cells
 let GRIDS = null;                                    // the open world, and the crypt: {x0, z0, w, h, grid (1 = blocked), hgt}
 export function buildNav(){
   const w = B.x1 - B.x0, h = B.z1 - B.z0, grid = new Uint8Array(w * h), hgt = new Float32Array(w * h);
   for(let j = 0; j < h; j++) for(let i = 0; i < w; i++){ const x = B.x0 + i + 0.5, z = B.z0 + j + 0.5, y = height(x, z); hgt[j*w + i] = y;
     if(i < 5 || j < 5 || i >= w - 5 || j >= h - 5 || y < WATER + 0.1) grid[j*w + i] = 1; }
+  // slopes too steep to walk up (a little stricter than the movement rule, so paths never lead up a slope you can't climb)
+  for(let j = 1; j < h - 1; j++) for(let i = 1; i < w - 1; i++){ const k = j*w + i, y = hgt[k];
+    if(Math.max(Math.abs(hgt[k + 1] - y), Math.abs(hgt[k - 1] - y), Math.abs(hgt[k + w] - y), Math.abs(hgt[k - w] - y)) > NAV_SLOPE) grid[k] = 1; }
   for(const c of colliders){ const r = c.r + PAD, i0 = Math.floor(c.x - r - B.x0), i1 = Math.floor(c.x + r - B.x0), j0 = Math.floor(c.z - r - B.z0), j1 = Math.floor(c.z + r - B.z0);
     for(let j = Math.max(0, j0); j <= Math.min(h - 1, j1); j++) for(let i = Math.max(0, i0); i <= Math.min(w - 1, i1); i++){
       const x = B.x0 + i + 0.5, z = B.z0 + j + 0.5; if((x - c.x) ** 2 + (z - c.z) ** 2 < r * r) grid[j*w + i] = 1; } }
@@ -19,14 +22,14 @@ export function reachable(x, z){ if(!GRIDS) buildNav(); if(x > 500) return true;
   if(!REACH){ REACH = new Uint8Array(g.w * g.h); const st = []; for(const [sx, sz] of REACH_FROM){ const k = Math.floor(sz - g.z0) * g.w + Math.floor(sx - g.x0); if(!g.grid[k] && !REACH[k]){ REACH[k] = 1; st.push(k); } }
     while(st.length){ const k = st.pop(), i = k % g.w, j = (k / g.w) | 0;
       for(const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]){ const ni = i + di, nj = j + dj; if(ni < 0 || nj < 0 || ni >= g.w || nj >= g.h) continue; const m = nj * g.w + ni;
-        if(!REACH[m] && !g.grid[m] && Math.abs(g.hgt[k] - g.hgt[m]) <= 1.6){ REACH[m] = 1; st.push(m); } } } }
+        if(!REACH[m] && !g.grid[m] && Math.abs(g.hgt[k] - g.hgt[m]) <= NAV_SLOPE){ REACH[m] = 1; st.push(m); } } } }
   const i = Math.floor(x - g.x0), j = Math.floor(z - g.z0); return i >= 0 && j >= 0 && i < g.w && j < g.h && !!REACH[j * g.w + i]; }
 let REACH_FROM = [[0, 0]]; export const setReachFrom = list => { REACH_FROM = list; REACH = null; };
 const gridAt = x => x > 500 ? GRIDS.find((g, i) => i > 0 && x >= g.x0 - 50 && x < g.x0 + 900) : GRIDS[0];
 let G = null, N = 0;                                 // the grid used by the current search (N = its width)
 const cell = (x, z) => [Math.floor(x - G.x0), Math.floor(z - G.z0)];
 const free = (i, j) => i >= 0 && j >= 0 && i < G.w && j < G.h && !G.grid[j*N + i];
-const steep = (a, b) => Math.abs(G.hgt[a] - G.hgt[b]) > 1.6;                   // cliffs between two cells
+const steep = (a, b) => Math.abs(G.hgt[a] - G.hgt[b]) > NAV_SLOPE * (Math.abs(a - b) === 1 || Math.abs(a - b) === N ? 1 : 1.41);   // too steep between two cells
 
 // nearest walkable cell to (i, j)
 function nearestFree(i, j){ if(free(i, j)) return [i, j];

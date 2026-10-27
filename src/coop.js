@@ -73,7 +73,8 @@ function broadcast(msg, except){ for(const c of COOP.conns) if(c !== except && c
 function sendTo(id, msg){ const r = COOP.remotes[id]; const c = r && COOP.conns.find(c => c.peer === r.via); if(c && c.open){ try{ c.send(msg); }catch(e){} } }
 function data(c, d){
   if(!d || typeof d !== "object") return;
-  if(COOP.role === "host" && (d.t === "st" || d.t === "bye")) broadcast(d, c);          // the host relays to the other guests
+  if(COOP.role === "host" && (d.t === "st" || d.t === "bye" || d.t === "chat")) broadcast(d, c);          // the host relays to the other guests
+  if(d.t === "chat"){ if(d.id !== myId() && H.chat) H.chat(d.name, d.cls, d.text); return; }
   if(d.t === "bye"){ const r = COOP.remotes[d.id]; if(r){ H.log(`${r.name} left the game.`, "#93a4ad"); removeRemote(d.id); } return; }
   if(d.t === "op"){ if(COOP.role === "host") hostOp(d); return; }
   if(d.t === "phit"){ if(d.to === myId()) G.petDamage(d.dmg, mobByNid(d.nid)); else if(COOP.role === "host") sendTo(d.to, d); return; }
@@ -92,14 +93,16 @@ function data(c, d){
   syncPet(r);
 }
 export const myId = () => (COOP.peer && COOP.peer.id) || "me";
+// co-op chat: a short message to everyone in the game
+export function chat(text){ text = String(text || "").trim().slice(0, 200); if(!text || !on()) return false; broadcast({t: "chat", id: myId(), name: S.cur.name, cls: S.cur.cls, text}); if(H.chat) H.chat(S.cur.name, S.cur.cls, text); return true; }
 
 // ---------------------------------------------------------------- my state → friends, 12 times a second
 function lookKey(){ const eq = S.cur.eq || {}, o = {}; for(const k of ["head", "shoulder", "chest", "hands", "legs", "feet", "weapon", "offhand"]) if(eq[k]) o[k] = {arm: eq[k].arm, wt: eq[k].wt, q: eq[k].q}; return o; }
 function state(){
   const pet = G.getPet();
   return {t: "st", id: COOP.peer.id, name: S.cur.name, race: S.cur.race, cls: S.cur.cls, lvl: S.cur.level, x: +P.x.toFixed(2), z: +P.z.toFixed(2), rot: +P.rot.toFixed(2), mv: !!P.moving,
-    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, sit: !!P.sitting, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
-    pet: pet ? {k: pet.kind, x: +pet.x.toFixed(2), z: +pet.z.toFixed(2), rot: +pet.rot.toFixed(2), hp: Math.round(pet.hp), mhp: pet.maxHp, dead: !!pet.dead, mv: !!pet.moving, atk: +(pet.attackAnim || 0).toFixed(2)} : null};
+    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, mt: P.mount || null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
+    pet: pet ? {k: pet.kind, x: +pet.x.toFixed(2), z: +pet.z.toFixed(2), rot: +pet.rot.toFixed(2), hp: Math.round(pet.hp), mhp: pet.maxHp, dead: !!pet.dead, mv: !!pet.moving, atk: +(pet.attackAnim || 0).toFixed(2), res: Math.round(pet.res || 0)} : null};
 }
 function sendState(){ if(!on() || !COOP.peer || !S.cur) return; broadcast(state()); }
 export function update(dt){
@@ -116,11 +119,11 @@ export function update(dt){
 }
 
 // ---------------------------------------------------------------- friends in the world: their characters and pets
-const sameRegion = (a, b) => reg(a.x) === reg(b.x);
+export const sameRegion = (a, b) => reg(a.x) === reg(b.x);
 export const visible = () => Object.values(COOP.remotes).filter(r => sameRegion(r, P));
 export const anyRemoteIn = g => Object.values(COOP.remotes).some(r => reg(r.x) === g);
 function looks(r){ return [r.race, r.cls, r.form, JSON.stringify(r.eq || {})].join("|"); }
-function removeRemote(id){ const r = COOP.remotes[id]; if(!r) return; if(r.mesh) H.scene.remove(r.mesh); if(r.petObj && r.petObj.mesh) H.scene.remove(r.petObj.mesh); if(r.plate) r.plate.remove(); if(r.petObj && r.petObj.plate) r.petObj.plate.remove(); delete COOP.remotes[id]; if(P.ftarget === id) P.ftarget = null; }
+function removeRemote(id){ const r = COOP.remotes[id]; if(!r) return; if(r.mesh) H.scene.remove(r.mesh); if(r.mtMesh) H.scene.remove(r.mtMesh); if(r.petObj && r.petObj.mesh) H.scene.remove(r.petObj.mesh); if(r.plate) r.plate.remove(); if(r.petObj && r.petObj.plate) r.petObj.plate.remove(); delete COOP.remotes[id]; if(P.ftarget === id) P.ftarget = null; }
 function syncPet(r){ const p = r.pet; if(!p){ if(r.petObj){ if(r.petObj.mesh) H.scene.remove(r.petObj.mesh); if(r.petObj.plate) r.petObj.plate.remove(); r.petObj = null; } return; }
   let o = r.petObj; if(!o || o.kind !== p.k){ if(o && o.mesh) H.scene.remove(o.mesh); if(o && o.plate) o.plate.remove();
     const mesh = p.k === "bear" ? makeBearForm() : makeWolf(); if(p.k === "bear") mesh.scale.setScalar(0.85); H.scene.add(mesh);
@@ -133,9 +136,11 @@ export function render(){
     if(!r.mesh || r.lk !== looks(r)){ if(r.mesh) H.scene.remove(r.mesh); r.lk = looks(r);
       r.mesh = r.form === "bear" ? makeBearForm() : r.form === "cat" ? makeWolfForm() : r.form === "leopard" ? makeLeopardForm() : makeHero(r.race, r.cls, RACES, r.eq || {});
       r.mesh.traverse(m => { if(m.isMesh) m.userData.remote = r; }); H.scene.add(r.mesh); }
-    const vis = sameRegion(r, P); r.mesh.visible = vis;
-    r.mesh.userData.animate(r.walk, r.mv, r.ak === "cast" ? 0 : r.atk || 0, r.sit ? "sit" : r.pose || null);
+    const vis = sameRegion(r, P) && !r.gh; r.mesh.visible = vis;                     // (a friend's spirit is not seen by the living)
+    if((r.mt || null) !== (r.mtShown || null)){ if(r.mtMesh) H.scene.remove(r.mtMesh); r.mtMesh = r.mt && H.mountMesh ? H.mountMesh(r.mt) : null; if(r.mtMesh) H.scene.add(r.mtMesh); r.mtShown = r.mt || null; }
+    r.mesh.userData.animate(r.walk, r.mv, r.ak === "cast" ? 0 : r.atk || 0, r.sit || r.mt ? "sit" : r.pose || null);
     r.mesh.position.set(r.x, height(r.x, r.z) + (r.dead ? 0.3 : 0), r.z); r.mesh.rotation.set(r.dead ? -1.4 : 0, r.rot, 0);
+    if(r.mtMesh){ r.mtMesh.visible = vis; r.mtMesh.position.set(r.x, height(r.x, r.z), r.z); r.mtMesh.rotation.y = r.rot; r.mtMesh.userData.animate(r.walk * 0.75, r.mv, 0); r.mesh.position.y += r.mtMesh.userData.saddle - 0.38; }
     if(!r.plate){ r.plate = document.createElement("div"); r.plate.className = "plate friend"; r.plate.innerHTML = `<span></span><div class="hb"><i></i></div>`; H.hud.appendChild(r.plate); }
     const s = vis ? H.toScreen(r.x, height(r.x, r.z) + r.mesh.userData.height + 0.35, r.z) : {on: false};
     if(!s.on){ r.plate.style.display = "none"; } else { r.plate.style.display = ""; r.plate.style.left = s.x + "px"; r.plate.style.top = s.y + "px";
@@ -235,7 +240,7 @@ export const cap = () => CAP;
 const FRIENDLY = new Set(["heal", "renew", "pws", "palheal", "touch", "rejuv", "bloom"]);
 function friendSel(){ const r = on() && P.ftarget && COOP.remotes[P.ftarget]; return r && !r.dead && sameRegion(r, P) ? r : null; }
 export const friendTarget = id => FRIENDLY.has(id) ? friendSel() : null;
-export function friendRange(id){ const r = friendTarget(id); return !r ? null : Math.hypot(r.x - P.x, r.z - P.z) > 14 ? `${r.name} is too far away`
+export function friendRange(id){ const r = friendTarget(id); return !r ? null : Math.hypot(r.x - P.x, r.z - P.z) > 17 ? `${r.name} is too far away`
   : !los(P.x, height(P.x, P.z) + 1.4, P.z, r.x, height(r.x, r.z) + 1.2, r.z) ? `${r.name} is not in line of sight` : null; }
 export function castOn(r, a, t){ CAP = {scale: (r.mhp || P.maxHp) / P.maxHp, fx: []}; try{ a.run(t); } finally{ const c = CAP; CAP = null; sendFx(r, c.fx, a.name); }
   G.burst(r.x * PXU, r.z * PXU, SCHOOL_COLOR[a.school] || "#fff", 12); }
@@ -250,17 +255,22 @@ function receiveFx(d){ if(P.dead) return;
     else if(f[0] === "hot") G.hot(f[1] + "_" + d.from, f[2], f[3]); else if(f[0] === "shield") G.shieldP(f[1], f[2]); else if(f[0] === "buff") G.buff(f[1], f[2]); }
   G.burst(P.px, P.py, "#9cf07a", 8);
   if(!d.label.startsWith("Holy")) H.log(`${d.from} cast ${d.label} on you.`, "#7be08a"); }
-export function select(id){ P.ftarget = P.ftarget === id ? null : id; const r = COOP.remotes[id]; if(P.ftarget && r) H.floatText(r, "Selected", "#7fc4ff"); }
+// select a friend as your target (your heals and shields then go to them); toggle: clicking their frame again lets go
+export function select(id, toggle){ const was = P.ftarget; P.ftarget = id && !(toggle && was === id) ? id : null; if(P.ftarget){ P.target = null; P.auto = false; } }
+export const remoteById = id => COOP.remotes[id];
 
 // ---------------------------------------------------------------- party frames under yours, and the co-op window
+// a friend's pet: a small health bar and its rage (bear) or energy (wolf)
+function petLine(p){ if(!p) return ""; const hp = Math.max(0, Math.min(1, p.hp / (p.mhp || 1))), rs = Math.max(0, Math.min(100, p.res || 0));
+  return `<div class="pp"><span>${p.k === "bear" ? "Bear" : "Wolf"}</span><div class="bar"><i style="width:${hp * 100}%;background:${p.dead ? "#555" : "#3fbf5a"}"></i></div><div class="bar r"><i style="width:${rs}%;background:var(--${p.k === "bear" ? "rage" : "energy"})"></i></div></div>`; }
 export function partyHUD(){
   const el = document.getElementById("party");
   if(!on()){ el.innerHTML = ""; return; }
   if(P.ftarget && !COOP.remotes[P.ftarget]) P.ftarget = null;
-  const rs = Object.values(COOP.remotes), key = rs.map(r => [r.id, r.name, r.lvl, Math.round(r.hp), r.mhp, r.dead, reg(r.x), P.ftarget === r.id].join(",")).join("|");
+  const rs = Object.values(COOP.remotes), key = rs.map(r => [r.id, r.name, r.lvl, Math.round(r.hp), r.mhp, r.dead, reg(r.x), P.ftarget === r.id, r.pet ? [r.pet.k, Math.round(r.pet.hp / (r.pet.mhp || 1) * 50), Math.round((r.pet.res || 0) / 10), r.pet.dead].join(":") : "", r.rt, Math.round((r.rv || 0) / (r.rm || 100) * 50), r.gh].join(",")).join("|");
   if(el.dataset.k === key) return; el.dataset.k = key;
   el.innerHTML = rs.map(r => { const pct = Math.max(0, Math.min(1, r.hp / (r.mhp || 1)));
-    return `<div class="pmem ${P.ftarget === r.id ? "sel" : ""}" data-pid="${r.id}" title="Click to select – your heals then go to ${esc(r.name)}"><div class="n"><b style="color:${CLASSES[r.cls]?.color || "#fff"}">${esc(r.name)}</b><span>${r.dead ? "Dead" : reg(r.x) !== reg(P.x) ? (reg(r.x) ? "In a dungeon" : "Outside") : "Level " + r.lvl}</span></div><div class="bar"><i style="width:${pct * 100}%;background:${r.dead ? "#555" : "#3fbf5a"}"></i><b>${Math.round(r.hp)} / ${r.mhp}</b></div></div>`; }).join("");
+    return `<div class="pmem ${P.ftarget === r.id ? "sel" : ""}" data-pid="${r.id}" title="Click to select – your heals then go to ${esc(r.name)}"><div class="n"><b style="color:${CLASSES[r.cls]?.color || "#fff"}">${esc(r.name)}</b><span>${r.gh ? "Spirit" : r.dead ? "Dead" : reg(r.x) !== reg(P.x) ? (reg(r.x) ? "In a dungeon" : "Outside") : "Level " + r.lvl}</span></div><div class="bar"><i style="width:${pct * 100}%;background:${r.dead ? "#555" : "#3fbf5a"}"></i><b>${Math.round(r.hp)} / ${r.mhp}</b></div>${r.rt ? `<div class="bar rs"><i style="width:${Math.max(0, Math.min(100, (r.rv || 0) / (r.rm || 100) * 100))}%;background:var(--${r.rt})"></i><b>${r.rv || 0} / ${r.rm || 100}</b></div>` : ""}${petLine(r.pet)}</div>`; }).join("");
 }
 export function coopHTML(){
   let h = `<h3>Co-op</h3><div class="muted" style="margin-bottom:8px">Play together with friends. One of you hosts and gets a code, the others join with it. You fight the same monsters and share the XP; loot is your own. Left-click a friend (or their frame under yours) to select them: your heals and shields then go to them. Click again to heal yourself.</div>`;

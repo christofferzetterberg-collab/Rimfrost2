@@ -5,7 +5,7 @@ export const ITEMS = {
   copper:{name:"Copper Ore", sell:2, kind:"ore"}, iron:{name:"Iron Ore", sell:5, kind:"ore"}, goldore:{name:"Gold Ore", sell:10, kind:"ore"},
   obsidian:{name:"Obsidian", sell:15, kind:"ore"}, rimkr:{name:"Rime Crystal", sell:22, kind:"ore"},
   ang:{name:"Meadow Bloom", sell:2, kind:"herb"}, silver:{name:"Silverweed", sell:5, kind:"herb"}, drake:{name:"Dragon's Eye", sell:10, kind:"herb"},
-  fireflower:{name:"Fire Bloom", sell:15, kind:"herb"}, iceflower:{name:"Ice Bloom", sell:22, kind:"herb"},
+  fireflower:{name:"Fire Bloom", sell:15, kind:"herb"}, moonbloom:{name:"Moonbloom", sell:9, kind:"herb"}, iceflower:{name:"Ice Bloom", sell:22, kind:"herb"},
   potHp:{name:"Healing Potion", sell:3, kind:"use", desc:"Restores 40% health."},
   potHp2:{name:"Greater Healing Potion", sell:8, kind:"use", desc:"Restores 75% health."},
   potHp3:{name:"Mighty Healing Potion", sell:20, kind:"use", desc:"Restores all health."},
@@ -86,8 +86,10 @@ const ARMOR_BASE = {
 };
 const JEWEL_BASE = {neck:["Necklace","Amulet","Pendant"], ring:["Ring","Signet","Band"]};
 const SLOT_ICON = {head:"helmet", shoulder:"upg_helmet", chest:"armor", hands:"upg_armor", legs:"armor", feet:"upg_armor", neck:"gemBlue", ring:"gemRed"};
-export const STAT_NAME = {pow:"Attack Power", sp:"Spell Power", hp:"Health", mana:"Mana", crit:"Critical Strike", def:"Armor"};
-const STAT_SUFFIX = {pow:"Power", sp:"Sorcery", hp:"Endurance", mana:"Wisdom", crit:"Precision", def:"Protection"};
+export const STAT_NAME = {str:"Strength", agi:"Agility", int:"Intellect", sta:"Stamina", pow:"Attack Power", sp:"Spell Power", sd:"Spell Damage", sh:"Spell Healing", hp:"Health", mana:"Mana", crit:"Critical Strike", def:"Armor"};
+// the stats each class gets the most out of (gear for a class rolls these first)
+export const CLASS_MAIN = {warrior:["str","sta"], paladin:["str","int","sta"], hunter:["agi","sta"], mage:["int","sta"], priest:["int","sta"], druid:["int","agi","str","sta"]};
+const STAT_SUFFIX = {str:"Strength", agi:"Agility", int:"Intellect", sta:"Stamina", pow:"Power", sp:"Sorcery", sd:"Destruction", sh:"Healing", hp:"Endurance", mana:"Wisdom", crit:"Precision", def:"Protection"};
 const PREFIX = [["Beggar's","Thrall's","Apprentice's"], [""], [""], ["Warden's","Master's","Knight's","Huntmaster's"], ["Stormcaller's","Nightfall","Runesmith's","Wolfking's"], ["Rimfrost","Ice Giant's","Draugr King's","Elder"]];
 export const GEAR_MAX = 30;
 
@@ -100,6 +102,8 @@ export function gearClasses(it){ if(it.arm) return ARMOR[it.arm].cls; if(it.wt) 
 export function canWear(it, cls){ return gearClasses(it).includes(cls); }
 export function gearTypeName(it){ return it.arm ? ARMOR[it.arm].name : it.wt ? WTYPES[it.wt].name : "Jewelry"; }
 
+// other stats a class can roll on its gear (besides its main stats)
+const EXTRA = {warrior:["agi","crit"], paladin:["sh","crit"], hunter:["crit","str"], mage:["sd","crit"], priest:["sh","sd"], druid:["sh","sd","crit"]};
 // make one item. opts: {slot, cls, q, il, r}
 export function makeGear(opts){
   const r = opts.r || Math.random, q = opts.q, il = Math.max(1, Math.min(30, Math.round(opts.il)));
@@ -116,16 +120,16 @@ export function makeGear(opts){
   const add = (k, p) => { if(p <= 0) return; it.st[k] = (it.st[k]||0) + p; };
   let defShare = it.arm ? ARMOR[it.arm].def : it.wt==="shield" ? 0.4 : 0;
   add("def", pts*defShare); pts *= 1-defShare;
-  if(slot==="weapon"){ if(role==="phys") add("pow", pts*0.75); else if(role==="caster") add("sp", pts*0.75); else { add("pow", pts*0.4); add("sp", pts*0.35); } pts *= 0.25; }
-  else if(it.wt==="tome"){ add("sp", pts*0.5); pts *= 0.5; }
-  // spread the rest over 1-3 random stats (better items get more stats)
-  const pool = role==="phys" ? ["pow","hp","crit"] : role==="caster" ? ["sp","hp","mana","crit"] : ["pow","sp","hp","mana","crit"];
+  if(slot==="weapon"){ if(role==="phys") add("pow", pts*0.6); else if(role==="caster") add(cls==="priest" ? "sp" : r() < 0.5 ? "sp" : "sd", pts*0.6); else { add("pow", pts*0.3); add("sp", pts*0.3); } pts *= 0.4; }
+  else if(it.wt==="tome"){ add(cls==="mage" ? "sd" : cls==="priest" ? "sh" : "sp", pts*0.4); pts *= 0.6; }
+  // spread the rest over 1-3 stats (better items get more): always one of the class's main stats first, then others it can use
+  const main = CLASS_MAIN[cls], extra = EXTRA[cls], pool = [...main, ...extra];
   const n = q <= 1 ? 1 : q === 2 ? 2 : 3;
-  const chosen = []; while(chosen.length < Math.min(n, pool.length)){ const k = pickR(pool, r); if(!chosen.includes(k)) chosen.push(k); }
+  const chosen = [pickR(main, r)]; while(chosen.length < Math.min(n, pool.length)){ const k = pickR(r() < 0.6 ? main : extra, r); if(!chosen.includes(k)) chosen.push(k); }
   const weights = chosen.map(()=>0.5 + r()); const tot = weights.reduce((a,b)=>a+b,0);
   chosen.forEach((k,i)=>add(k, pts*weights[i]/tot));
   // points -> real numbers
-  const conv = {pow:0.17, sp:0.17, hp:2.4, mana:3, crit:0.07, def:0.1};
+  const conv = {str:0.4, agi:0.4, int:0.4, sta:0.3, pow:0.17, sp:0.17, sd:0.17, sh:0.2, hp:2.4, mana:3, crit:0.07, def:0.1};
   for(const k of Object.keys(it.st)){ let v = it.st[k]*conv[k]; v = (k==="crit"||k==="def") ? Math.round(v*10)/10 : Math.round(v); if(v <= 0) delete it.st[k]; else it.st[k] = v; }
   it.n = gearName(it, r); it.en = 1;
   return it;
@@ -134,7 +138,7 @@ export function makeGear(opts){
 function gearName(it, r){
   const base = it.wt ? pickR(WTYPES[it.wt].base, r) : (it.slot==="neck"||it.slot==="ring") ? pickR(JEWEL_BASE[it.slot], r) : ARMOR_BASE[it.arm][it.slot];
   const pre = pickR(PREFIX[it.q], r);
-  const w = k => k==="crit" ? 40 : (k==="pow"||k==="sp") ? 10 : 1;
+  const w = k => k==="crit" ? 40 : ["pow","sp","sd","sh","str","agi","int","sta"].includes(k) ? 10 : 1;
   const top = Object.keys(it.st).filter(k=>k!=="def").sort((a,b)=>it.st[b]*w(b) - it.st[a]*w(a))[0];
   return (pre ? pre+" " : "") + base + (it.q >= 2 && top ? " of " + STAT_SUFFIX[top] : "");
 }

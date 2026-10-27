@@ -191,3 +191,17 @@ export function makeHero(race = "human", cls = "warrior", RACES = {}, eq = {}){
   if(race === "undead"){ o.gaunt = true; o.eyes = 0xffe86a; }
   return makeHumanoid(o);
 }
+// ---------------- mounts: a horse, ram or wolf with a saddle; userData.saddle = how high you sit
+export function makeMount(d){
+  const c = parseInt(d.color.slice(1), 16), mane = parseInt(d.mane.slice(1), 16);
+  const g = d.wolf ? makeBeast({w: 0.62, h: 0.62, l: 1.55, legH: 0.7, head: 0.5, color: c, snout: mane, leg: mane, ears: true, tail: 0.8})
+    : makeBeast({w: 0.62, h: 0.72, l: 1.7, legH: d.horns ? 0.72 : 0.9, head: 0.46, color: c, snout: d.horns ? 0xe8e0d0 : mane, leg: mane, ears: true, tail: d.horns ? 0.25 : 0.7});
+  const legH = d.wolf ? 0.7 : d.horns ? 0.72 : 0.9, top = legH + (d.wolf ? 0.62 : 0.72);
+  const body = g.children[0];
+  const saddle = part(new THREE.BoxGeometry(0.66, 0.12, 0.6), 0x5a3a22, 0, top + 0.05, -0.05); body.add(saddle);
+  const cloth = part(new THREE.BoxGeometry(0.7, 0.4, 0.5), 0x8a2a2a, 0, top - 0.15, -0.05); body.add(cloth);
+  if(d.horns) for(const s of [-1, 1]){ const h = part(new THREE.TorusGeometry(0.16, 0.05, 5, 8, 4.2), 0xe0d8c0, s * 0.2, top + 0.25, 1.0); h.rotation.y = s * 1.2; body.add(h); }
+  if(!d.wolf) body.add(part(new THREE.BoxGeometry(0.12, 0.35, 0.7), mane, 0, top + 0.12, 0.55));   // mane
+  g.userData.saddle = top + 0.1;
+  return g;
+}

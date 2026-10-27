@@ -1,7 +1,7 @@
 // Quests, trainers and shops: the rules (the windows you see live in main.js).
 import {P, S} from "./state.js";
 import {AB, CLASSES} from "./rimdata.js";
-import {QUESTS, QITEMS, NPCS, GOODS, trainCost, respecCost} from "./content.js";
+import {QUESTS, QITEMS, NPCS, GOODS, GATHER, PROF, PROF_MAX, trainCost, respecCost} from "./content.js";
 import {EXPLORE} from "./worlddata.js";
 import {ITEMS, SLOT_ORDER, CLASS_OFF, GEAR_MAX, makeGear, mulberry, hashStr, gearPrice, gearSell} from "./items.js";
 import * as G from "./engine.js";
@@ -21,14 +21,14 @@ export const qSoon = q => !qs()[q.id] && prereqOk(q) && C().level < q.lvl;
 export const qActive = q => qs()[q.id] && qs()[q.id].state === "active";
 export const qDone = q => qs()[q.id] && qs()[q.id].state === "done";
 export const qTurnInNpc = q => q.to || q.npc;
-export function qProg(q, i){ const o = q.obj[i]; if(o[0] === "collect" || o[0] === "loot") return Math.min(qb()[o[1]] || 0, o[2]); return Math.min(qs()[q.id].prog[i] || 0, o[2]); }
+export function qProg(q, i){ const o = q.obj[i]; if(o[0] === "collect" || o[0] === "loot") return Math.min(qb()[o[1]] || 0, o[2]); if(o[0] === "skill") return Math.min(profSkill(o[1]), o[2]); return Math.min(qs()[q.id].prog[i] || 0, o[2]); }
 export const qReady = q => qActive(q) && q.obj.every((o, i) => qProg(q, i) >= o[2]);
 export function qXP(q){ const d = C().level - q.lvl, f = d <= 1 ? 1 : Math.max(0.1, 1 - (d - 1) * 0.2); return Math.round(G.xpNeed(q.lvl) * 0.3 * (q.mult || 1) * f); }
 export const qGold = q => Math.round((3 + q.lvl * q.lvl * 0.5) * (q.mult || 1));
 // gear rewards (as in Rimfrost 1): in the old quest chains every third quest is green (uncommon) and the last one blue (rare);
 // the newer quests (n) give no gear, and "pick" quests let you choose one of three pieces instead
 export function questGearQ(q){ if(q.n || q.pick) return -1; const num = +q.id.replace(/\D/g, ""), last = !QUESTS.some(o => o.id[0] === q.id[0] && +o.id.replace(/\D/g, "") > num); return last ? 3 : num % 3 === 0 ? 2 : -1; }
-export const objName = o => o[0] === "explore" ? "Find " + EXPLORE[o[1]].name : o[0] === "kill" ? H.mobName(o[1]) : QITEMS[o[1]].name;
+export const objName = o => o[0] === "skill" ? PROF[o[1]] + " skill" : o[0] === "explore" ? "Find " + EXPLORE[o[1]].name : o[0] === "kill" ? H.mobName(o[1]) : QITEMS[o[1]].name;
 export const activeQuests = () => QUESTS.filter(qActive);
 
 // what floats over a person's head: "!" a quest to give, "?" a quest to hand in, "…" a quest in progress, "soon" (gray !) one for later
@@ -74,6 +74,25 @@ export function questKill(kind){
     }); }
   H.refresh();
 }
+// everything your active quests still need, worked out once per frame: quest items to pick up or loot, and monster kinds
+export function neededItems(){ const out = new Set(); for(const q of QUESTS) if(qActive(q)) q.obj.forEach((o, i) => { if((o[0] === "collect" || o[0] === "loot") && qProg(q, i) < o[2]) out.add(o[1]); }); return out; }
+export function neededMobs(){ const out = new Set(); for(const q of QUESTS) if(qActive(q)) q.obj.forEach((o, i) => { if(qProg(q, i) >= o[2]) return; if(o[0] === "kill") out.add(o[1]); if(o[0] === "loot") out.add(o[3]); }); return out; }
+// is this monster needed for one of your active quests (to kill, or for its loot)?
+export const mobNeeded = kind => QUESTS.some(q => qActive(q) && q.obj.some((o, i) => (o[0] === "kill" && o[1] === kind || o[0] === "loot" && o[3] === kind) && qProg(q, i) < o[2]));
+
+// ---------------------------------------------------------------- gathering: Mining and Herbalism (1–150)
+const prof = () => C().prof || (C().prof = {mining: C().race === "dwarf" ? 25 : 1, herb: 1});   // dwarves start with Mining 25
+export const profSkill = k => prof()[k] || 1;
+export const gatherReq = item => GATHER[item] || null;
+// how likely a gather raises your skill: always while the node is new to you, then less and less
+export function skillUpChance(item){ const g = GATHER[item]; if(!g) return 0; const d = profSkill(g.skill) - g.req;
+  return profSkill(g.skill) >= PROF_MAX ? 0 : d < 30 ? 1 : d < 55 ? 0.5 : d < 80 ? 0.2 : 0; }
+export function canGather(item){ const g = GATHER[item]; if(!g) return true; return profSkill(g.skill) >= g.req ? true : `Requires ${PROF[g.skill]} ${g.req}`; }
+export function gainProf(item){ const g = GATHER[item]; if(!g || Math.random() >= skillUpChance(item)) return;
+  const p = prof(); p[g.skill] = Math.min(PROF_MAX, (p[g.skill] || 1) + 1); H.log(`Your ${PROF[g.skill]} skill has increased to ${p[g.skill]}.`, "#7fc4ff");
+  for(const q of QUESTS) if(qActive(q) && q.obj.some(o => o[0] === "skill" && o[1] === g.skill && p[g.skill] === o[2])) progressLog(q); }
+export {PROF, PROF_MAX};
+
 // do you still need this quest item?
 export const needsQItem = item => QUESTS.some(q => qActive(q) && q.obj.some(o => (o[0] === "collect" || o[0] === "loot") && o[1] === item && (qb()[item] || 0) < o[2]));
 export function gotQItem(item){ qb()[item] = (qb()[item] || 0) + 1;
@@ -81,9 +100,11 @@ export function gotQItem(item){ qb()[item] = (qb()[item] || 0) + 1;
   H.save(); H.refresh(); }
 
 // ---------------------------------------------------------------- the trainer
-export function trainable(){ return G.allBarIds().filter(id => !C().learned.includes(id)).sort((a, b) => AB[a].lvl - AB[b].lvl); }
-export function learnAbility(id){ const a = AB[id], cost = trainCost(a.lvl);
-  if(C().learned.includes(id) || C().level < a.lvl) return; if(C().gold < cost) return H.err("You don't have enough gold");
+// what the trainer can teach you: abilities you don't know yet (some need another one first, like Dismiss Pet after Call Bear)
+export function trainable(){ return G.allBarIds().filter(id => !C().learned.includes(id) && (!AB[id].needs || C().learned.includes(AB[id].needs))).sort((a, b) => AB[a].lvl - AB[b].lvl); }
+export const abCost = id => AB[id].free ? 0 : trainCost(AB[id].lvl);
+export function learnAbility(id){ const a = AB[id], cost = abCost(id);
+  if(C().learned.includes(id) || C().level < a.lvl || (a.needs && !C().learned.includes(a.needs))) return; if(C().gold < cost) return H.err("You don't have enough gold");
   C().gold -= cost; C().learned.push(id); G.burst(P.px, P.py, "#9fd6e8", 16); H.log(`You learned ${a.name}.`, "#9fd6e8"); H.buildBar(); H.save(); H.refresh(); }
 export function buyRespec(){ const c = respecCost(C().level); if(!G.talentsSpent()) return; if(C().gold < c) return H.err("You don't have enough gold");
   C().gold -= c; G.resetTalents(); }
@@ -95,8 +116,14 @@ export function buyGoods(k){ const row = GOODS.find(g => g[0] === k); if(!row) r
   C().gold -= row[1]; G.addItem(k, 1); H.log(`You bought ${ITEMS[k].name}.`, "#d9e3e7"); H.save(); H.refresh(); }
 export function sellItem(k, all){ const I = ITEMS[k], n = all ? C().bag[k] : 1; if(!I || !C().bag[k]) return;
   C().gold += I.sell * n; G.removeItem(k, n); H.log(`You sold ${n > 1 ? n + " × " : ""}${I.name} for ${I.sell * n} gold.`, "#d9e3e7"); H.save(); H.refresh(); }
-export function sellJunk(){ let g = 0; for(const k of Object.keys(C().bag)) if(ITEMS[k] && ITEMS[k].kind === "junk"){ g += ITEMS[k].sell * C().bag[k]; delete C().bag[k]; }
-  if(g){ C().gold += g; H.log(`You sold all your loot for ${g} gold.`, "#d9e3e7"); H.save(); H.refresh(); } }
+// junk: gray loot and poor (gray) equipment – never quest items, potions, elixirs, herbs or ore
+export const isJunkGear = it => it.q === 0;
+export function junkValue(){ let g = 0; for(const k of Object.keys(C().bag)) if(ITEMS[k] && ITEMS[k].kind === "junk") g += ITEMS[k].sell * C().bag[k];
+  for(const it of C().gear) if(isJunkGear(it)) g += gearSell(it); return g; }
+export function sellJunk(){ const g = junkValue(); if(!g) return;
+  for(const k of Object.keys(C().bag)) if(ITEMS[k] && ITEMS[k].kind === "junk") delete C().bag[k];
+  C().gear = C().gear.filter(it => !isJunkGear(it));
+  C().gold += g; H.log(`You sold all your junk for ${g} gold.`, "#d9e3e7"); H.save(); H.refresh(); }
 export function sellGear(id){ const it = C().gear.find(x => x.id === id); if(!it) return; const p = gearSell(it);
   C().gear = C().gear.filter(x => x !== it); C().gold += p; H.log(`You sold ${it.n} for ${p} gold.`, "#d9e3e7"); H.save(); H.refresh(); }
 // the smith's stock: one plain item for every slot, plus three better ones; the same for everyone of your class and level band

@@ -17,7 +17,7 @@
   .bar{position:relative;height:14px;background:#0d1216;border:1px solid var(--line);border-radius:3px;margin-top:4px;overflow:hidden}
   .bar i{position:absolute;inset:0 auto 0 0;background:#3fbf5a}
   .bar b{position:absolute;inset:0;text-align:center;font-size:11px;line-height:14px;text-shadow:0 1px 2px #000}
-  #tframe .bar i{background:#d84a42}
+  #tframe .bar i{background:#d84a42} #tframe.friend .bar i{background:#3fbf5a} #tframe.friend{border-color:#7fc4ff}
   #xpbar{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);width:min(520px,70vw);height:8px}
   #xpbar i{background:#8a6fd8} #xpbar b{font-size:9px;line-height:8px}
   #title{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:'Uncial Antiqua',serif;font-size:26px;color:var(--frost);text-shadow:0 2px 8px #000}
@@ -26,6 +26,9 @@
   #help{position:absolute;top:12px;right:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;color:var(--mute);font-size:12.5px;line-height:1.5;max-width:300px}
   #help b{color:var(--text)}
   #log{position:absolute;bottom:22px;left:12px;width:340px;font-size:13px;text-shadow:0 1px 3px #000}
+  #chatbox{position:absolute;bottom:4px;left:12px;width:340px;display:flex;gap:6px;align-items:center;z-index:3;background:var(--panel);border:1px solid #7fc4ff;border-radius:6px;padding:3px 8px}
+  #chatbox[hidden]{display:none} #chatbox span{color:#7fc4ff;font-weight:800;font-size:13px} #chatbox input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font:600 13px 'Alegreya Sans'}
+  #log .chat b{color:#7fc4ff}
   #bar{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto}
   .slot{position:relative;width:52px;height:52px;border:1px solid #4a5a64;border-radius:6px;background:linear-gradient(#3a2c22,#1b1410);color:#fff;font:800 13px 'Alegreya Sans';cursor:pointer;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.05}
   .slot .k{position:absolute;top:2px;left:4px;font-size:11px;color:#ddd}
@@ -37,10 +40,13 @@
   .plate .hb{width:52px;height:5px;margin:2px auto 0;background:rgba(0,0,0,.7);border-radius:2px;overflow:hidden}
   .plate .hb i{display:block;height:100%;background:#d84a42}
   .plate.sel span{text-decoration:underline}
+  .plate.q span::before{content:"\2726  ";color:#ffd84a} .plate.q .hb{box-shadow:0 0 0 1px #ffd84a}
   .ft{position:absolute;transform:translate(-50%,-50%);font:800 16px 'Alegreya Sans';text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}
   .ft.big{font-size:22px}
   #dead{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(40,46,52,.5);backdrop-filter:grayscale(1);z-index:4}
   #dead[hidden]{display:none}
+  #ghostbar{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid #9fd6ff;border-radius:8px;padding:8px 14px;z-index:4;font-size:14px;color:#dff4ff;display:flex;gap:10px;align-items:center;white-space:nowrap}
+  #ghostbar[hidden]{display:none} #ghostbar button{font:800 14px 'Alegreya Sans';padding:5px 14px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer} #ghostbar button:disabled{opacity:.4;cursor:default}
   #dead .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 26px;text-align:center}
   #dead h2{font-family:'Uncial Antiqua',serif;font-weight:400;color:#ff6b5e;margin:0 0 12px}
   #dead button{font:800 15px 'Alegreya Sans';padding:8px 18px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer}
@@ -50,6 +56,11 @@
   #bar{flex-wrap:nowrap} .slot canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:5px}
   .slot .k{z-index:2;text-shadow:0 1px 2px #000} .slot .cd{z-index:3;border-radius:5px} .slot.nores canvas{filter:saturate(.3) brightness(.6)} .slot.oor .k{color:#ff6b5e}
   .slot.atk{font-size:12px}
+  #petbar .slot{width:40px;height:40px} #petbar .slot.off canvas{filter:grayscale(1) brightness(.45)} #petbar .slot.off::after{content:"OFF";position:absolute;bottom:1px;right:3px;z-index:2;font-size:10px;color:#ff8a7a;text-shadow:0 1px 2px #000}
+  #petbar .slot.auto{box-shadow:0 0 0 2px #e6bd5c inset} #petbar .slot.on{box-shadow:0 0 0 2px #7be08a inset}
+  #ppet{margin-top:6px;padding-top:5px;border-top:1px solid var(--line)} #ppet .n{font-size:12.5px} #ppet .n span:last-child{color:var(--mute);font-weight:700;font-size:11.5px} #ppet .bar{height:11px;margin-top:3px} #ppet .bar b{font-size:9.5px;line-height:11px}
+  .pmem .bar.rs{height:7px;margin-top:2px} .pmem .bar.rs b{font-size:0}
+  .pmem .pp{display:flex;align-items:center;gap:5px;margin-top:3px;font-size:10.5px;color:var(--mute)} .pmem .pp .bar{flex:1;height:7px;margin:0} .pmem .pp .bar.r{flex:.6}
   #cast{position:absolute;bottom:92px;left:50%;transform:translateX(-50%);width:260px;height:16px} #cast[hidden]{display:none} #cast i{background:#e0b84a} #cast b{font-size:11.5px;line-height:16px}
   #tip{position:fixed;max-width:280px;background:rgba(10,14,17,.96);border:1px solid #4a5a64;border-radius:6px;padding:8px 10px;font-size:13px;line-height:1.35;pointer-events:none;z-index:6}
   #tip[hidden]{display:none} #tip h4{margin:0 0 3px;font-size:15px} #tip .m{color:var(--mute);font-size:12px;margin-bottom:4px}
@@ -74,6 +85,7 @@
   #panel .tabs{display:flex;gap:4px;padding:8px 8px 0;position:sticky;top:0;background:#10161b;z-index:1;border-bottom:1px solid var(--line)}
   #panel .tabs button{font:800 13px 'Alegreya Sans';padding:6px 10px;border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0;background:#141c22;color:var(--mute);cursor:pointer}
   #panel .tabs button.on{color:var(--text);background:#1c262d} #panel .tabs .x{margin-left:auto;border:0;background:none}
+  #panel .vtabs{position:static;padding:0;margin:12px 0 6px;align-items:flex-end;background:none} #panel .vtabs span{font-size:13px;padding-bottom:4px}
   #pbody{padding:8px 12px} #pbody h3{margin:12px 0 6px;font-size:12.5px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
   .muted{color:var(--mute)} .row{display:flex;align-items:center;gap:8px}
   .it{display:flex;align-items:center;gap:8px;padding:5px 6px;border:1px solid var(--line);border-radius:6px;margin-bottom:4px;background:#0f151a}
@@ -90,7 +102,7 @@
   .qc{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:6px;background:#0f151a} .qt{font-size:13.5px;line-height:1.4;margin:4px 0;color:#d8e2e6} .qo{font-size:12.5px;margin:4px 0 6px;color:#ffd36b}
   .sbtn.pri{background:#9fd6e8;color:#0b1013;border-color:#9fd6e8}
   #pbody canvas{width:32px;height:32px;border-radius:4px;flex:none}
-  #tracker{position:absolute;right:12px;top:226px;width:250px;font-size:13px;text-shadow:0 1px 3px #000,0 0 2px #000} #tracker .tq{margin-bottom:8px} #tracker b{color:#ffd36b} #tracker .ok{color:#7be08a}
+  #tracker{position:absolute;right:12px;top:248px;width:250px;font-size:13px;text-shadow:0 1px 3px #000,0 0 2px #000} #tracker .tq{margin-bottom:8px} #tracker b{color:#ffd36b} #tracker .ok{color:#7be08a} #tracker .wh{color:#a8b4ba;font-style:italic} #tracker .wh.nt{color:#9fb4ff}
   #barwrap{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
   #barwrap #cast{position:relative;bottom:auto;left:auto;transform:none;width:280px;height:18px;margin-bottom:6px}
   .abar{display:flex;gap:4px;pointer-events:auto;background:rgba(10,14,17,.55);padding:3px;border-radius:8px}
@@ -103,6 +115,7 @@
   #mini{position:absolute;top:12px;right:12px;width:180px;text-align:center}
   #minimap{width:180px;height:180px;border-radius:50%;border:2px solid #4a5a64;box-shadow:0 2px 10px rgba(0,0,0,.5);background:#1a2a20;display:block}
   #mini #zone{position:static;transform:none;margin-top:4px;color:var(--text);font-weight:700}
+  #clock{text-align:center;font-size:12px;color:var(--mute);text-shadow:0 1px 3px #000} #clock.night{color:#9fb4ff}
   #gmenu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,8,10,.45);z-index:4}
   #gmenu[hidden]{display:none}
   #gmenu .box{width:240px;background:#10161b;border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
@@ -128,7 +141,7 @@
   #load[hidden]{display:none}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261028a", "./src/dungeon.js": "./src/dungeon.js?v=20261028a", "./src/coop.js": "./src/coop.js?v=20261028a", "./src/content.js": "./src/content.js?v=20261028a", "./src/engine.js": "./src/engine.js?v=20261028a", "./src/items.js": "./src/items.js?v=20261028a", "./src/keys.js": "./src/keys.js?v=20261028a", "./src/main.js": "./src/main.js?v=20261028a", "./src/models.js": "./src/models.js?v=20261028a", "./src/nav.js": "./src/nav.js?v=20261028a", "./src/quests.js": "./src/quests.js?v=20261028a", "./src/rimdata.js": "./src/rimdata.js?v=20261028a", "./src/state.js": "./src/state.js?v=20261028a", "./src/util.js": "./src/util.js?v=20261028a", "./src/world.js": "./src/world.js?v=20261028a", "./src/worlddata.js": "./src/worlddata.js?v=20261028a", "./src/mobs.js": "./src/mobs.js?v=20261028a" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261029c", "./src/dungeon.js": "./src/dungeon.js?v=20261029c", "./src/dev.js": "./src/dev.js?v=20261029c", "./src/clock.js": "./src/clock.js?v=20261029c", "./src/coop.js": "./src/coop.js?v=20261029c", "./src/content.js": "./src/content.js?v=20261029c", "./src/engine.js": "./src/engine.js?v=20261029c", "./src/items.js": "./src/items.js?v=20261029c", "./src/keys.js": "./src/keys.js?v=20261029c", "./src/main.js": "./src/main.js?v=20261029c", "./src/models.js": "./src/models.js?v=20261029c", "./src/nav.js": "./src/nav.js?v=20261029c", "./src/quests.js": "./src/quests.js?v=20261029c", "./src/rimdata.js": "./src/rimdata.js?v=20261029c", "./src/state.js": "./src/state.js?v=20261029c", "./src/util.js": "./src/util.js?v=20261029c", "./src/world.js": "./src/world.js?v=20261029c", "./src/worlddata.js": "./src/worlddata.js?v=20261029c", "./src/mobs.js": "./src/mobs.js?v=20261029c" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Cmd+Shift+R.</div>`; });
@@ -137,15 +150,16 @@
 <body>
 <div id="load">Rimfrost 2</div>
 <div id="hud">
-  <div class="frame" id="pframe"><div class="n"><span id="pname">Adventurer</span><span id="plvl">Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt"></b></div><div class="bar res"><i id="presi"></i><b id="prest"></b></div><div id="pcp"></div><div class="auras" id="pbuffs"></div></div>
+  <div class="frame" id="pframe"><div class="n"><span id="pname">Adventurer</span><span id="plvl">Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt"></b></div><div class="bar res"><i id="presi"></i><b id="prest"></b></div><div id="pcp"></div><div class="auras" id="pbuffs"></div><div id="ppet" hidden><div class="n"><span id="ppetn"></span><span id="ppetm"></span></div><div class="bar"><i id="ppethi"></i><b id="ppetht"></b></div><div class="bar res"><i id="ppetri"></i><b id="ppetrt"></b></div></div></div>
   <div id="party"></div>
   <div class="frame" id="tframe" hidden><div class="n"><span id="tname"></span><span id="tlvl"></span></div><div class="bar"><i id="thpi"></i><b id="thpt"></b></div><div class="s" id="tstate"></div><div class="auras" id="tauras"></div></div>
   <div id="title">Rimfrost 2</div>
-  <div id="mini"><canvas id="minimap" width="180" height="180"></canvas><div id="zone"></div></div>
+  <div id="mini"><canvas id="minimap" width="180" height="180"></canvas><div id="zone"></div><div id="clock"></div></div>
   <div id="banner"></div>
   <div id="log"></div>
+  <div id="chatbox" hidden><span>Say:</span><input id="chatin" maxlength="200" autocomplete="off" placeholder="Type a message – Enter sends, Esc cancels"></div>
   <div id="tracker"></div>
-  <div id="barwrap"><div class="bar" id="cast" style="visibility:hidden"><i></i><b></b></div><div class="abar" id="bar2"></div><div class="abar" id="bar1"></div></div>
+  <div id="barwrap"><div class="bar" id="cast" style="visibility:hidden"><i></i><b></b></div><div class="abar" id="petbar" hidden></div><div class="abar" id="bar2"></div><div class="abar" id="bar1"></div></div>
   <div class="bar" id="xpbar"><i id="xpi"></i><b id="xpt"></b></div>
   <div id="fps"></div>
 </div>
@@ -153,7 +167,7 @@
 <div id="bigmap" hidden><div class="mbox"><div class="mhead"><b id="mapTitle">World map</b><span class="muted">M or Esc to close · mouse wheel to zoom</span></div><canvas id="mapcv"></canvas></div></div>
 <div id="gmenu" hidden><div class="box"><h2>Menu</h2>
   <button data-g="map">World map</button><button data-g="quests">Quests</button><button data-g="char">Character</button><button data-g="bag">Bag</button><button data-g="spells">Spellbook</button>
-  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="coop">Co-op</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
+  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="coop">Co-op</button><button data-g="dev" class="devb" hidden>Dev tools (F8)</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
 <div id="panel" hidden><div class="tabs"><button data-tab="quests">Quests</button><button data-tab="char">Character</button><button data-tab="bag">Bag</button><button data-tab="spells">Spellbook</button><button data-tab="tal">Talents</button><button data-tab="keys">Keys</button><button data-tab="coop">Co-op</button><button class="x" title="Close (Esc)">✕</button></div><div id="pbody"></div></div>
 <div id="chars" hidden><div class="box">
   <h1>Rimfrost 2</h1>
@@ -166,7 +180,8 @@
     <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" id="ccreate">Create</button><button class="btn ghost" id="ccancel">Cancel</button></div>
   </div>
 </div></div>
+<div id="ghostbar" hidden></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button></div></div>
-<script type="module" src="./src/main.js?v=20261028a"></script>
+<script type="module" src="./src/main.js?v=20261029c"></script>
 </body>
 </html>

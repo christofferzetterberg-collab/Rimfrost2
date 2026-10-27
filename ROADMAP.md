@@ -122,17 +122,60 @@ Tick items off with `[x]` when they are done. Add new items at the bottom of the
 - [x] Ore and herbs from quests are picked up in the world (no gathering skills yet)
 - [x] Characters from the old map move to their race's home town with a fresh quest log (level, gear and gold stay)
 
+### Stage 9 – gathering, quest help and polish
+- [x] Mining and Herbalism (skill 1–150): every zone has herbs and ore veins you can gather; rarer ones need more skill; gathered herbs and ore are trade goods you can sell
+- [x] Gathering quests from the smiths and alchemists of the race towns and from Rimhaven's smith and apothecary (reach skill 15, 40, 80 and 110)
+- [x] Quest help: a pillar of light over things your quests need, a ✦ on the name of monsters you need, gold dots on the minimap, quest areas on the world map and minimap, and where to go in the quest tracker
+- [x] Longer range for bows and spells (mages, hunters, priests and druids, 25% further)
+- [x] Race towns only have trainers for the classes that race can be
+- [x] Merchants have separate Buy and Sell tabs, with "Sell all junk" (gray loot and poor equipment, never quest items)
+- [x] Starting zones: the weakest monsters live closest to town and get stronger further out
+- [x] Hunter pet bar: Attack (Ctrl+1), Follow (Ctrl+2) and the pet's skills, which can be switched on and off; pet health and rage / energy under your frame and in co-op party frames
+
+## To fix
+
+Numbered so we can refer to them. Tick them off as they get done.
+
+### Co-op
+- [x] 1. Show friends' mana, rage, energy and focus bars on their party frames
+- [x] 2. Target friends by clicking them in the world (not only their frame); clicking on nothing clears the target
+- [x] 3. Chat while in co-op (only then): Enter opens the chat box, Enter again sends
+
+### General
+- [x] 4. Spells cost a bit more mana, mostly felt at low level until you have gear with spell power and stats
+- [x] 5. Stats: Stamina, Intellect, Strength and Agility, plus gear with spell damage and spell healing
+- [x] 6. Every class has main stats to strive for, which give it the most benefit
+- [x] 7. Riding from level 20: one riding trainer and mount seller for all classes; mounts make you 60% faster; druids get Travel Form at 20 and can also buy a mount
+- [x] 8. Make it clearer when auto-attack is on (for example a pulsing red circle under the target)
+- [x] 9. Monsters getting stuck in the mountains
+- [x] 10. Players, monsters and pets can't climb hills that are too steep (a pet got stuck on a cliff edge)
+- [x] 11. Monsters you attack from range don't notice you until hit by the spell or arrow (they still notice you by level and when you get too close)
+- [x] 12. Death: press "Release Spirit" to appear at the zone's graveyard (one per zone, not always at a camp, only visible while dead). A spirit there offers to bring you back at once with a debuff (75% lower damage, healing, health, mana and stats for a while), or you walk back to your body and come back with 50% health and mana and no debuff
+
+### Classes
+- [x] 13. Talents split into specializations per class (at least two each), for example Druid: Balance (caster), Feral (wolf damage, bear tank) and Restoration (healing)
+- [x] 14. Hunter: Dismiss Pet costs no gold, but can only be learned after Call Bear
+- [x] 15. Druid: a quick bar for the shapeshifts, with changeable keys (default Ctrl+1 Bear, Ctrl+2 Wolf, Ctrl+3 Travel Form)
+
+### General (added)
+- [x] 16. Key bindings are saved per character
+- [x] 17. Dev tools (?dev, F8): cheats, teleports and a class balance test
+
+### Stage 10 – day and night
+- [x] Game clock: a day lasts 80 minutes (night 20), the same for everyone in co-op; light, sky, mist, town firelight and a small light around you at night
+- [x] More wolves, undead and spirits at night (a level higher); monsters see you from a bit shorter range in the dark
+- [x] Moonbloom, a night-only herb, and the optional quest "Moonbloom"; the quest tracker and world map show what is better or only possible at night
+
 ## Planned
 
 ### Next
 - [ ] Sound effects (CC0 sounds from Rimfrost 1)
 - [ ] Rimfrost 1's dungeon puzzles (levers, runes and gates) and group scaling
-- [ ] Gathering skills (mining and herbalism) and the smith's weapon upgrades
+- [ ] The smith's weapon upgrades and other crafting (on hold)
 
 ### Art
 - [ ] Replace the shape-built characters and monsters with free CC0 low-poly models with animations (for example Quaternius, KayKit or Kenney)
 
 ## Ideas to investigate
 
-- [ ] Mobile support (touch controls)
-- [ ] Day and night cycle
+- [ ] A rare night-only elite in some zones
