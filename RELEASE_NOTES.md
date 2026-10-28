@@ -1,5 +1,27 @@
 # Rimfrost 2 – Release notes
 
+## v0.16.0
+
+### New
+- **Racial abilities.** Every race has its own ability from level 1. It is in the spellbook under "Racial" and goes onto your action bar by itself. It costs nothing and does not trigger the global cooldown.
+  - **Human – Sprint:** movement speed +40% for 8 sec. 2 min cooldown.
+  - **Orc – Bloodrage:** damage dealt +20% for 8 sec. 2 min cooldown.
+  - **Elf – Shadowmeld:** monsters lose track of you and you leave combat. Lasts until you move or act, up to 1 min. 2 min cooldown. In co-op, a monster only gives up if nobody else has fought it.
+  - **Dwarf – Stoneform:** damage taken −20% for 8 sec. 2 min cooldown.
+  - **Undead – Will of the Dead:** only while dead. Come back to life where you fell with 30% health and no Resurrection Sickness. Once every 30 min. Also a button in the "You are dead" window.
+- Each racial ability has its own look: a coloured ring at your feet, and Sprint leaves a trail, Bloodrage makes you glow red, Stoneform turns you to stone, Shadowmeld makes you fade into the shadows, and Will of the Dead raises you in a green light.
+
+### Changed
+- **Racial bonuses lowered:**
+  - Human: experience +5% (was 10%).
+  - Orc: damage +3% (was 10%).
+  - Elf: dodge +3% (was +5% critical strike, +10% mana and +1% dodge).
+  - Dwarf: maximum health +8% (was 15%); no longer starts with Mining 25.
+  - Undead: unchanged (health and mana regeneration out of combat +50%).
+
+### Fixed
+- Loading a character could skip setting up its quest log and quest items (a code comment had swallowed that line).
+
 ## v0.15.2
 
 ### New

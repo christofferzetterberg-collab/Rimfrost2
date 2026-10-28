@@ -56,6 +56,7 @@
   #ghostbar[hidden]{display:none} #ghostbar button{font:800 14px 'Alegreya Sans';padding:5px 14px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer} #ghostbar button:disabled{opacity:.4;cursor:default}
   #dead .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 26px;text-align:center}
   #dead h2{font-family:'Uncial Antiqua',serif;font-weight:400;color:#ff6b5e;margin:0 0 12px}
+  #dead button:disabled{opacity:.45;cursor:default} #wotd{background:#7ad06a!important}
   #dead button{font:800 15px 'Alegreya Sans';padding:8px 18px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer}
   #pframe .bar.res i{background:var(--mana)}
   #pcp{display:flex;gap:3px;margin-top:4px} #pcp i{width:12px;height:6px;border-radius:2px;background:#3a2a20} #pcp i.on{background:#ffcf4a} #pcp:empty{display:none}
@@ -148,7 +149,7 @@
   #load[hidden]{display:none}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261101e", "./src/dungeon.js": "./src/dungeon.js?v=20261101e", "./src/dev.js": "./src/dev.js?v=20261101e", "./src/clock.js": "./src/clock.js?v=20261101e", "./src/coop.js": "./src/coop.js?v=20261101e", "./src/content.js": "./src/content.js?v=20261101e", "./src/engine.js": "./src/engine.js?v=20261101e", "./src/items.js": "./src/items.js?v=20261101e", "./src/keys.js": "./src/keys.js?v=20261101e", "./src/main.js": "./src/main.js?v=20261101e", "./src/models.js": "./src/models.js?v=20261101e", "./src/nav.js": "./src/nav.js?v=20261101e", "./src/quests.js": "./src/quests.js?v=20261101e", "./src/rimdata.js": "./src/rimdata.js?v=20261101e", "./src/state.js": "./src/state.js?v=20261101e", "./src/util.js": "./src/util.js?v=20261101e", "./src/world.js": "./src/world.js?v=20261101e", "./src/worlddata.js": "./src/worlddata.js?v=20261101e", "./src/mobs.js": "./src/mobs.js?v=20261101e" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261102a", "./src/dungeon.js": "./src/dungeon.js?v=20261102a", "./src/dev.js": "./src/dev.js?v=20261102a", "./src/clock.js": "./src/clock.js?v=20261102a", "./src/coop.js": "./src/coop.js?v=20261102a", "./src/content.js": "./src/content.js?v=20261102a", "./src/engine.js": "./src/engine.js?v=20261102a", "./src/items.js": "./src/items.js?v=20261102a", "./src/keys.js": "./src/keys.js?v=20261102a", "./src/main.js": "./src/main.js?v=20261102a", "./src/models.js": "./src/models.js?v=20261102a", "./src/nav.js": "./src/nav.js?v=20261102a", "./src/quests.js": "./src/quests.js?v=20261102a", "./src/rimdata.js": "./src/rimdata.js?v=20261102a", "./src/state.js": "./src/state.js?v=20261102a", "./src/util.js": "./src/util.js?v=20261102a", "./src/world.js": "./src/world.js?v=20261102a", "./src/worlddata.js": "./src/worlddata.js?v=20261102a", "./src/mobs.js": "./src/mobs.js?v=20261102a" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -189,7 +190,7 @@
   </div>
 </div></div>
 <div id="ghostbar" hidden></div>
-<div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button></div></div>
-<script type="module" src="./src/main.js?v=20261101e"></script>
+<div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
+<script type="module" src="./src/main.js?v=20261102a"></script>
 </body>
 </html>

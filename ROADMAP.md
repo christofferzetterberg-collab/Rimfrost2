@@ -217,6 +217,10 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] More wolves, undead and spirits at night (a level higher); monsters see you from a bit shorter range in the dark
 - [x] Moonbloom, a night-only herb, and the optional quest "Moonbloom"; the quest tracker and world map show what is better or only possible at night
 
+### Stage 11 – racial abilities
+- [x] Lower racial bonuses: Human +5% XP, Orc +3% damage, Elf +3% dodge, Dwarf +8% health, Undead faster regeneration
+- [x] A racial ability for each race with its own visual effect: Sprint (Human), Bloodrage (Orc), Shadowmeld (Elf), Stoneform (Dwarf), Will of the Dead (Undead)
+
 ## Planned
 
 ### Next

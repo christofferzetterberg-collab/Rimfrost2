@@ -8,7 +8,7 @@ import {DUNGEONS, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
 import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
 import {P, S, mobs, PXU} from "./state.js";
-import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RES_NAME, TALENTS, TIER_NEED, abIcon, drawIcon} from "./rimdata.js";
+import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, abIcon, drawIcon} from "./rimdata.js";
 import {ITEMS, QUAL, SLOTS, SLOT_ORDER, STAT_NAME, GEAR_MAX, CLASS_MAIN, canWear, gearTypeName, upgradeGear} from "./items.js";
 import * as G from "./engine.js";
 import * as Q from "./quests.js";
@@ -130,7 +130,7 @@ function buildHero(){
   const c = S.cur;
   hero = P.form === "bear" ? makeBearForm() : P.form === "cat" ? makeWolfForm() : P.form === "leopard" ? makeLeopardForm() : makeHero(c.race, c.cls, RACES, c.eq || {});
   if(P.ghost) hero.traverse(o => { if(o.isMesh){ o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.45; o.material.depthWrite = false; if(o.material.color) o.material.color.lerp(new THREE.Color(0xbfe6ff), 0.6); o.castShadow = false; } });
-  scene.add(hero); buildMount();
+  tintHero(); scene.add(hero); buildMount();
 }
 // ---------------------------------------------------------------- riding (from level 20): summon your mount, 60% faster
 let mountMesh = null;
@@ -222,7 +222,9 @@ function loadWorld(){ let w = null; try{ w = JSON.parse(localStorage.getItem(WKE
 addEventListener("beforeunload", () => save());
 let running = false;
 function play(c){
-  S.cur = c; K.useChar(c);                                                        /* every character has its own key bindings */ if(!c.learned) c.learned = []; for(const id of Q.starterAbilities(c.cls)) if(!c.learned.includes(id)) c.learned.push(id);   // the abilities every new character starts with if(!c.quests) c.quests = {}; if(!c.qbag) c.qbag = {};
+  S.cur = c; K.useChar(c);                                                        /* every character has its own key bindings */ if(!c.learned) c.learned = []; for(const id of Q.starterAbilities(c.cls)) if(!c.learned.includes(id)) c.learned.push(id);   // the abilities every new character starts with
+  if(RACIAL[c.race] && !c.learned.includes(RACIAL[c.race])) c.learned.push(RACIAL[c.race]);                        // and the racial ability
+  if(!c.quests) c.quests = {}; if(!c.qbag) c.qbag = {};
   let moved = false; if(c.world !== 2){ const sp = spawnFor(c.race); c.x = sp.x; c.z = sp.z; c.quests = {}; c.qbag = {}; delete c.pick; c.world = 2; moved = true; }   // a character from the old map: home town, fresh quest log
   for(const m of mobs) respawn(m);
   for(const it of [...Object.values(c.eq || {}), ...(c.gear || [])]) upgradeGear(it, c.cls);   // old gear gets the new stats
@@ -288,7 +290,7 @@ const SPECIALS = {
   mount:   {name: "Mount", icon: "paw", color: "#b08a5a", desc: "Summons your mount, increasing movement speed by 60%. Out of combat only. Cannot be used in dungeons."}
 };
 const formKey = () => S.cur.cls === "druid" && P.form ? P.form : "normal";
-const idsFor = form => BARS[form === "normal" ? S.cur.cls : "druid_" + form].filter(id => S.cur.learned.includes(id));
+const idsFor = form => [...BARS[form === "normal" ? S.cur.cls : "druid_" + form], RACIAL[S.cur.race]].filter(id => id && S.cur.learned.includes(id));
 function defaultBar(form){ const bar = Array(20).fill(null), ids = idsFor(form);
   ids.forEach((id, i) => { if(i < 16) bar[i] = id; }); if(form === "normal") ["attack", "pothp", "potmana", "rest"].forEach((x, i) => bar[16 + i] = x); return bar; }
 function curBar(){ const c = S.cur, f = formKey(); if(!c.bars) c.bars = {}; if(!c.barSeen) c.barSeen = {};
@@ -411,6 +413,7 @@ function renderPanel(){
       h += `<h3>${title}${c.cls === "druid" && title !== "Abilities" ? " – change to this form to place these on its bar" : ""}</h3><div class="book">`;
       for(const id of ids) h += `<div class="bk" draggable="true" data-drag="${id}" data-tipab="${id}"><canvas width="36" height="36" data-icon="${id}"></canvas><span>${AB[id].name}</span></div>`;
       h += `</div>`; }
+    { const rid = RACIAL[c.race]; if(rid) h += `<h3>Racial</h3><div class="book"><div class="bk" draggable="true" data-drag="${rid}" data-tipab="${rid}"><canvas width="36" height="36" data-icon="${rid}"></canvas><span>${AB[rid].name}</span></div></div>`; }
     h += `<h3>Other</h3><div class="book">`; for(const x in SPECIALS) if(x !== "mount" || c.riding) h += `<div class="bk" draggable="true" data-drag="${x}" data-tipab="${x}"><canvas width="36" height="36" data-icon="${x}"></canvas><span>${SPECIALS[x].name}</span></div>`; h += `</div>`;
     const later = Q.trainable(); if(later.length) h += `<h3>Not learned yet</h3><div class="muted">${later.map(id => `${AB[id].name} (level ${AB[id].lvl})`).join(", ")} – learn them from your class trainer.</div>`;
   } else if(panelTab === "keys"){
@@ -601,7 +604,7 @@ function npcHTML(n){
 let shopStock = [];
 
 // ---------------------------------------------------------------- death
-function onDeath(){ $("dead").hidden = false; $("ghostbar").hidden = true; log("You have died.", "#ff6b5e"); }
+function onDeath(){ $("dead").hidden = false; updWotdBtn(); $("ghostbar").hidden = true; log("You have died.", "#ff6b5e"); }
 // ---------------------------------------------------------------- graveyards: one in every zone, seen only by spirits
 // Release Spirit takes you there as a spirit. Walk back to your body to come back with half your health and mana,
 // or let the Spirit Guide bring you back at once with Resurrection Sickness (everything at 25% for a while).
@@ -692,6 +695,41 @@ function exitDungeon(d){
   for(const m of mobs) if(m.dg && m.state === "chase" && dungeonAt(m.hx) === d) evade(m);
   banner(zoneName(), ""); log(`You leave ${d.name}.`, "#93a4ad"); save(); }
 $("revive").addEventListener("click", releaseSpirit);
+// Undead: Will of the Dead – back to life where you fell, 30% health, no Resurrection Sickness, once every 30 min (the wait is kept across reloads)
+const WOTD = 1800;
+const wotdLeft = () => Math.max(0, ((S.cur && S.cur.wotd) || 0) - Date.now()) / 1000;
+function willOfTheDead(){ if(!P.dead || S.cur.race !== "undead") return; if(wotdLeft() > 0) return err("Not ready yet");
+  if(P.ghost && P.corpse){ P.x = P.corpse.x; P.z = P.corpse.z; }
+  S.cur.wotd = Date.now() + WOTD * 1000; $("dead").hidden = true; comeBack(0.3);
+  G.ring(P.px, P.py, 70, "#5ab04a"); G.burst(P.px, P.py, "#7aff6a", 30); G.burst(P.px, P.py, "#1a1a1a", 18); raiseFx = 1.6;
+  floatText(P, "Will of the Dead", "#7aff6a", true); log("You rise again – Will of the Dead.", "#7aff6a"); save(); }
+$("wotd").addEventListener("click", () => G.tryUse("willdead"));
+function updWotdBtn(){ const b = $("wotd"); if(!S.cur || S.cur.race !== "undead"){ b.hidden = true; return; } b.hidden = false; const l = wotdLeft();
+  b.disabled = l > 0; const txt = l > 0 ? `Will of the Dead (${Math.ceil(l / 60)} min)` : "Will of the Dead"; if(b.textContent !== txt) b.textContent = txt; }
+// ---------------------------------------------------------------- racial ability effects on your character
+// a glowing ring at your feet while Sprint, Bloodrage, Stoneform or Shadowmeld is active; your body turns to stone, glows red or fades into the shadows
+const RACE_FX = {sprint: 0x7fe8ff, bloodrage: 0xff3a2a, stoneform: 0xb8b0a0, meld: 0x8a6ab8};
+const fxRing = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 32), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide}));
+fxRing.rotation.x = -Math.PI / 2; fxRing.visible = false; fxRing.raycast = () => {}; scene.add(fxRing);
+const raiseCol = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.3, 9, 16, 1, true), new THREE.MeshBasicMaterial({color: 0x7aff6a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending}));
+raiseCol.visible = false; raiseCol.raycast = () => {}; scene.add(raiseCol);
+let raiseFx = 0, heroLook = "", puffT = 0;
+const lookOf = () => P.ghost ? "" : P.buffs.meld ? "meld" : P.buffs.stoneform ? "stone" : P.buffs.bloodrage ? "rage" : "";
+function tintHero(){ if(!hero || !heroLook) return; const L = heroLook;
+  hero.traverse(o => { if(!o.isMesh) return; o.material = o.material.clone();
+    if(L === "meld"){ o.material.transparent = true; o.material.opacity = 0.32; o.material.depthWrite = false; if(o.material.color) o.material.color.lerp(new THREE.Color(0x2a1a4a), 0.55); o.castShadow = false; }
+    if(L === "stone" && o.material.color) o.material.color.lerp(new THREE.Color(0x9a948a), 0.75);
+    if(L === "rage" && o.material.emissive){ o.material.emissive.setHex(0x8a1a0a); o.userData.rage = true; } }); }
+function updRaceFx(dt){
+  const L = running ? lookOf() : ""; if(L !== heroLook){ heroLook = L; buildHero(); }
+  const k = running && !P.ghost && Object.keys(RACE_FX).find(b => P.buffs[b]);
+  fxRing.visible = !!k; if(k){ fxRing.material.color.setHex(RACE_FX[k]); fxRing.position.set(P.x, height(P.x, P.z) + 0.07, P.z); fxRing.rotation.z += dt * 1.5;
+    const pulse = 1 + Math.sin(now * 6) * 0.08; fxRing.scale.setScalar(pulse); fxRing.material.opacity = Math.min(0.7, P.buffs[k] * 0.6); }
+  if(heroLook === "rage" && hero){ const e = 0.35 + Math.sin(now * 9) * 0.25; hero.traverse(o => { if(o.isMesh && o.userData.rage) o.material.emissiveIntensity = e; }); }
+  if(running && P.buffs.sprint && P.moving && (puffT -= dt) <= 0){ puffT = 0.09; G.burst(P.px - Math.sin(P.rot) * 12, P.py - Math.cos(P.rot) * 12, "#dff6ff", 3); }
+  if(raiseFx > 0){ raiseFx -= dt; raiseCol.visible = raiseFx > 0; raiseCol.position.set(P.x, height(P.x, P.z) + 4.5, P.z); raiseCol.material.opacity = Math.min(0.45, raiseFx * 0.4); raiseCol.scale.set(1 + (1.6 - raiseFx) * 0.4, 1, 1 + (1.6 - raiseFx) * 0.4); }
+  if(S.cur && S.cur.race === "undead"){ const l = wotdLeft(); if(l > 0) P.cds.willdead = l; else delete P.cds.willdead; if(P.dead && !$("dead").hidden) updWotdBtn(); }
+}
 
 function refresh(){ if(!$("panel").hidden) renderPanel(); updTracker(); }
 // ---------------------------------------------------------------- dungeon loot rolls: Need / Greed / Pass (30 sec)
@@ -711,7 +749,7 @@ $("chatin").addEventListener("keydown", e => { e.stopPropagation();
 $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("chatbox").hidden = true; });
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
-G.initEngine(scene, {floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount});
+G.initEngine(scene, {floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead});
 CO.initCoop({scene, hud, log, err, save, floatText, chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? makeMount(MOUNTS[k]) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t),
@@ -919,7 +957,7 @@ function npcPlate(n){ let p = npcPlates.get(n); if(!p){ p = document.createEleme
 // buffs and debuffs: small icons with the seconds left, under your frame and the target frame
 const AURA = {   // buff key → ability whose icon it uses
   shout: "shout", bark: "bark", avenging: "avenging", bubble: "bubble", dash: "dash", hotstreak: "pyroblast",
-  ignite: "fireball", deep: "rend", burn: "firearrow", pyro: "pyroblast"};
+  ignite: "fireball", deep: "rend", burn: "firearrow", pyro: "pyroblast", sprint: "sprint", bloodrage: "bloodrage", meld: "meld", stoneform: "stoneform"};
 const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir of Ironskin", "#a8b0bc"], keen: ["Elixir of Keenness", "#ff9a4a"], sage: ["Elixir of Wisdom", "#9fd6e8"]};
 function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good}; }
 function playerAuras(){ const L = [];
@@ -1139,6 +1177,7 @@ function update(dt){
     const pose = P.sitting ? "sit" : P.pose || (P.attackAnim > 0 && P.attackKind === "cast" ? "cast" : null);
     hero.userData.animate(P.walk, P.moving, P.attackKind === "cast" ? 0 : P.attackAnim, pose);
     hero.position.set(P.x, height(P.x, P.z) + (P.moving ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(P.dead && !P.ghost ? -1.4 : 0, P.rot, 0); if(P.dead && !P.ghost) hero.position.y += 0.3;
+  updRaceFx(dt);
     if(P.ghost) hero.position.y += 0.25 + Math.sin(now * 2) * 0.08;                            // a spirit floats
     if(mountMesh){ const gy = height(P.x, P.z); mountMesh.position.set(P.x, gy, P.z); mountMesh.rotation.y = P.rot; mountMesh.userData.animate(P.walk * 0.75, P.moving, 0); hero.position.y = gy + mountMesh.userData.saddle - 0.38 + (P.moving ? Math.abs(Math.sin(P.walk * 0.75)) * 0.08 : 0); } }
   // monsters: only the ones near you (or a friend) are drawn and move about

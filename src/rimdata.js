@@ -32,13 +32,15 @@ const petCallCheck = (...a) => E.petCallCheck(...a), petCall = (...a) => E.petCa
 const MAX_LVL = 30;
 export const HUNTER_MIN = 138;      // bows need at least 6 m to the target (in Rimfrost pixels; 23 px = 1 m)
 export const RACES = {
-  human:{name:"Human", skin:"#e2b48e", desc:"Experience gained increased by 10%.", hair:"#5b3a22"},
-  orc:{name:"Orc", skin:"#6f9a4a", desc:"Damage dealt increased by 10%.", hair:"#1e1e1e"},
-  elf:{name:"Elf", skin:"#efd8c8", desc:"Critical strike chance increased by 5%. Maximum mana increased by 10%.", hair:"#e7dca0"},
-  dwarf:{name:"Dwarf", skin:"#d9a07c", desc:"Maximum health increased by 15%. Starts with Mining 25.", hair:"#a2462a"},
-  undead:{name:"Undead", skin:"#b8c4a8", desc:"Health and mana regeneration out of combat increased by 50%.", hair:"#3a3a3a"}
+  human:{name:"Human", skin:"#e2b48e", desc:"Experience gained increased by 5%. Racial ability: Sprint.", hair:"#5b3a22"},
+  orc:{name:"Orc", skin:"#6f9a4a", desc:"Damage dealt increased by 3%. Racial ability: Bloodrage.", hair:"#1e1e1e"},
+  elf:{name:"Elf", skin:"#efd8c8", desc:"Chance to dodge increased by 3%. Racial ability: Shadowmeld.", hair:"#e7dca0"},
+  dwarf:{name:"Dwarf", skin:"#d9a07c", desc:"Maximum health increased by 8%. Racial ability: Stoneform.", hair:"#a2462a"},
+  undead:{name:"Undead", skin:"#b8c4a8", desc:"Health and mana regeneration out of combat increased by 50%. Racial ability: Will of the Dead.", hair:"#3a3a3a"}
 };
 
+// each race's racial ability (an ability id in AB)
+export const RACIAL = {human:"sprint", orc:"bloodrage", elf:"meld", dwarf:"stoneform", undead:"willdead"};
 // which classes each race may choose
 export const RACE_CLASSES = {
   human:["mage","warrior","priest","druid"],
@@ -66,6 +68,23 @@ export const SCHOOL_COLOR = {fire:"#ff8a3a", frost:"#8fd8ff", arcane:"#d38cff", 
 // Abilities. run(t) fires when the cast finishes. Helpers (pow, hit, proj, dot...) live in the engine.
 
 export const AB = {
+  // ---- Racial abilities: every character of that race has one from level 1 (no cost, no global cooldown)
+  sprint:{name:"Sprint", racial:"human", lvl:1, cost:0, cd:120, range:0, school:"phys", icon:"boot", tgt:"self", offGcd:true,
+    desc:()=>`Increases movement speed by 40%. Lasts 8 sec. Human racial ability.`,
+    run:()=>{buff("sprint",8);ring(P.px,P.py,55,"#9fe8ff");burst(P.px,P.py,"#cff4ff",14);}},
+  bloodrage:{name:"Bloodrage", racial:"orc", lvl:1, cost:0, cd:120, range:0, school:"phys", icon:"flame", tgt:"self", offGcd:true,
+    desc:()=>`Increases damage dealt by 20%. Lasts 8 sec. Orc racial ability.`,
+    run:()=>{buff("bloodrage",8);ring(P.px,P.py,60,"#ff3a2a");burst(P.px,P.py,"#ff5a3a",18);}},
+  meld:{name:"Shadowmeld", racial:"elf", lvl:1, cost:0, cd:120, range:0, school:"shadow", icon:"moon", tgt:"self", offGcd:true,
+    desc:()=>`Fade into the shadows. Monsters lose track of you and you leave combat. Lasts until you move or act, up to 1 min. Elf racial ability.`,
+    run:()=>{P.buffs.meld=60;P.auto=false;P.combatT=0;ring(P.px,P.py,45,"#8a6ab8");burst(P.px,P.py,"#3a2a5a",22);}},
+  stoneform:{name:"Stoneform", racial:"dwarf", lvl:1, cost:0, cd:120, range:0, school:"phys", icon:"shield", tgt:"self", offGcd:true,
+    desc:()=>`Turns your skin to stone, reducing damage taken by 20%. Lasts 8 sec. Dwarf racial ability.`,
+    run:()=>{buff("stoneform",8);ring(P.px,P.py,50,"#a8a294");burst(P.px,P.py,"#8a8478",16);}},
+  willdead:{name:"Will of the Dead", racial:"undead", whileDead:true, lvl:1, cost:0, cd:1800, range:0, school:"shadow", icon:"skull", tgt:"self", offGcd:true,
+    desc:()=>`Usable only while dead. Return to life where you fell with 30% health and no Resurrection Sickness. Once every 30 min. Undead racial ability.`,
+    check:()=>P.dead ? true : "You can only use this while dead",
+    run:()=>E.willOfTheDead()},
   // ---- Mage
   fireball:{name:"Fireball", lvl:1, cost:22, cast:2.0, range:300, school:"fire", icon:"orb", tgt:"enemy",
     desc:()=>`Hurls a fiery ball that deals ${fmt(spow()*2.2)} Fire damage.`,
@@ -472,6 +491,7 @@ export const TALENTS = {
 };
 
 export const AB_ICON = {
+  sprint:["boot","#5fc8e8"], bloodrage:["flame","#d8302a"], meld:["moon","#7a5ab0"], stoneform:["shield","#9a9488"], willdead:["skull","#5ab04a"],
   fireball:["orb","#ff8a3a"], frostbolt:["shard","#8fd8ff"], fireblast:["burst","#ff5a2a"], frostnova:["snowflake","#bfe9ff"], blizzard:["storm","#5fa8e0"],
   pyroblast:["flame","#ffb02e"], sparkrain:["spark","#d38cff"], icearmor:["crystal","#7fd0e8"], meteor:["meteor","#d8482a"],
   dismisspet:["dismiss","#8a9199"], intimidate:["roar","#e0a050"], bestialwrath:["fang","#ff5a3a"],

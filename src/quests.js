@@ -86,7 +86,7 @@ export function neededMobs(){ const out = new Set(); for(const q of QUESTS) if(q
 export const mobNeeded = kind => QUESTS.some(q => qActive(q) && q.obj.some((o, i) => (o[0] === "kill" && o[1] === kind || o[0] === "loot" && o[3] === kind) && qProg(q, i) < o[2]));
 
 // ---------------------------------------------------------------- gathering: Mining and Herbalism (1–150)
-const prof = () => C().prof || (C().prof = {mining: C().race === "dwarf" ? 25 : 1, herb: 1});   // dwarves start with Mining 25
+const prof = () => C().prof || (C().prof = {mining: 1, herb: 1});
 export const profSkill = k => prof()[k] || 1;
 export const gatherReq = item => GATHER[item] || null;
 // how likely a gather raises your skill: always while the node is new to you, then less and less
