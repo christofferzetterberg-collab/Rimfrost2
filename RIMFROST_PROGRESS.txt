@@ -22,7 +22,7 @@ Add to list:
  - Hunters:
   - 
  - Druid:
-  -
+  - Set Entangling roots to a 20 sec cooldown.
 
  - Paladin:
   - 

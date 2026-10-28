@@ -350,7 +350,7 @@ function updPetBar(){ const key = classBarKey(); if(key !== petBarKind) buildPet
     else { const on = G.petSkillOn(x); p.el.classList.toggle("off", !on); p.el.classList.toggle("auto", on); const cd = x === "growl" ? pt.growl : 0; p.cd.textContent = on && cd > 0 && !pt.dead ? Math.ceil(cd) : ""; } } }
 const petBusy = pt => !pt.dead && G.petFight();
 function tipFor(id){ const a = AB[id], type = a.res || G.resType(), cost = G.costOf(id), bits = [];
-  if(cost) bits.push(`${cost} ${RES_NAME[type].toLowerCase()}`); bits.push(a.cast ? `${a.cast} sec cast` : "Instant"); if(a.cd) bits.push(`${a.cd} sec cooldown`);
+  if(cost) bits.push(`${cost} ${RES_NAME[type].toLowerCase()}`); bits.push(a.cast ? `${a.cast} sec cast` : "Instant"); if(a.cd) bits.push(a.cd >= 60 && a.cd % 60 === 0 ? `${a.cd / 60} min cooldown` : `${a.cd} sec cooldown`);
   if(a.range) bits.push(a.minRange ? `${Math.round(a.minRange / PXU)}–${Math.round(a.range / PXU)} m range` : `${Math.round(a.range / PXU)} m range`);
   return `<h4>${a.name}</h4><div class="m">${bits.join(" · ")}</div>${a.desc()}`; }
 function showTip(e, html){ const t = $("tip"); t.innerHTML = html; t.hidden = false; const r = e.currentTarget.getBoundingClientRect();
@@ -702,7 +702,7 @@ function willOfTheDead(){ if(!P.dead || S.cur.race !== "undead") return; if(wotd
   if(P.ghost && P.corpse){ P.x = P.corpse.x; P.z = P.corpse.z; }
   S.cur.wotd = Date.now() + WOTD * 1000; $("dead").hidden = true; comeBack(0.3);
   G.ring(P.px, P.py, 70, "#5ab04a"); G.burst(P.px, P.py, "#7aff6a", 30); G.burst(P.px, P.py, "#1a1a1a", 18); raiseFx = 1.6;
-  floatText(P, "Will of the Dead", "#7aff6a", true); log("You rise again – Will of the Dead.", "#7aff6a"); save(); }
+  floatText(P, "Will of the Dead", "#7aff6a", true); log("Will of the Dead: you have returned to life.", "#7aff6a"); save(); }
 $("wotd").addEventListener("click", () => G.tryUse("willdead"));
 function updWotdBtn(){ const b = $("wotd"); if(!S.cur || S.cur.race !== "undead"){ b.hidden = true; return; } b.hidden = false; const l = wotdLeft();
   b.disabled = l > 0; const txt = l > 0 ? `Will of the Dead (${Math.ceil(l / 60)} min)` : "Will of the Dead"; if(b.textContent !== txt) b.textContent = txt; }

@@ -3,13 +3,14 @@
 ## v0.16.0
 
 ### New
-- **Racial abilities.** Every race has its own ability from level 1. It is in the spellbook under "Racial" and goes onto your action bar by itself. It costs nothing and does not trigger the global cooldown.
-  - **Human – Sprint:** movement speed +40% for 8 sec. 2 min cooldown.
-  - **Orc – Bloodrage:** damage dealt +20% for 8 sec. 2 min cooldown.
-  - **Elf – Shadowmeld:** monsters lose track of you and you leave combat. Lasts until you move or act, up to 1 min. 2 min cooldown. In co-op, a monster only gives up if nobody else has fought it.
-  - **Dwarf – Stoneform:** damage taken −20% for 8 sec. 2 min cooldown.
-  - **Undead – Will of the Dead:** only while dead. Come back to life where you fell with 30% health and no Resurrection Sickness. Once every 30 min. Also a button in the "You are dead" window.
-- Each racial ability has its own look: a coloured ring at your feet, and Sprint leaves a trail, Bloodrage makes you glow red, Stoneform turns you to stone, Shadowmeld makes you fade into the shadows, and Will of the Dead raises you in a green light.
+- **Racial abilities.** Every race has a racial ability from level 1. It appears in the spellbook under "Racial" and is placed on your action bar automatically. Racial abilities cost nothing and do not trigger the global cooldown.
+  - **Human – Sprint:** Increases movement speed by 40%. Lasts 8 sec. 2 min cooldown.
+  - **Orc – Bloodrage:** Increases damage dealt by 20%. Lasts 8 sec. 2 min cooldown.
+  - **Elf – Shadowmeld:** Enemies lose track of you and you leave combat. Lasts up to 60 sec. Moving or acting cancels the effect. 2 min cooldown. In co-op, an enemy only resets if no other player has fought it.
+  - **Dwarf – Stoneform:** Reduces damage taken by 20%. Lasts 8 sec. 2 min cooldown.
+  - **Undead – Will of the Dead:** Returns you to life at your corpse with 30% of your health, without Resurrection Sickness. Usable only while dead. 30 min cooldown. Also available from the death window.
+- Each racial ability has its own visual effect: a coloured ring around your character, plus a speed trail (Sprint), a red glow (Bloodrage), a stone skin (Stoneform), a shadowy fade (Shadowmeld) or a column of green light (Will of the Dead).
+- Ability tooltips now show long cooldowns in minutes.
 
 ### Changed
 - **Racial bonuses lowered:**
