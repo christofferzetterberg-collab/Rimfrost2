@@ -1,32 +1,38 @@
 Add to list: 
 - Co-op:
- - Remove the description for the target 
+ - 
 
+- Dungeons:
+ - Iron mine:
+  - 
+  - 
+  - 
 - General:
- - Make every shot or attack to start auto attacking (does not count for spells)
- - Increase the "use" of all areas, instead of having quest right at the start, spread it so the full areas are used more
- - When being dead, the Vision should be reduced and should not give away where every monster or NPC is, only the environment should be visible and the waypoint for the corpse. NPC or monsters should only be visible when being a few yards away.
+ - 
+ - 
+ - 
 
 - Bugs:
- - Spirit healer cannot be talked to for ressurection sickness
- - When being dead, NPC in the towns etc should not turn to you as if you were alive.
+ - 
 
 - Classes:
  - General class changes:
-  - 
+  -
 
  - Hunters:
-  - Instead of Frost arrow, replace it by an arrow that only slows the target it hits for 8 seconds and deal no damage. Should have 8 seconds cooldown. (Cripple Shot)
-  - Change Dismiss pet a 5 sec cast instead of instant.
-
+  - 
  - Druid:
   -
 
  - Paladin:
-  - Include Light's Mending as starter spell assigned to the action bar
+  - 
 
  - Warrior:
-  - Mighty strike should be added from the start and not be learned when creating a new character.
+  - 
 
  - Priest:
-  - Smite & Healing Light should be added from the start and not have to be learned when creating a new character
+  - 
+
+ - Mage:
+  - 
+

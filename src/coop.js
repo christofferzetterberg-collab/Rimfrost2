@@ -9,6 +9,7 @@ import {makeHero, makeBearForm, makeWolfForm, makeLeopardForm, makeWolf} from ".
 import {height, los} from "./world.js";
 import * as G from "./engine.js";
 import {regionOf} from "./dungeon.js";
+import {makeGear, rollQuality} from "./items.js";
 
 export const COOP = {peer: null, conns: [], role: null, code: null, status: "", remotes: {}, sendT: 0, mobT: 0, busy: false};
 const PEER_PREFIX = "rimfrost2-coop-v1-";
@@ -73,8 +74,13 @@ function broadcast(msg, except){ for(const c of COOP.conns) if(c !== except && c
 function sendTo(id, msg){ const r = COOP.remotes[id]; const c = r && COOP.conns.find(c => c.peer === r.via); if(c && c.open){ try{ c.send(msg); }catch(e){} } }
 function data(c, d){
   if(!d || typeof d !== "object") return;
-  if(COOP.role === "host" && (d.t === "st" || d.t === "bye" || d.t === "chat")) broadcast(d, c);          // the host relays to the other guests
+  if(COOP.role === "host" && (d.t === "st" || d.t === "bye" || d.t === "chat" || d.t === "vfx" || d.t === "explore" || d.t === "roll" || d.t === "rollr")) broadcast(d, c);          // the host relays to the other guests
   if(d.t === "chat"){ if(d.id !== myId() && H.chat) H.chat(d.name, d.cls, d.text); return; }
+  if(d.t === "vfx"){ if(d.id !== myId()) showVfx(d); return; }
+  if(d.t === "roll"){ if(d.ids.includes(myId())) H.rollShow(d); return; }
+  if(d.t === "rollc"){ if(COOP.role === "host") rollAnswer(d.rid, d.id, d.ch); return; }
+  if(d.t === "rollr"){ rollResult(d); return; }
+  if(d.t === "explore"){ const r = COOP.remotes[d.id]; if(d.id !== myId() && r && sameRegion(r, P) && Math.hypot(r.x - P.x, r.z - P.z) < 65 && !P.dead && H.explored) H.explored(d.place, d.name); return; }
   if(d.t === "bye"){ const r = COOP.remotes[d.id]; if(r){ H.log(`${r.name} left the game.`, "#93a4ad"); removeRemote(d.id); } return; }
   if(d.t === "op"){ if(COOP.role === "host") hostOp(d); return; }
   if(d.t === "phit"){ if(d.to === myId()) G.petDamage(d.dmg, mobByNid(d.nid)); else if(COOP.role === "host") sendTo(d.to, d); return; }
@@ -93,6 +99,13 @@ function data(c, d){
   syncPet(r);
 }
 export const myId = () => (COOP.peer && COOP.peer.id) || "me";
+// spells and arrows: what you cast is drawn for your friends too (only the picture – damage goes through the host as before)
+export function sendVfx(v){ if(!on() || !S.cur) return; broadcast({t: "vfx", id: myId(), ...v}); }
+function showVfx(d){ const r = COOP.remotes[d.id]; if(!r || !sameRegion(r, P)) return;
+  if(d.k === "p"){ const t = d.n != null ? mobs[d.n] : null; if(t && !t.dead) G.vfxProj(r.x, r.z, t, d.c, d.s, d.a); }
+  else if(d.k === "r") G.vfxRing(d.x, d.z, d.r, d.c);
+  else if(d.k === "z") G.vfxZone(d.x, d.z, d.r, d.d, d.c); }
+export const shareExplore = place => { if(on() && S.cur) broadcast({t: "explore", id: myId(), name: S.cur.name, place}); };
 // co-op chat: a short message to everyone in the game
 export function chat(text){ text = String(text || "").trim().slice(0, 200); if(!text || !on()) return false; broadcast({t: "chat", id: myId(), name: S.cur.name, cls: S.cur.cls, text}); if(H.chat) H.chat(S.cur.name, S.cur.cls, text); return true; }
 
@@ -208,19 +221,48 @@ export function killShare(m){ if(!coopMob(m) || COOP.role !== "host") return 1;
   const meIn = !P.dead && near(P), ids = Object.values(COOP.remotes).filter(r => !r.dead && near(r)).map(r => r.id);
   const n = ids.length + (meIn ? 1 : 0); if(ids.length) broadcast({t: "kill", nid: m.nid, n, to: ids});
   return meIn ? n : 0; }
+// ---------------------------------------------------------------- dungeon loot: elites and bosses drop ONE piece of gear for the group, and everyone rolls Need / Greed / Pass
+const ROLLS = {};                    // (host) open rolls: rid → {item, ids, answers, t}
+export function dungeonLoot(m){
+  const elite = m.boss ? "boss" : "elite";
+  let ids;
+  if(!coopMob(m)) ids = [myId()];
+  else { if(COOP.role !== "host") return; const inC = reg(m.x), near = e => reg(e.x) === inC && (inC || Math.hypot(e.x - m.x, e.z - m.z) < 65);
+    ids = [...(!P.dead && near(P) ? [myId()] : []), ...Object.values(COOP.remotes).filter(r => !r.dead && near(r)).map(r => r.id)]; }
+  if(!ids.length) return;
+  const clsOf = id => id === myId() ? S.cur.cls : (COOP.remotes[id] || {}).cls, cls = clsOf(ids[Math.floor(Math.random() * ids.length)]);
+  const item = makeGear({q: rollQuality(elite), il: m.lvl, cls});
+  if(ids.length === 1){ if(ids[0] === myId()) G.gainGear(item, `${m.name} dropped`); else rollResult(sendResult({rid: "r" + Date.now(), item, winner: ids[0], rolls: [[ids[0], "solo", 0]], from: m.name})); return; }
+  const rid = "r" + Date.now() + Math.random().toString(36).slice(2, 6), msg = {t: "roll", rid, item, ids, from: m.name, names: Object.fromEntries(ids.map(id => [id, id === myId() ? S.cur.name : (COOP.remotes[id] || {}).name]))};
+  ROLLS[rid] = {item, ids, answers: {}, t: performance.now(), from: m.name, names: msg.names}; broadcast(msg); if(ids.includes(myId())) H.rollShow(msg); }
+// your choice: "need", "greed" or "pass"
+export function rollChoose(rid, ch){ if(COOP.role === "host" || !on()) rollAnswer(rid, myId(), ch); else broadcast({t: "rollc", rid, id: myId(), ch}); }
+function rollAnswer(rid, id, ch){ const R = ROLLS[rid]; if(!R || !R.ids.includes(id) || R.answers[id]) return; R.answers[id] = ch; if(R.ids.every(i => R.answers[i])) resolveRoll(rid); }
+function resolveRoll(rid){ const R = ROLLS[rid]; if(!R) return; delete ROLLS[rid];
+  const rolls = R.ids.map(id => { const ch = R.answers[id] || "pass"; return [id, ch, ch === "pass" ? 0 : 1 + Math.floor(Math.random() * 100)]; });
+  const best = k => rolls.filter(r => r[1] === k).sort((a, b) => b[2] - a[2])[0], w = best("need") || best("greed");
+  rollResult(sendResult({rid, item: R.item, winner: w ? w[0] : null, rolls, from: R.from, names: R.names})); }
+function sendResult(res){ const msg = {t: "rollr", ...res}; broadcast(msg); return msg; }
+function rollResult(d){ H.rollHide(d.rid); const nm = id => (d.names && d.names[id]) || (id === myId() ? S.cur.name : (COOP.remotes[id] || {}).name || "Someone");
+  const it = d.item, col = QUAL[it.q].color;
+  if(d.rolls.length > 1) H.log(d.rolls.map(([id, ch, n]) => `${nm(id)}: ${ch === "pass" ? "pass" : ch + " " + n}`).join(" · "), "#93a4ad");
+  if(!d.winner) H.log(`Everyone passed on [${it.n}].`, "#93a4ad");
+  else if(d.winner === myId()) G.gainGear(it, `You won`);
+  else H.log(`${nm(d.winner)} won [${it.n}].`, col); }
+export function rollTick(){ const now = performance.now(); for(const [rid, R] of Object.entries(ROLLS)) if(now - R.t > 30000) resolveRoll(rid); }   // (30 sec to choose)
 // host → guests: monsters near any guest, 10 times a second
 const ST = {idle: 0, chase: 1, return: 2, dead: 0};
 function hostMobs(){ const rs = Object.values(COOP.remotes); if(!rs.length) return; const out = [];
   for(const m of mobs){ if(m.nid == null) continue;
     if(!rs.some(r => reg(r.x) === reg(m.x) && Math.hypot(r.x - m.x, r.z - m.z) < 90)) continue;
     out.push([m.nid, +m.x.toFixed(2), +m.z.toFixed(2), Math.round(m.hp), ST[m.state] || 0, m.dead ? 1 : 0, +m.rot.toFixed(2), m.moving ? 1 : 0, m.tgtId || 0,
-      m.nova ? [+m.nova.t.toFixed(2), +m.nova.x.toFixed(1), +m.nova.z.toFixed(1)] : 0, +m.stunT.toFixed(1), +m.rootT.toFixed(1), +m.slowT.toFixed(1), m.dots.map(d => [d.key, d.left]), +(m.attackAnim || 0).toFixed(2), m.slowPct || 0]); }
+      m.nova ? [+m.nova.t.toFixed(2), +m.nova.x.toFixed(1), +m.nova.z.toFixed(1)] : 0, +m.stunT.toFixed(1), +m.rootT.toFixed(1), +m.slowT.toFixed(1), m.dots.map(d => [d.key, d.left]), +(m.attackAnim || 0).toFixed(2), m.slowPct || 0, m.maxHp]); }
   broadcast({t: "mobs", m: out}); }
 function applyMobs(list){
   for(const s of list){ const m = mobByNid(s[0]); if(!m) continue;
     const wasDead = m.dead;
     m.nx = s[1]; m.nz = s[2]; if(s[5] || wasDead || Math.hypot(m.nx - m.x, m.nz - m.z) > 15){ m.x = m.nx; m.z = m.nz; }
-    if(s[3] < m.hp) m.flash = 0.15; m.hp = s[3];
+    if(s[3] < m.hp) m.flash = 0.15; m.hp = s[3]; if(s[16]) m.maxHp = s[16];             // (dungeon monsters grow with the group)
     if(s[5] && !wasDead){ m.dead = true; m.state = "dead"; m.deadT = 0; m.dots = []; if(P.target === m){ P.target = null; P.auto = false; } G.burst(m.px, m.py, "#d9c49a", 10); }
     else if(!s[5] && wasDead){ H.respawnVis(m); }
     if(!s[5]){ m.dead = false; m.state = ["idle", "chase", "return"][s[4]]; }
@@ -330,7 +372,7 @@ function finishTrade(){
   for(const [k, n] of Object.entries(theirs.items)) if(ITEMS[k]) G.addItem(k, n);
   c.gold += theirs.gold || 0;
   H.log(`Trade with ${name} complete.`, "#7be08a"); H.save(); closeTrade(); }
-export function tradeTick(){ if((TR.open || TR.waiting) && TR.with){ const r = COOP.remotes[TR.with]; if(!r || Math.hypot(r.x - P.x, r.z - P.z) > 15){ H.log("The trade was cancelled – you are too far apart.", "#93a4ad"); cancelTrade(); } } }
+export function tradeTick(){ if((TR.open || TR.waiting) && TR.with){ const r = COOP.remotes[TR.with]; if(!r || Math.hypot(r.x - P.x, r.z - P.z) > 15){ H.log("Trade cancelled: target is too far away.", "#93a4ad"); cancelTrade(); } } }
 const offerHTML = (o, mineSide) => {
   const g = o.gear.map(it => `<div class="it" data-tip="trade:${it.id}">${H.gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${esc(it.n)}</b><small>level ${it.il}</small></div>${mineSide ? `<button class="sbtn" data-act="tunoffer" data-id="${it.id}">Take back</button>` : ""}</div>`).join("");
   const it = Object.entries(o.items).map(([k, n]) => `<div class="it">${H.itemImg(k)}<div class="nm"><b>${ITEMS[k] ? ITEMS[k].name : k}</b> <span class="muted">× ${n}</span></div>${mineSide ? `<button class="sbtn" data-act="titem" data-id="${k}" data-n="-1">−1</button>` : ""}</div>`).join("");

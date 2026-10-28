@@ -63,8 +63,13 @@ export function takePick(i){ const p = C().pick; if(!p || !p.items[i]) return; i
 export function questExplore(x, z){
   for(const q of QUESTS){ if(!qActive(q)) continue; const s = qs()[q.id];
     q.obj.forEach((o, i) => { if(o[0] !== "explore" || s.prog[i] >= o[2]) return; const sp = EXPLORE[o[1]]; if(Math.hypot(x - sp.x, z - sp.z) > 7) return;
-      s.prog[i] = o[2]; const nm = sp.name[0].toUpperCase() + sp.name.slice(1); H.banner(nm, "Location discovered"); H.log(`${q.name}: you found ${sp.name}.`, "#e6bd5c"); progressLog(q); H.save(); H.refresh(); }); } }
-function progressLog(q){ if(qReady(q)) H.log(`${q.name} is complete – return to ${npcById(qTurnInNpc(q)).name}.`, "#7be08a"); }
+      exploreDone(q, i, o[1], ""); if(H.shareExplore) H.shareExplore(o[1]); }); } }
+function exploreDone(q, i, place, by){ const s = qs()[q.id], sp = EXPLORE[place]; s.prog[i] = q.obj[i][2]; const nm = sp.name[0].toUpperCase() + sp.name.slice(1);
+  H.banner(nm, by ? `Discovered by ${by}` : "Location discovered"); H.log(`${q.name}: ${by ? by + " found" : "discovered"} ${sp.name}.`, "#e6bd5c"); progressLog(q); H.save(); H.refresh(); }
+// co-op: a friend near you found a place – it counts for you too
+export function friendExplored(place, by){ for(const q of QUESTS){ if(!qActive(q)) continue; const s = qs()[q.id];
+  q.obj.forEach((o, i) => { if(o[0] === "explore" && o[1] === place && s.prog[i] < o[2]) exploreDone(q, i, place, by); }); } }
+function progressLog(q){ if(qReady(q)) H.log(`${q.name} completed. Return to ${npcById(qTurnInNpc(q)).name}.`, "#7be08a"); }
 // a monster died: count kills and roll quest loot
 export function questKill(kind){
   for(const q of QUESTS){ if(!qActive(q)) continue; const s = qs()[q.id];
@@ -101,15 +106,16 @@ export function gotQItem(item){ qb()[item] = (qb()[item] || 0) + 1;
 
 // ---------------------------------------------------------------- the trainer
 // what the trainer can teach you: abilities you don't know yet (some need another one first, like Dismiss Pet after Call Bear)
-export function trainable(){ return G.allBarIds().filter(id => !C().learned.includes(id) && (!AB[id].needs || C().learned.includes(AB[id].needs))).sort((a, b) => AB[a].lvl - AB[b].lvl); }
+export function trainable(){ return G.allBarIds().filter(id => !C().learned.includes(id) && !AB[id].talent && (!AB[id].needs || C().learned.includes(AB[id].needs))).sort((a, b) => AB[a].lvl - AB[b].lvl); }
 export const abCost = id => AB[id].free ? 0 : trainCost(AB[id].lvl);
 export function learnAbility(id){ const a = AB[id], cost = abCost(id);
   if(C().learned.includes(id) || C().level < a.lvl || (a.needs && !C().learned.includes(a.needs))) return; if(C().gold < cost) return H.err("You don't have enough gold");
-  C().gold -= cost; C().learned.push(id); G.burst(P.px, P.py, "#9fd6e8", 16); H.log(`You learned ${a.name}.`, "#9fd6e8"); H.buildBar(); H.save(); H.refresh(); }
+  C().gold -= cost; C().learned.push(id); G.burst(P.px, P.py, "#9fd6e8", 16); H.log(`You have learned ${a.name}.`, "#9fd6e8"); H.buildBar(); H.save(); H.refresh(); }
 export function buyRespec(){ const c = respecCost(C().level); if(!G.talentsSpent()) return; if(C().gold < c) return H.err("You don't have enough gold");
   C().gold -= c; G.resetTalents(); }
 // the abilities a new character starts with
-export const starterAbilities = cls => cls === "druid" ? ["wrath", "touch"] : [G.allBarIdsFor(cls)[0]];
+export const STARTERS = {druid: ["wrath", "touch"], paladin: ["palstrike", "palheal"], warrior: ["heroic"], priest: ["smite", "heal"], mage: ["fireball"], hunter: ["steady"]};
+export const starterAbilities = cls => (STARTERS[cls] || [G.allBarIdsFor(cls)[0]]).slice();
 
 // ---------------------------------------------------------------- shops
 export function buyGoods(k){ const row = GOODS.find(g => g[0] === k); if(!row) return; if(C().gold < row[1]) return H.err("You don't have enough gold");
@@ -123,7 +129,7 @@ export function junkValue(){ let g = 0; for(const k of Object.keys(C().bag)) if(
 export function sellJunk(){ const g = junkValue(); if(!g) return;
   for(const k of Object.keys(C().bag)) if(ITEMS[k] && ITEMS[k].kind === "junk") delete C().bag[k];
   C().gear = C().gear.filter(it => !isJunkGear(it));
-  C().gold += g; H.log(`You sold all your junk for ${g} gold.`, "#d9e3e7"); H.save(); H.refresh(); }
+  C().gold += g; H.log(`Sold junk for ${g} gold.`, "#d9e3e7"); H.save(); H.refresh(); }
 export function sellGear(id){ const it = C().gear.find(x => x.id === id); if(!it) return; const p = gearSell(it);
   C().gear = C().gear.filter(x => x !== it); C().gold += p; H.log(`You sold ${it.n} for ${p} gold.`, "#d9e3e7"); H.save(); H.refresh(); }
 // the smith's stock: one plain item for every slot, plus three better ones; the same for everyone of your class and level band

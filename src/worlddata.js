@@ -57,15 +57,16 @@ export const EXPLORE = {
   stones: {name: "the Whispering Stones", tx: 84, ty: 60}, moonwell: {name: "the Moon Well", tx: 146, ty: 106}, oldshaft: {name: "the Abandoned Shaft", tx: 184, ty: 50},
   frozenfalls: {name: "the Frozen Falls", tx: 204, ty: 76}, skullrock: {name: "Bleached Skull Rock", tx: 84, ty: 278}, rustcaravan: {name: "the Rusted Caravan", tx: 108, ty: 204},
   cryptdoor: {name: "the Sealed Crypt Door", tx: 78, ty: 308}, barrow: {name: "the Hollow Barrow", tx: 208, ty: 326},
-  watchtower: {name: "the Broken Watchtower", tx: 232, ty: 150}, minershrine: {name: "the Miner's Shrine", tx: 178, ty: 198},
+  watchtower: {name: "the Broken Watchtower", tx: 236, ty: 134}, minershrine: {name: "the Miner's Shrine", tx: 178, ty: 198},
   witchhut: {name: "the Witch's Hut", tx: 256, ty: 224}, sunkenbell: {name: "the Sunken Bell", tx: 300, ty: 268},
   obelisk: {name: "the Cinder Obelisk", tx: 328, ty: 102}, scorchbridge: {name: "the Scorched Bridge", tx: 282, ty: 58},
   frozencamp: {name: "the Frozen Camp", tx: 404, ty: 160}, giantprint: {name: "the Giant's Footprint", tx: 364, ty: 208}
 };
 // Dungeon doors in the world (tiles) and the camp whose road leads there
 export const DG_DOORS = {
-  d_mine: {tx: 232, ty: 150, hub: "jarnfastet"}, d_temple: {tx: 294, ty: 250, hub: "traskvakten"}, d_forge: {tx: 314, ty: 76, hub: "askvakten"},
-  d_vault: {tx: 394, ty: 168, hub: "isporten"}, d_crypt: {tx: 280, ty: 276, hub: "traskvakten"}
+  d_mine: {tx: 232, ty: 150, hub: "jarnfastet", name: "The Iron Mine", lv: "12–16"}, d_temple: {tx: 294, ty: 250, hub: "traskvakten", name: "The Drowned Temple", lv: "17–21"},
+  d_forge: {tx: 314, ty: 76, hub: "askvakten", name: "The Ember Forge", lv: "22–26"}, d_vault: {tx: 394, ty: 168, hub: "isporten", name: "The Frost Vault", lv: "27–31"},
+  d_crypt: {tx: 280, ty: 276, hub: "traskvakten", name: "The Draug King's Crypt", lv: "20"}
 };
 // world positions (units) and sizes for everything above
 for(const o of [...Object.values(HUBS), ...Object.values(LAIRS), ...Object.values(EXPLORE), ...Object.values(DG_DOORS)]){ Object.assign(o, W(o.tx, o.ty)); if(o.r) o.R = o.r * TS; }

@@ -1,7 +1,7 @@
 // Rimfrost 2 – stage 3: races, classes and Rimfrost's abilities in a low-poly 3D world, seen from an angled top-down camera.
 import * as THREE from "three";
 import {clamp, lerp, rng} from "./util.js";
-import {B, WATER, height, ground, houses, colliders, buildWorld, zoneAt, landAt, hubAt, placeName, openAt, featureAt, roadDist, GROUND, waterColor, SIGNS, DOORS} from "./world.js";
+import {B, WATER, height, ground, houses, colliders, buildWorld, zoneAt, landAt, hubAt, placeName, openAt, featureAt, roadDist, GROUND, waterColor, SIGNS, DOORS, STABLE_HORSES} from "./world.js";
 import {HUBS, ZONES, LAIRS, EXPLORE, RACE_HUB, DG_DOORS} from "./worlddata.js";
 import {KINDS, SPAWNS, ZONE_MOB_MULT, FIXED} from "./mobs.js";
 import {DUNGEONS, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
@@ -9,7 +9,7 @@ import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, mak
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
 import {P, S, mobs, PXU} from "./state.js";
 import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RES_NAME, TALENTS, TIER_NEED, abIcon, drawIcon} from "./rimdata.js";
-import {ITEMS, QUAL, SLOTS, SLOT_ORDER, STAT_NAME, GEAR_MAX, CLASS_MAIN, canWear, gearTypeName} from "./items.js";
+import {ITEMS, QUAL, SLOTS, SLOT_ORDER, STAT_NAME, GEAR_MAX, CLASS_MAIN, canWear, gearTypeName, upgradeGear} from "./items.js";
 import * as G from "./engine.js";
 import * as Q from "./quests.js";
 import * as K from "./keys.js";
@@ -37,6 +37,7 @@ Object.assign(sun.shadow.camera, {left: -40, right: 40, top: 40, bottom: -40, ne
 scene.add(sun, sun.target);
 addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 const {terrain, water} = buildWorld(scene);
+["horse", "gray"].forEach((k, i) => { const s = STABLE_HORSES[i]; if(!s) return; const g = makeMount(MOUNTS[k]); g.position.set(s.x, height(s.x, s.z), s.z); g.rotation.y = s.rot; scene.add(g); });   /* horses in Rimhaven's stable */
 // ---------------------------------------------------------------- the people in the towns and camps
 const hexc = s => parseInt(s.slice(1), 16);
 function npcModel(d){ if(d.trains) return makeHero(d.race, d.trains, RACES);                       // trainers look like their class
@@ -57,8 +58,8 @@ const portals = [];
   for(const d of DUNGEONS){ d.door = DOORS[d.id]; mk(d.door.x + d.door.fx * 0.8, d.door.z + d.door.fz * 0.8, "Enter " + d.name, "in", d); const ex = d.tileCenter(...d.exit); mk(ex.x, ex.z - 0.4, "Leave " + d.name, "out", d); } }
 const torch = new THREE.PointLight(0xffb070, 0, 32, 1.1); scene.add(torch);
 const townLight = new THREE.PointLight(0xffa860, 0, 40, 1.2); scene.add(townLight);
-const NIGHT_SKY = new THREE.Color(0x0c1424), MOON_COL = new THREE.Color(0x8fa8ff), DUSK_COL = new THREE.Color(0xff9a50);
-let sunAng = 1.2, nightNow = false, NIGHT_EXTRA = null, nightT = 0;
+const GHOST_SKY = new THREE.Color(0x26323e), NIGHT_SKY = new THREE.Color(0x0c1424), MOON_COL = new THREE.Color(0x8fa8ff), DUSK_COL = new THREE.Color(0xff9a50);
+let sunAng = 1.2, nightNow = false, NIGHT_EXTRA = null, nightT = 0, scaleT = 0;
 buildNav();
 // where a character starts (and wakes up): next to the square of a town, the fire of a camp, or Rimhaven's fountain
 const spotCache = new Map();
@@ -78,8 +79,11 @@ const exploreBeams = new Map(Object.values(EXPLORE).map(e => { const b = questBe
 { const r = rng(77), herbGeo = new THREE.ConeGeometry(0.22, 0.6, 5), budGeo = new THREE.SphereGeometry(0.16, 8, 6), L = (c, fs = true) => new THREE.MeshLambertMaterial({color: c, flatShading: fs});
   const glowOf = d => d.color ? [hexc(d.color), new THREE.Color(hexc(d.color)).multiplyScalar(0.55).getHex()] : null;
   for(const d of QOBJECTS){ const Z = ZONES[d.zone], spots = [];
-    for(let i = 0; spots.length < d.count && i < 4000; i++){ const x = Z.cx + (r() - 0.5) * 220, z = Z.cz + (r() - 0.5) * 220;
+    // spread over the whole zone: away from towns and camps, and well apart from each other
+    for(let i = 0; spots.length < d.count && i < 6000; i++){ const x = Z.cx + (r() - 0.5) * 320, z = Z.cz + (r() - 0.5) * 320, gap = i < 4000 ? 11 : 6;
       if(zoneAt(x, z) !== d.zone || hubAt(x, z) || roadDist(x, z) < 2.5 || featureAt(x, z) || height(x, z) < 0.5 || openAt(x, z) < 0.3) continue;
+      if(Object.values(HUBS).some(h => Math.hypot(x - h.x, z - h.z) < h.R + (i < 4000 ? 16 : 8))) continue;
+      if(spots.some(o => Math.hypot(o.x - x, o.z - z) < gap)) continue;
       if(d.far && Math.hypot(x - HUBS[d.far].x, z - HUBS[d.far].z) < d.d) continue;
       if(colliders.some(c => Math.abs(c.x - x) < 4 && Math.abs(c.z - z) < 4 && Math.hypot(c.x - x, c.z - z) < c.r + 1) || spots.some(o => Math.hypot(o.x - x, o.z - z) < 6) || !reachable(x, z)) continue;
       spots.push({x, z}); }
@@ -133,17 +137,17 @@ let mountMesh = null;
 function buildMount(){ if(mountMesh){ scene.remove(mountMesh); mountMesh = null; } if(P.mount && MOUNTS[P.mount]){ mountMesh = makeMount(MOUNTS[P.mount]); scene.add(mountMesh); } }
 function toggleMount(){ const c = S.cur; if(P.dead) return; if(P.mount) return dismount();
   if(P.casting && P.casting.kind === "mount") return G.cancelCast();
-  if(!c.riding) return err("You don't know how to ride yet – see the stablemaster in Rimhaven");
-  if(!c.mounts || !c.mounts.length) return err("You have no mount – buy one from the stablemaster in Rimhaven");
+  if(!c.riding) return err("You do not know how to ride");
+  if(!c.mounts || !c.mounts.length) return err("You have no mount");
   if(P.combatT > 0) return err("You cannot mount in combat"); if(inCrypt()) return err("You cannot ride here"); if(P.form) return err("Return to your normal form first");
   if(P.casting) return; if(P.sitting) G.standUp(); const k = c.mountSel && c.mounts.includes(c.mountSel) ? c.mountSel : c.mounts[0];
   P.casting = {kind: "mount", mount: k, total: 1.5, el: 0, label: MOUNTS[k].name}; P.auto = false; }
 function finishMount(k){ if(P.dead || inCrypt()) return; P.mount = k; buildMount(); G.burst(P.px, P.py, "#d8c08a", 12); }
 function dismount(){ if(!P.mount) return; P.mount = null; buildMount(); }
 function learnRiding(){ const c = S.cur; if(c.riding || c.level < RIDING_LVL) return; if(c.gold < RIDING_COST) return err("You don't have enough gold");
-  c.gold -= RIDING_COST; c.riding = true; G.burst(P.px, P.py, "#9fd6e8", 16); log("You learned Riding. Now pick a mount!", "#9fd6e8"); save(); refresh(); }
+  c.gold -= RIDING_COST; c.riding = true; G.burst(P.px, P.py, "#9fd6e8", 16); log("You have learned Riding.", "#9fd6e8"); save(); refresh(); }
 function buyMount(k){ const c = S.cur, M = MOUNTS[k]; if(!M || !c.riding) return; c.mounts = c.mounts || []; if(c.mounts.includes(k)) return; if(c.gold < M.price) return err("You don't have enough gold");
-  c.gold -= M.price; c.mounts.push(k); c.mountSel = k; log(`You bought a ${M.name}. Press ${K.keyOf("mount")} (or the Mount button) to ride.`, "#7be08a");
+  c.gold -= M.price; c.mounts.push(k); c.mountSel = k; log(`You bought ${M.name}. Press ${K.keyOf("mount")} to mount.`, "#7be08a");
   const bar = curBar(); if(!bar.includes("mount")){ const i = bar.indexOf(null); if(i >= 0){ bar[i] = "mount"; buildBar(); } } save(); refresh(); }
 
 // ---------------------------------------------------------------- monsters (Rimfrost 1's, see mobs.js), spread over their zones
@@ -156,7 +160,7 @@ const townDist = (x, z) => Math.min(...RACE_TOWNS.map(h => Math.hypot(x - h.x, z
 const minTownDist = K => K.passive ? 0 : Math.min(50, 18 + (K.lv[0] - 1) * 7);
 function zoneSpot(r, zone, near, far, minTown = 0){
   const Z = ZONES[zone], L = near ? LAIRS[near] : null;
-  for(let i = 0; i < 600; i++){ const x = L ? L.x + (r() - 0.5) * 30 : Z.cx + (r() - 0.5) * 230, z = L ? L.z + (r() - 0.5) * 30 : Z.cz + (r() - 0.5) * 230;
+  for(let i = 0; i < 900; i++){ const x = L ? L.x + (r() - 0.5) * 30 : Z.cx + (r() - 0.5) * 320, z = L ? L.z + (r() - 0.5) * 30 : Z.cz + (r() - 0.5) * 320;   // (the whole zone)
     if(L ? Math.hypot(x - L.x, z - L.z) > 14 : zoneAt(x, z) !== zone) continue;
     if(hubAt(x, z) || Object.values(HUBS).some(h => Math.hypot(x - h.x, z - h.z) < h.R + 8)) continue;
     if(!L && Object.values(LAIRS).some(l => Math.hypot(x - l.x, z - l.z) < l.R + 4)) continue;
@@ -169,11 +173,13 @@ function zoneSpot(r, zone, near, far, minTown = 0){
 // the boss of a lair stands near its middle, on a free spot
 function lairSpot(l){ for(let k = 0; k < 24; k++){ const a = 1.57 + k * 0.52, rr = 2.4 + Math.floor(k / 12) * 1.6, x = l.x + Math.cos(a) * rr, z = l.z + Math.sin(a) * rr;
   if(!colliders.some(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.3) && reachable(x, z)) return {x, z}; } return {x: l.x, z: l.z + 2.6}; }
+// dungeon monsters are tougher than those outside
+const DG_HP = 1.6, DG_DMG = 1.3, GROUP_HP = 0.7, GROUP_DMG = 0.1;
 function makeMob(kind, p, lvl, r){ const K = KINDS[kind];
   const m = withPx({kind, K, name: K.name, lvl, elite: K.elite, boss: K.boss, dg: K.dg, novaT: K.nova ? K.nova.every : 0, nova: null, x: p.x, z: p.z, hx: p.x, hz: p.z, rot: r() * 6.28, r: K.r, mesh: K.make(), walk: 0, moving: false,
-    maxHp: Math.round((30 + lvl * 18) * K.hp), dmg: (3 + lvl * 2.4) * K.dmg, state: "idle", dead: false, wanderT: r() * 4, wx: null, wz: null, atkT: 1, attackAnim: 0, lastHit: 0, deadT: 0, flash: 0,
+    maxHp: Math.round((30 + lvl * 18) * K.hp * (K.dg ? DG_HP : 1)), dmg: (3 + lvl * 2.4) * K.dmg * (K.dg ? DG_DMG : 1), state: "idle", dead: false, wanderT: r() * 4, wx: null, wz: null, atkT: 1, attackAnim: 0, lastHit: 0, deadT: 0, flash: 0,
     dots: [], slowT: 0, slowPct: 0, rootT: 0, stunT: 0, path: null, inScene: false});
-  m.nid = mobs.length; m.hp = m.maxHp; m.mesh.traverse(o => { if(o.isMesh) o.userData.mob = m; }); mobs.push(m); return m; }   // nid: the same number on every computer in co-op
+  m.nid = mobs.length; m.hp = m.maxHp; m.baseHp = m.maxHp; m.baseDmg = m.dmg; m.scaleN = 1; m.mesh.traverse(o => { if(o.isMesh) o.userData.mob = m; }); mobs.push(m); return m; }   // nid: the same number on every computer in co-op
 { const r = rng(99), lvlOf = K => K.lv[0] + Math.floor(r() * (K.lv[1] - K.lv[0] + 1));
   // in the starting zones a monster's level grows with its distance from the town, so the lowest ones are closest
   const lvlAt = (K, p, zone) => { if(!(ZONES[zone].race && ZONES[zone].lv[0] === 1) || K.passive) return lvlOf(K); const d0 = minTownDist(K), t = clamp((townDist(p.x, p.z) - d0) / 30 + (r() - 0.5) * 0.3, 0, 0.999);
@@ -196,12 +202,30 @@ const KEY = "rimfrost2-chars";
 function loadChars(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
 function saveChars(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} }
 function save(){ const c = S.cur; if(!c || !running || DEV.sim) return; const at = P.corpse || P; c.x = Math.round(at.x * 10) / 10; c.z = Math.round(at.z * 10) / 10; c.t = Date.now();   // a spirit is saved where its body lies
-  const list = loadChars(), i = list.findIndex(o => o.id === c.id); if(i >= 0) list[i] = c; else list.push(c); saveChars(list); }
+  // health, mana, death and Resurrection Sickness are kept, so reloading the page changes nothing
+  c.hpPct = P.maxHp ? Math.round(P.hp / P.maxHp * 1000) / 1000 : 1; c.mpPct = P.maxMana ? Math.round(P.mana / P.maxMana * 1000) / 1000 : 1;
+  c.sick = P.buffs.ressick ? Math.round(P.buffs.ressick) : 0;
+  c.death = P.dead ? {ghost: !!P.ghost, gx: Math.round(P.x * 10) / 10, gz: Math.round(P.z * 10) / 10} : null;
+  const list = loadChars(), i = list.findIndex(o => o.id === c.id); if(i >= 0) list[i] = c; else list.push(c); saveChars(list); saveWorld(); }
+// the world remembers what you killed and gathered: monsters and herbs / ore come back on their own timer, also after reloading the page
+const WKEY = "rimfrost2-world";
+function saveWorld(){ if(CO.COOP.role === "guest" || DEV.sim) return; const now = Date.now(), w = {mobs: {}, nodes: {}};
+  for(const m of mobs) if(m.dead && !m.dg && !m.night && !m.dev && m.nid != null){ const left = (m.elite ? RESPAWN_ELITE : RESPAWN) - m.deadT; if(left > 1) w.mobs[m.nid] = Math.round(now + left * 1000); }
+  nodes.forEach((n, i) => { if(!n.active && n.respawn > 1) w.nodes[i] = Math.round(now + n.respawn * 1000); });
+  w.dg = mobs.filter(m => m.dg && m.dead && m.nid != null).map(m => m.nid);                                   // dungeon monsters stay dead until the dungeon is reset
+  try{ localStorage.setItem(WKEY, JSON.stringify(w)); }catch(e){} }
+function loadWorld(){ let w = null; try{ w = JSON.parse(localStorage.getItem(WKEY)); }catch(e){} if(!w) return; const now = Date.now();
+  for(const [nid, at] of Object.entries(w.mobs || {})){ const m = mobs[+nid]; if(!m || m.nid !== +nid || at <= now) continue;
+    Object.assign(m, {dead: true, state: "dead", hp: 0, deadT: (m.elite ? RESPAWN_ELITE : RESPAWN) - (at - now) / 1000}); m.mesh.visible = false; }
+  for(const nid of w.dg || []){ const m = mobs[nid]; if(m && m.dg && m.nid === nid){ Object.assign(m, {dead: true, state: "dead", hp: 0, deadT: 99}); m.mesh.visible = false; } }
+  for(const [i, at] of Object.entries(w.nodes || {})){ const n = nodes[+i]; if(n && at > now){ n.active = false; n.respawn = (at - now) / 1000; } } }
+addEventListener("beforeunload", () => save());
 let running = false;
 function play(c){
-  S.cur = c; K.useChar(c);                                                        // every character has its own key bindings if(!c.learned || !c.learned.length) c.learned = Q.starterAbilities(c.cls); if(!c.quests) c.quests = {}; if(!c.qbag) c.qbag = {};
+  S.cur = c; K.useChar(c);                                                        /* every character has its own key bindings */ if(!c.learned) c.learned = []; for(const id of Q.starterAbilities(c.cls)) if(!c.learned.includes(id)) c.learned.push(id);   // the abilities every new character starts with if(!c.quests) c.quests = {}; if(!c.qbag) c.qbag = {};
   let moved = false; if(c.world !== 2){ const sp = spawnFor(c.race); c.x = sp.x; c.z = sp.z; c.quests = {}; c.qbag = {}; delete c.pick; c.world = 2; moved = true; }   // a character from the old map: home town, fresh quest log
   for(const m of mobs) respawn(m);
+  for(const it of [...Object.values(c.eq || {}), ...(c.gear || [])]) upgradeGear(it, c.cls);   // old gear gets the new stats
   const talReset = G.migrateTalents();
   G.clearFx(); G.resetPlayer(c.x ?? SPAWN.x, c.z ?? SPAWN.z); setGhost(false); $("ghostbar").hidden = true; closeChat();
   if(blocked(P.x, P.z, P.x, P.z, P.r)){ const sp = spawnFor(c.race); P.x = sp.x; P.z = sp.z; }
@@ -209,9 +233,16 @@ function play(c){
   buildHero(); buildBar(); $("pname").textContent = c.name; $("dead").hidden = true; $("chars").hidden = true; running = true;
   banner(zoneName(), `${c.name} – ${RACES[c.race].name} ${CLASSES[c.cls].name}`);
   for(const n of nodes){ n.active = true; n.respawn = 0; }
-  log(`Welcome, ${c.name}. Talk to the people of ${HUBS[RACE_HUB[c.race]].name} – a yellow ! means they have a quest for you.`, "#9fd6e8"); updTracker();
-  if(moved) log("The world has changed: it is now Rimfrost 1's big map. You are back in your home town and your quest log starts over (you keep your level, gear and gold).", "#e6bd5c");
-  if(talReset) log("Talents now have three specializations per class. Your talent points have been given back – press N to spend them.", "#e6bd5c");
+  loadWorld();
+  // health and mana as you left them; Resurrection Sickness keeps ticking; and if you were dead, you still are
+  if(c.sick > 0){ P.buffs.ressick = c.sick; P.sickOn = true; G.recompute(false); }
+  if(c.hpPct != null){ P.hp = Math.max(1, Math.round(P.maxHp * c.hpPct)); P.mana = Math.round(P.maxMana * (c.mpPct ?? 1)); }
+  if(c.death){ P.dead = true; P.hp = 0;
+    if(c.death.ghost){ P.corpse = {x: P.x, z: P.z}; P.x = c.death.gx; P.z = c.death.gz; G.petStash(); setGhost(true); }
+    else $("dead").hidden = false; }
+  updTracker();
+  if(moved) log("The world map has been updated. You have been returned to your home town and your quest log has been reset. Level, gear and gold are kept.", "#e6bd5c");
+  if(talReset) log("Your talents have been reset due to a talent update.", "#e6bd5c");
   if(c.pick) openPick(); updHelp();
 }
 function showChars(){
@@ -241,6 +272,8 @@ $("ccreate").onclick = () => { const name = $("cname").value.trim();
   if(loadChars().some(c => c.name.toLowerCase() === name.toLowerCase())) return $("cerr").textContent = "You already have a character with that name.";
   const sp = spawnFor(pickRace), c = {id: Date.now().toString(36), name, race: pickRace, cls: pickCls, level: 1, xp: 0, learned: [], x: sp.x, z: sp.z, t: Date.now(), gold: 0, bag: {potHp: 3}, gear: [], eq: {}, talents: {}, world: 2};
   play(c); save(); };
+$("pframe").style.pointerEvents = "auto"; $("pframe").style.cursor = "pointer";        // (set here too, so an old cached page still works)
+$("pframe").addEventListener("click", () => { if(!running) return; P.target = null; P.auto = false; CO.select(null); P.selfT = true; });   // click your own portrait: target yourself
 $("party").addEventListener("click", e => { const b = e.target.closest("[data-pid]"); if(b) CO.select(b.dataset.pid, true); });
 $("cname").addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter") $("ccreate").click(); });
 addEventListener("beforeunload", save);
@@ -248,11 +281,11 @@ addEventListener("beforeunload", save);
 // ---------------------------------------------------------------- the two action bars (keys 1–0 and Shift+1–0 by default)
 // Each character keeps its own layout (one per druid form). A slot holds an ability id or one of the SPECIALS.
 const SPECIALS = {
-  attack:  {name: "Attack", icon: "sword", color: "#b0763a", desc: "Start or stop attacking your target (or right-click a monster)."},
-  pothp:   {name: "Healing Potion", icon: "flask", color: "#d8404a", desc: "Drink your best healing potion. Potions share a 20 sec cooldown."},
-  potmana: {name: "Mana Potion", icon: "flask", color: "#3f7fe0", desc: "Drink your best mana potion. Potions share a 20 sec cooldown."},
-  rest:    {name: "Rest", icon: "halo", color: "#7fa8b8", desc: "Sit down out of combat to regain health and mana 2.5× faster. Moving, attacking or casting makes you stand up."},
-  mount:   {name: "Mount", icon: "paw", color: "#b08a5a", desc: "Summon your mount (1.5 sec, out of combat, not in dungeons): 60% faster. Attacking or using an ability gets you off. Press again to get off."}
+  attack:  {name: "Attack", icon: "sword", color: "#b0763a", desc: "Starts or stops attacking your target."},
+  pothp:   {name: "Healing Potion", icon: "flask", color: "#d8404a", desc: "Drinks your best healing potion. Potions share a 20 sec cooldown."},
+  potmana: {name: "Mana Potion", icon: "flask", color: "#3f7fe0", desc: "Drinks your best mana potion. Potions share a 20 sec cooldown."},
+  rest:    {name: "Rest", icon: "halo", color: "#7fa8b8", desc: "Sit down to regenerate health and mana 2.5× faster. Out of combat only."},
+  mount:   {name: "Mount", icon: "paw", color: "#b08a5a", desc: "Summons your mount, increasing movement speed by 60%. Out of combat only. Cannot be used in dungeons."}
 };
 const formKey = () => S.cur.cls === "druid" && P.form ? P.form : "normal";
 const idsFor = form => BARS[form === "normal" ? S.cur.cls : "druid_" + form].filter(id => S.cur.learned.includes(id));
@@ -296,9 +329,9 @@ function classBarKey(){ const c = S.cur; if(!c) return null; if(c.cls === "hunte
 function buildPetBar(){ const el = $("petbar"), key = classBarKey(); petBarKind = key; el.hidden = !key; el.innerHTML = ""; petSlots = []; if(!key) return;
   let list;
   if(key.startsWith("pet:")){ const pt = G.getPet();
-    list = [{x: "pa", name: "Attack", icon: "fang", color: "#d84a42", key: "petAttack", desc: "Your pet attacks your target."},
-      {x: "pf", name: "Follow", icon: "leap", color: "#9ccf8a", key: "petFollow", desc: "Your pet stops attacking and comes back to you. It stays out of the fight until the fight is over or you order an attack."},
-      ...G.PET_SKILLS[pt.kind].map((sk, i) => ({...sk, x: sk.id, key: "petSkill" + (i + 1), skill: true, desc: sk.desc + "<br><i>Click to switch on or off.</i>"}))]; }
+    list = [{x: "pa", name: "Attack", icon: "fang", color: "#d84a42", key: "petAttack", desc: "Commands your pet to attack your target."},
+      {x: "pf", name: "Follow", icon: "leap", color: "#9ccf8a", key: "petFollow", desc: "Commands your pet to stop attacking and return to you."},
+      ...G.PET_SKILLS[pt.kind].map((sk, i) => ({...sk, x: sk.id, key: "petSkill" + (i + 1), skill: true, desc: sk.desc + "<br><i>Click to toggle.</i>"}))]; }
   else list = FORMS.filter(([id]) => S.cur.learned.includes(id)).map(([id, key]) => { const [ic, col] = abIcon(id); return {x: "form:" + id, form: id, name: AB[id].name, icon: ic, color: col, key, desc: AB[id].desc()}; });
   for(const it of list){ const s = document.createElement("div"); s.className = "slot"; const cv = document.createElement("canvas"); cv.width = cv.height = 52; drawIcon(cv, it.icon, it.color); s.append(cv);
     s.insertAdjacentHTML("beforeend", `<span class="k">${K.short((K.binds[it.key] || [])[0])}</span><span class="cd"></span>`);
@@ -316,7 +349,7 @@ function updPetBar(){ const key = classBarKey(); if(key !== petBarKind) buildPet
 const petBusy = pt => !pt.dead && G.petFight();
 function tipFor(id){ const a = AB[id], type = a.res || G.resType(), cost = G.costOf(id), bits = [];
   if(cost) bits.push(`${cost} ${RES_NAME[type].toLowerCase()}`); bits.push(a.cast ? `${a.cast} sec cast` : "Instant"); if(a.cd) bits.push(`${a.cd} sec cooldown`);
-  if(a.range) bits.push(`${Math.round(a.range / PXU)} m range`);
+  if(a.range) bits.push(a.minRange ? `${Math.round(a.minRange / PXU)}–${Math.round(a.range / PXU)} m range` : `${Math.round(a.range / PXU)} m range`);
   return `<h4>${a.name}</h4><div class="m">${bits.join(" · ")}</div>${a.desc()}`; }
 function showTip(e, html){ const t = $("tip"); t.innerHTML = html; t.hidden = false; const r = e.currentTarget.getBoundingClientRect();
   t.style.left = clamp(r.left + r.width / 2 - 140, 8, innerWidth - 290) + "px"; t.style.top = (r.top - t.offsetHeight - 10) + "px"; }
@@ -331,7 +364,7 @@ function closePanel(){ if(panelTab === "trade" && (CO.TR.open || CO.TR.waiting))
 function openGameMenu(){ closePanel(); $("gmenu").hidden = false; updHelp(); }
 function closeGameMenu(){ $("gmenu").hidden = true; }
 document.querySelectorAll("#gmenu [data-g]").forEach(b => b.onclick = () => { const g = b.dataset.g; closeGameMenu();
-  if(g === "map"){ toggleMap(); return; } if(g === "dev"){ toggleDev(); return; }
+  if(g === "map"){ toggleMap(); return; }
   if(g === "logout"){ CO.leave(true); showChars(); } else if(g !== "resume") togglePanel(g); });
 document.querySelectorAll("#panel .tabs button[data-tab]").forEach(b => b.onclick = () => togglePanel(b.dataset.tab));
 document.querySelector("#panel .tabs .x").onclick = closePanel;
@@ -358,10 +391,11 @@ function renderPanel(){
   if($("panel").hidden || !S.cur) return;
   const c = S.cur, b = $("pbody"); let h = "";
   document.querySelectorAll("#panel .tabs button[data-tab]").forEach(x => x.classList.toggle("on", x.dataset.tab === panelTab));
-  document.querySelector("#panel .tabs").style.display = panelTab === "npc" || panelTab === "trade" || panelTab === "pick" ? "none" : "";
+  document.querySelector("#panel .tabs").style.display = panelTab === "dgenter" || panelTab === "npc" || panelTab === "trade" || panelTab === "pick" ? "none" : "";
   if(panelTab === "pick"){ const p = c.pick; if(!p) return closePanel(); const q = Q.qById(p.qid);
     h += `<h3>Choose your reward</h3><div class="muted" style="margin-bottom:6px">${q ? q.name : ""} – take one of these:</div>`;
     p.items.forEach((it, i) => { h += `<div class="it" data-tip="pick:${i}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${SLOTS[it.slot].name} · ${gearTypeName(it)} · level ${it.il}</small></div><button class="sbtn pri" data-act="takepick" data-id="${i}">Take</button></div>`; }); }
+  else if(panelTab === "dgenter"){ if(!dgAsk) return closePanel(); h += dgEnterHTML(dgAsk); }
   else if(panelTab === "npc"){ if(!talkNpc) return closePanel(); h += `<div style="text-align:right;margin:-2px -4px 0"><button class="sbtn" data-act="close">✕</button></div>` + npcHTML(talkNpc); }
   else if(panelTab === "quests"){
     const list = Q.activeQuests(); h += `<h3>Quest log</h3>`;
@@ -405,11 +439,11 @@ function renderPanel(){
       <span>Attack Crit</span><b>${pct(G.critChance(null, "phys"))}</b>${mu ? `<span>Spell Crit</span><b>${pct(G.critChance(null, "fire"))}</b><span>Healing bonus</span><b>+${Math.round((G.healMult() - 1) * 100)}%</b>` : ""}<span>Dodge</span><b>${pct(av.dodge)}</b><span>Parry</span><b>${pct(av.parry)}</b>
       <span>Damage taken</span><b>${pct(G.takenMult())}</b><span>Gold</span><b>${c.gold}</b></div>`;
     h += `<h3>Gathering</h3><div class="stats">${Object.entries(Q.PROF).map(([k, nm]) => `<span>${nm}</span><b>${Q.profSkill(k)} / ${Q.PROF_MAX}</b>`).join("")}</div>
-      <div class="muted" style="font-size:12px;margin-top:4px">Right-click herbs and ore veins (or press F) to gather them. Rarer ones need more skill.</div>`;
+      <div class="muted" style="font-size:12px;margin-top:4px">Right-click or press F to gather herbs and ore. Rare nodes require higher skill.</div>`;
   } else if(panelTab === "bag"){
     h += `<div class="row" style="justify-content:space-between"><span><b>${c.gold}</b> gold</span><span class="muted">Equipment ${c.gear.length} / ${GEAR_MAX}</span></div>`;
     h += `<h3>Equipment</h3>`;
-    if(!c.gear.length) h += `<div class="muted">Nothing yet. Monsters sometimes drop equipment – bandits most often.</div>`;
+    if(!c.gear.length) h += `<div class="muted">No equipment.</div>`;
     for(const it of c.gear){ const ok = canWear(it, c.cls) && c.level >= it.il;
       h += `<div class="it" data-tip="gear:${it.id}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${SLOTS[it.slot].name} · ${gearTypeName(it)} · level ${it.il}</small></div>
         <button class="sbtn" data-act="equip" data-id="${it.id}" ${ok ? "" : "disabled"}>Equip</button><button class="sbtn" data-act="destroy" data-id="${it.id}">${sureId === it.id ? "Sure?" : "Destroy"}</button></div>`; }
@@ -417,11 +451,11 @@ function renderPanel(){
     h += `<h3>Items</h3>`;
     if(!keys.length) h += `<div class="muted">Your bag is empty.</div>`;
     for(const k of keys){ const I = ITEMS[k];
-      h += `<div class="it">${itemImg(k)}<div class="nm"><b>${I.name}</b> <span class="muted">× ${c.bag[k]}</span><small>${I.desc || (I.kind === "junk" ? `Junk – sell to a merchant for ${I.sell} gold.` : I.kind === "ore" || I.kind === "herb" ? `Trade good – sells for ${I.sell} gold.` : "")}</small></div>${I.kind === "use" ? `<button class="sbtn" data-act="use" data-id="${k}">Use</button>` : ""}</div>`; }
+      h += `<div class="it">${itemImg(k)}<div class="nm"><b>${I.name}</b> <span class="muted">× ${c.bag[k]}</span><small>${I.desc || (I.kind === "junk" ? `Sell price: ${I.sell} gold.` : I.kind === "ore" || I.kind === "herb" ? `Trade good. Sell price: ${I.sell} gold.` : "")}</small></div>${I.kind === "use" ? `<button class="sbtn" data-act="use" data-id="${k}">Use</button>` : ""}</div>`; }
   } else if(panelTab === "tal"){
     const pts = G.talentPoints(), spent = G.talentsSpent(), left = pts - spent;
-    if(c.level < 10) h += `<div class="muted" style="margin:4px 0 8px">Talents unlock at level 10. From then on you get 1 talent point per level (21 points at level 30). Each class has three specializations – put your points where you want your character to shine.</div>`;
-    else h += `<div class="row" style="justify-content:space-between;margin:4px 0"><span><b>${left}</b> point${left === 1 ? "" : "s"} left · ${spent} spent</span><button class="sbtn" data-act="respec" ${spent ? "" : "disabled"}>${sureId === "respec" ? "Sure? Click again" : "Reset (free for now)"}</button></div>`;
+    if(c.level < 10) h += `<div class="muted" style="margin:4px 0 8px">Talents unlock at level 10. One talent point is awarded per level, up to 21 at level 30.</div>`;
+    else h += `<div class="row" style="justify-content:space-between;margin:4px 0"><span><b>${left}</b> point${left === 1 ? "" : "s"} left · ${spent} spent</span></div>`;
     // one specialization at a time: tabs with the points spent in each
     const trees = G.TREES[c.cls]; if(!trees.some(t => t.id === talTree)) talTree = (trees.find(t => G.treePoints(t.id) > 0) || trees[0]).id;
     h += `<div class="tabs vtabs">${trees.map(t => `<button class="${t.id === talTree ? "on" : ""}" data-act="taltree" data-id="${t.id}">${t.name} <span class="muted">${G.treePoints(t.id)}</span></button>`).join("")}</div>`;
@@ -446,6 +480,8 @@ $("pbody").addEventListener("click", e => { const el = e.target.closest("[data-a
   else if(a === "bind"){ capture = {action: id, slot: +el.dataset.slot}; renderPanel(); return; }
   else if(a === "resetkeys"){ if(sureId === "resetkeys"){ sureId = null; K.resetKeys(); buildBar(); updHelp(); } else sureId = "resetkeys"; renderPanel(); return; }
   else if(a === "spiritres"){ resurrectAtSpirit(); return; }
+  else if(a === "dgenter"){ if(dgAsk && distU(P, dgAsk.door) < 8) enterDungeon(dgAsk); return; }
+  else if(a === "dgreset"){ if(sureId !== "dgreset"){ sureId = "dgreset"; renderPanel(); return; } sureId = null; if(dgAsk && CO.COOP.role !== "guest" && !CO.anyRemoteIn(regionOf(dgAsk.x0))){ resetDungeon(dgAsk); enterDungeon(dgAsk); } return; }
   else if(a === "taltree") talTree = id;
   else if(a === "learnriding") learnRiding(); else if(a === "buymount") buyMount(id); else if(a === "pickmount"){ S.cur.mountSel = id; if(P.mount){ P.mount = id; buildMount(); } save(); }
   else if(a === "takepick"){ Q.takePick(+id); if(!S.cur.pick) closePanel(); return; }
@@ -455,7 +491,6 @@ $("pbody").addEventListener("click", e => { const el = e.target.closest("[data-a
   else if(a === "abandon"){ if(sureId === id){ sureId = null; Q.abandonQuest(id); } else { sureId = id; renderPanel(); } return; }
   else if(a === "buyrespec"){ if(sureId === "buyrespec"){ sureId = null; Q.buyRespec(); } else { sureId = "buyrespec"; renderPanel(); } return; }
   else if(a === "destroy"){ if(sureId === id){ sureId = null; G.destroyGear(id); } else { sureId = id; renderPanel(); } return; }
-  else if(a === "respec"){ if(sureId === "respec"){ sureId = null; G.resetTalents(); } else { sureId = "respec"; renderPanel(); } return; }
   sureId = null; hideTip(); renderPanel(); });
 $("pbody").addEventListener("mousemove", e => { const ab = e.target.closest("[data-tipab]"); if(ab) return showTipAt(e, slotTip(ab.dataset.tipab)); const el = e.target.closest("[data-tip]"); if(!el) return hideTip(); const [kind, id] = el.dataset.tip.split(":");
   const it = kind === "pick" ? (S.cur.pick && S.cur.pick.items[+id]) : kind === "eq" ? S.cur.eq[id] : kind === "shop" ? shopStock.find(x => x.id === id) : kind === "trade" ? CO.TR.theirs.gear.find(x => x.id === id) : S.cur.gear.find(x => x.id === id); if(it) showTipAt(e, gearTip(it)); });
@@ -469,11 +504,11 @@ function useThing(n){
   if(distU(P, n) > USE_RANGE) return err(n.role ? `Get closer to talk to ${n.name}` : "Get closer to pick that up");
   P.pendingUse = null; P.dest = null;
   if(n.role){ talkTo(n); return; }
-  if(n.portal){ if(P.combatT > 0) return err("You cannot do that in combat"); if(n.portal === "in") enterDungeon(n.d); else exitDungeon(n.d); return; }
+  if(n.portal){ if(P.combatT > 0) return err("You cannot do that in combat"); if(n.portal === "in") askEnter(n.d); else exitDungeon(n.d); return; }
   if(!n.active) return;
   const gath = !!Q.gatherReq(n.item);                    // herbs and ore can always be gathered (with enough skill); other things only for a quest
-  if(!gath && !Q.needsQItem(n.item)) return err("You don't need this right now");
-  if(n.def.night && !isNight()) return err("Moonbloom only opens at night");
+  if(!gath && !Q.needsQItem(n.item)) return err("You do not need this item");
+  if(n.def.night && !isNight()) return err("Moonbloom can only be gathered at night");
   if(gath){ const ok = Q.canGather(n.item); if(ok !== true) return err(ok); }
   if(P.combatT > 0) return err("You cannot pick that up in combat");
   if(P.sitting) G.standUp(); dismount();
@@ -493,50 +528,57 @@ function updTracker(){
     const here = curDungeon() ? curDungeon().name : (ZONES[zoneAt(P.x, P.z)] || {}).name;
     const where = o => { if(Q.qProg(q, o) >= q.obj[o][2]) return ""; const ob = q.obj[o], a = ob[0] === "explore" ? null : nearestArea(ob), w = ob[0] === "explore" ? placeName(EXPLORE[ob[1]].x, EXPLORE[ob[1]].z) : a && a.where;
       const nk = (ob[0] === "kill" && NIGHT_KINDS.has(ob[1])) || (ob[0] === "loot" && NIGHT_KINDS.has(ob[3])), no = ob[0] === "collect" && ob[1] === "moonbloom";
-      const nh = no ? (isNight() ? ` <span class="wh nt">· now, at night</span>` : ` <span class="wh nt">· night only – in ${Math.ceil(minutesToNight())} min</span>`) : nk ? ` <span class="wh nt">· ${isNight() ? "more out now" : "more at night"}</span>` : "";
+      const nh = no ? (isNight() ? ` <span class="wh nt">· Night only (available now)</span>` : ` <span class="wh nt">· Night only (in ${Math.ceil(minutesToNight())} min)</span>`) : nk ? ` <span class="wh nt">· ${isNight() ? "More common at night (now)" : "More common at night"}</span>` : "";
       return (w && w !== here ? ` <span class="wh">· ${w}</span>` : "") + nh; };
     const tn = Q.npcById(Q.qTurnInNpc(q)), th = tn && HUBS[tn.hub];
-    return `<div class="tq"><b>${q.name}</b>${ready ? `<div class="ok">Return to ${tn.name}${th && Math.hypot(th.x - P.x, th.z - P.z) > th.R + 10 ? ` <span class="wh">· ${th.name}</span>` : ""}</div>` : q.obj.map((o, i) => `<div>${Q.objName(o)}: ${Q.qProg(q, i)}/${o[2]}${where(i)}</div>`).join("")}</div>`; }).join("");
+    return `<div class="tq"><b>${q.name}</b>${dgTag(q)}${ready ? `<div class="ok">Return to ${tn.name}${th && Math.hypot(th.x - P.x, th.z - P.z) > th.R + 10 ? ` <span class="wh">· ${th.name}</span>` : ""}</div>` : q.obj.map((o, i) => `<div>${Q.objName(o)}: ${Q.qProg(q, i)}/${o[2]}${where(i)}</div>`).join("")}</div>`; }).join("");
 }
+// quests whose monsters live in a dungeon say so ("Dungeon: The Iron Mine")
+const qdCache = new Map();
+function questDungeon(q){ if(qdCache.has(q.id)) return qdCache.get(q.id); let name = null;
+  for(const o of q.obj){ const kind = o[0] === "kill" ? o[1] : o[0] === "loot" ? o[3] : null; if(!kind) continue; const ms = mobs.filter(m => m.kind === kind && !m.dev);
+    if(ms.length && ms.every(m => m.dg)){ const d = dungeonAt(ms[0].hx); if(d) name = d.name; } }
+  qdCache.set(q.id, name); return name; }
+const dgTag = q => { const d = questDungeon(q); return d ? ` <span class="dgtag">Dungeon: ${d}</span>` : ""; };
 function questCard(q){
   const ready = Q.qReady(q), active = Q.qActive(q), gq = Q.questGearQ(q);
   const rew = `${Q.qXP(q)} XP · ${Q.qGold(q)} gold${q.items ? " · " + Object.entries(q.items).map(([k, n]) => `${n} × ${ITEMS[k].name}`).join(", ") : ""}${gq >= 0 ? ` · <span style="color:${QUAL[gq].color}">${QUAL[gq].name.toLowerCase()} equipment</span>` : ""}${q.pick ? ` · <span style="color:${QUAL[q.pick.q].color}">your choice of ${QUAL[q.pick.q].name.toLowerCase()} equipment</span>` : ""}`;
   const objs = q.obj.map((o, i) => `<div>${Q.objName(o)}: ${active ? Q.qProg(q, i) : 0}/${o[2]}</div>`).join("") || (q.to ? `<div>Talk to ${Q.npcById(q.to).name}</div>` : "");
   const btn = ready && Q.qTurnInNpc(q) === talkNpc?.id ? `<button class="sbtn pri" data-act="turnin" data-id="${q.id}">Complete quest</button>` : !active ? `<button class="sbtn pri" data-act="accept" data-id="${q.id}">Accept</button>` : `<span class="muted">In progress</span>`;
-  return `<div class="qc"><div class="row" style="justify-content:space-between"><b>${q.name}</b><span class="muted">level ${q.lvl}</span></div>
+  return `<div class="qc"><div class="row" style="justify-content:space-between"><b>${q.name}${dgTag(q)}</b><span class="muted">level ${q.lvl}</span></div>
     <div class="qt">${ready && Q.qTurnInNpc(q) === talkNpc?.id ? (q.done || "Well done.") : q.text}</div><div class="qo">${objs}</div><div class="muted" style="font-size:12px">Reward: ${rew}</div><div style="margin-top:6px">${btn}</div></div>`;
 }
 function npcHTML(n){
   const c = S.cur;
   if(n.role === "spirit") return `<div class="row" style="justify-content:space-between"><b style="font-size:16px;color:#9fd6ff">Spirit Guide</b><span class="muted">${n.name}</span></div>
-    <div class="qt" style="margin:6px 0 10px">${P.ghost ? "It is not your time yet, wanderer. Walk back to your body and live again – or I can return you to life here and now. But the journey back would leave you weak for a while." : "Rest easy. The living have no business here."}</div>
-    ${P.ghost ? `<div class="it"><div class="nm"><b>Resurrect here</b><small>Come back now with Resurrection Sickness: 75% lower damage, healing, health, mana and stats for ${SICK_TIME / 60} minutes.</small></div><button class="sbtn pri" data-act="spiritres">Resurrect</button></div>
-    <div class="muted" style="margin-top:8px">Or walk back to your body (the white light, also on your maps): you come back with half your health and mana and no sickness.</div>` : ""}`; let h = `<div class="row" style="justify-content:space-between"><b style="font-size:16px;color:#7be08a">${n.name}</b><span class="muted">${n.title}</span></div><div class="qt" style="margin:6px 0 4px">${n.hello}</div>`;
+    <div class="qt" style="margin:6px 0 10px">${P.ghost ? "Your time has not yet come. Return to your corpse, or I can resurrect you here at a cost." : "The living have no business here."}</div>
+    ${P.ghost ? `<div class="it"><div class="nm"><b>Resurrect here</b><small>Resurrect now with Resurrection Sickness: damage, healing, health, mana and stats reduced by 75% for ${SICK_TIME / 60} min.</small></div><button class="sbtn pri" data-act="spiritres">Resurrect</button></div>
+    <div class="muted" style="margin-top:8px">Alternatively, return to your corpse (marked on your maps) to resurrect with 50% health and mana.</div>` : ""}`; let h = `<div class="row" style="justify-content:space-between"><b style="font-size:16px;color:#7be08a">${n.name}</b><span class="muted">${n.title}</span></div><div class="qt" style="margin:6px 0 4px">${n.hello}</div>`;
   const QUESTS_HERE = [...Q.activeQuests().filter(q => Q.qTurnInNpc(q) === n.id && Q.qReady(q)), ...Q.activeQuests().filter(q => (q.npc === n.id || Q.qTurnInNpc(q) === n.id) && !Q.qReady(q))];
   for(const q of Q.QUESTS_LIST()) if(q.npc === n.id && Q.qAvailable(q)) QUESTS_HERE.push(q);
   if(QUESTS_HERE.length){ h += `<h3>Quests</h3>`; for(const q of [...new Set(QUESTS_HERE)]) h += questCard(q); }
-  else if(n.role === "quest") h += `<div class="muted" style="margin-top:8px">${Q.QUESTS_LIST().some(q => q.npc === n.id && Q.qSoon(q)) ? "I'll have more for you when you are stronger." : "I have nothing more for you right now."}</div>`;
-  if(n.role === "trainer" && n.trains !== c.cls) h += `<div class="muted" style="margin-top:8px">I only teach ${CLASSES[n.trains].name}s. Look for the ${CLASSES[c.cls].name} trainer.</div>`;
+  else if(n.role === "quest") h += `<div class="muted" style="margin-top:8px">${Q.QUESTS_LIST().some(q => q.npc === n.id && Q.qSoon(q)) ? "Return when you have gained more experience." : "I have no tasks for you at this time."}</div>`;
+  if(n.role === "trainer" && n.trains !== c.cls) h += `<div class="muted" style="margin-top:8px">I train only ${CLASSES[n.trains].name}s. Seek out a ${CLASSES[c.cls].name} trainer.</div>`;
   else if(n.role === "trainer"){
     h += `<h3>Abilities · you have <b>${c.gold}</b> gold</h3>`;
     const list = Q.trainable();
-    if(!list.length) h += `<div class="muted">You know everything I can teach you.</div>`;
+    if(!list.length) h += `<div class="muted">You have learned all available abilities.</div>`;
     for(const id of list.slice(0, 8)){ const a = AB[id], cost = Q.abCost(id), ok = c.level >= a.lvl;
       h += `<div class="it"><canvas width="32" height="32" data-icon="${id}"></canvas><div class="nm"><b>${a.name}</b> <span class="muted">· ${cost ? cost + " gold" : "free"}</span><small>${ok ? a.desc() : `Requires level ${a.lvl}`}</small></div>
         <button class="sbtn" data-act="learn" data-id="${id}" ${ok && c.gold >= cost ? "" : "disabled"}>Learn</button></div>`; }
     if(c.level >= 10){ const rc = Q.respecCost(c.level), sp = G.talentsSpent();
-      h += `<h3>Talents</h3><div class="it"><div class="nm"><b>Reset all talents</b> <span class="muted">· ${rc} gold</span><small>${sp ? `You get back all ${sp} talent points.` : "You have not spent any talent points yet."}</small></div>
+      h += `<h3>Talents</h3><div class="it"><div class="nm"><b>Reset all talents</b> <span class="muted">· ${rc} gold</span><small>${sp ? `Refunds ${sp} talent points.` : "No talent points spent."}</small></div>
         <button class="sbtn" data-act="buyrespec" ${sp && c.gold >= rc ? "" : "disabled"}>${sureId === "buyrespec" ? "Sure?" : "Reset"}</button></div>`; }
   }
   if(n.role === "stable"){
     h += `<h3>Riding · you have <b>${c.gold}</b> gold</h3>`;
-    if(c.riding) h += `<div class="muted">You know how to ride.</div>`;
-    else h += `<div class="it"><div class="nm"><b>Riding</b> <span class="muted">· ${RIDING_COST} gold</span><small>${c.level >= RIDING_LVL ? "Learn to ride a mount: 60% faster travel." : `Requires level ${RIDING_LVL}`}</small></div><button class="sbtn" data-act="learnriding" ${c.level >= RIDING_LVL && c.gold >= RIDING_COST ? "" : "disabled"}>Learn</button></div>`;
+    if(c.riding) h += `<div class="muted">Riding learned.</div>`;
+    else h += `<div class="it"><div class="nm"><b>Riding</b> <span class="muted">· ${RIDING_COST} gold</span><small>${c.level >= RIDING_LVL ? "Allows you to ride mounts. Increases movement speed by 60%." : `Requires level ${RIDING_LVL}`}</small></div><button class="sbtn" data-act="learnriding" ${c.level >= RIDING_LVL && c.gold >= RIDING_COST ? "" : "disabled"}>Learn</button></div>`;
     h += `<h3>Mounts</h3>`;
     for(const [k, M] of Object.entries(MOUNTS)){ const own = (c.mounts || []).includes(k), sel = own && (c.mountSel || c.mounts[0]) === k;
-      h += `<div class="it"><div style="width:32px;height:32px;border-radius:4px;background:${M.color};border:2px solid ${M.mane}"></div><div class="nm"><b>${M.name}</b> <span class="muted">· ${own ? "yours" : M.price + " gold"}</span><small>${own ? (sel ? "This is the mount you ride." : "Click Ride to use this one.") : c.riding ? "60% faster travel." : "Learn Riding first."}</small></div>
+      h += `<div class="it"><div style="width:32px;height:32px;border-radius:4px;background:${M.color};border:2px solid ${M.mane}"></div><div class="nm"><b>${M.name}</b> <span class="muted">· ${own ? "yours" : M.price + " gold"}</span><small>${own ? (sel ? "Active mount." : "Owned.") : c.riding ? "Increases movement speed by 60%." : "Requires Riding."}</small></div>
         ${own ? `<button class="sbtn" data-act="pickmount" data-id="${k}" ${sel ? "disabled" : ""}>${sel ? "Riding" : "Ride"}</button>` : `<button class="sbtn" data-act="buymount" data-id="${k}" ${c.riding && c.gold >= M.price ? "" : "disabled"}>Buy</button>`}</div>`; }
-    if(c.cls === "druid") h += `<div class="muted" style="margin-top:8px">Druids also get Travel Form at level ${RIDING_LVL} from their trainer – just as fast, but a mount lets you keep your normal form.</div>`;
+    if(c.cls === "druid") h += `<div class="muted" style="margin-top:8px">Druids also learn Travel Form at level ${RIDING_LVL}.</div>`;
   }
   if(n.role === "vendor"){
     h += `<div class="tabs vtabs"><button class="${vendorTab === "buy" ? "on" : ""}" data-act="vtab" data-id="buy">Buy</button><button class="${vendorTab === "sell" ? "on" : ""}" data-act="vtab" data-id="sell">Sell</button><span class="muted" style="margin-left:auto">you have <b>${c.gold}</b> gold</span></div>`;
@@ -546,7 +588,7 @@ function npcHTML(n){
         for(const it of shopStock){ const price = Q.gearPrice(it); h += `<div class="it" data-tip="shop:${it.id}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${SLOTS[it.slot].name} · level ${it.il} · ${price} gold</small></div><button class="sbtn" data-act="buygear" data-id="${it.id}" ${c.gold >= price && c.level >= it.il ? "" : "disabled"}>Buy</button></div>`; } }
     } else {
       const sell = Object.keys(c.bag).filter(k => ITEMS[k]), jv = Q.junkValue();
-      h += `<div class="row" style="justify-content:space-between;margin:4px 0 8px"><span class="muted">Junk: gray loot and poor equipment. Quest items are never sold.</span><button class="sbtn pri" data-act="selljunk" ${jv ? "" : "disabled"}>Sell all junk${jv ? ` (${jv} gold)` : ""}</button></div>`;
+      h += `<div class="row" style="justify-content:space-between;margin:4px 0 8px"><span class="muted">Sells all gray items and poor equipment.</span><button class="sbtn pri" data-act="selljunk" ${jv ? "" : "disabled"}>Sell all junk${jv ? ` (${jv} gold)` : ""}</button></div>`;
       if(sell.length) h += `<h3>Items</h3>`;
       for(const k of sell) h += `<div class="it">${itemImg(k)}<div class="nm"><b>${ITEMS[k].name}</b> <span class="muted">× ${c.bag[k]}</span><small>${ITEMS[k].sell} gold each</small></div><button class="sbtn" data-act="sell" data-id="${k}">Sell 1</button>${c.bag[k] > 1 ? `<button class="sbtn" data-act="sellall" data-id="${k}">All</button>` : ""}</div>`;
       if(c.gear.length) h += `<h3>Equipment</h3>`;
@@ -583,53 +625,84 @@ const graveyards = [];
     const guide = makeHumanoid({shirt: 0xbfe6ff, robe: true, cape: 0x9fd6ff, hair: 0xf4f8fa, skin: 0xdff4ff, beard: true, weaponType: "staff", weapon: 0x9fd6ff});
     guide.traverse(o => { if(o.isMesh){ o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.6; o.material.emissive && o.material.emissive.setHex(0x3a6a8a); } });
     guide.position.set(0, 0, 0); g.add(guide);
-    const halo = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 1.4, 12, 10, 1, true), glowMat); halo.position.y = 6; halo.raycast = () => {}; g.add(halo);
+    const halo = new THREE.Mesh(new THREE.RingGeometry(1.2, 1.6, 32), glowMat); halo.rotation.x = -Math.PI / 2; halo.position.y = 0.08; halo.raycast = () => {}; g.add(halo);   // a faint ring on the ground
     const gy = {zone: zid, name: Z.name + " Graveyard", x: spot.x, z: spot.z, mesh: guide, group: g, spirit: true, role: "spirit", r: 0.5, title: "Spirit Guide"};
     guide.traverse(o => { if(o.isMesh) o.userData.npc = gy; }); graveyards.push(gy); } }
 // the body you left behind: a glowing mark while you are a spirit
-const corpseMark = (() => { const g = new THREE.Group(), m = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.6, 14, 10, 1, true), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide, fog: false}));
-  m.position.y = 7; m.raycast = () => {}; g.add(m); const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.15, 28), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.7, side: THREE.DoubleSide}));
+const corpseMark = (() => { const g = new THREE.Group(), m = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 40, 12, 1, true), new THREE.MeshBasicMaterial({color: 0xbfe6ff, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, fog: false, blending: THREE.AdditiveBlending}));
+  m.position.y = 20; m.raycast = () => {}; g.add(m); const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.15, 28), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.7, side: THREE.DoubleSide}));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.1; g.add(ring); g.visible = false; scene.add(g); return g; })();
-const CORPSE_RANGE = 6;
-function nearestGraveyard(){ const inDg = curDungeon(); if(inDg){ const s = inDg.tileCenter(...inDg.start); return {x: s.x, z: s.z + 1, name: inDg.name + " entrance"}; }
+const CORPSE_RANGE = 6, GHOST_SIGHT = 9;          // a spirit only sees monsters and people within a few yards
+// the graveyard you go to: the nearest one – after dying in a dungeon, the nearest to its door, out in the world
+function nearestGraveyard(){ const inDg = curDungeon(), from = inDg ? inDg.door : P;
   const list = graveyards.length ? graveyards : Object.values(HUBS).map(hubSpot);
-  return list.slice().sort((a, b) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(b.x - P.x, b.z - P.z))[0]; }
-function setGhost(on){ P.ghost = on; renderer.domElement.style.filter = on ? "grayscale(.85) brightness(1.05) contrast(.95)" : "";
+  return list.slice().sort((a, b) => Math.hypot(a.x - from.x, a.z - from.z) - Math.hypot(b.x - from.x, b.z - from.z))[0]; }
+// where your body is shown on the maps: in a dungeon, at its door (seen from outside)
+function corpseMark2(){ if(!P.corpse) return null; const d = dungeonAt(P.corpse.x); return d && !curDungeon() ? {x: d.door.x, z: d.door.z, dg: d} : {x: P.corpse.x, z: P.corpse.z}; }
+function setGhost(on){ P.ghost = on; renderer.domElement.style.filter = on ? "grayscale(.55) saturate(.7) brightness(.92)" : "";
   for(const gy of graveyards) gy.group.visible = on; corpseMark.visible = on && !!P.corpse;
   if(on && P.corpse) corpseMark.position.set(P.corpse.x, height(P.corpse.x, P.corpse.z), P.corpse.z);
   buildHero(); updGhostBar(); }
 function releaseSpirit(){ if(!P.dead || P.ghost) return;
-  P.corpse = {x: P.x, z: P.z}; G.petStash(); P.target = null; P.auto = false; CO.select(null);
+  P.corpse = {x: P.x, z: P.z}; G.petStash(); P.target = null; P.auto = false; P.combatT = 0; CO.select(null);
   const sp = nearestGraveyard(); P.x = sp.x + 1.6; P.z = sp.z + 1.6; P.hp = 0; $("dead").hidden = true; setGhost(true);
-  log(`You are a spirit. Walk back to your body (the white light, also on your maps) to come back to life, or ask the Spirit Guide at ${sp.name}.`, "#9fd6e8"); save(); }
+  log(`You have released your spirit at ${sp.name}. Return to your corpse to resurrect.`, "#9fd6e8"); save(); }
 function comeBack(hpPct){ P.dead = false; P.corpse = null; P.shield = 0; P.hots = []; setGhost(false); G.recompute(false); P.hp = Math.max(1, P.maxHp * hpPct); P.mana = P.maxMana * hpPct; P.combatT = 0; G.petLoad(); }
 function resurrectAtCorpse(){ if(!P.ghost || !P.corpse || Math.hypot(P.x - P.corpse.x, P.z - P.corpse.z) > CORPSE_RANGE) return;
-  P.x = P.corpse.x; P.z = P.corpse.z; comeBack(0.5); G.burst(P.px, P.py, "#ffffff", 20); log("You return to your body with half your health and mana.", "#7be08a"); save(); }
+  P.x = P.corpse.x; P.z = P.corpse.z; comeBack(0.5); G.burst(P.px, P.py, "#ffffff", 20); log("You have been resurrected.", "#7be08a"); save(); }
 function resurrectAtSpirit(){ if(!P.ghost) return; closePanel();
   P.buffs.ressick = SICK_TIME; P.sickOn = true; comeBack(1); G.burst(P.px, P.py, "#9fd6ff", 24);
-  log(`The Spirit Guide brings you back. Resurrection Sickness: your damage, healing, health, mana and stats are 75% lower for ${SICK_TIME / 60} minutes.`, "#e6bd5c"); save(); }
+  log(`You have been resurrected with Resurrection Sickness (${SICK_TIME / 60} min).`, "#e6bd5c"); save(); }
 // the bar at the top while you are a spirit
 function updGhostBar(){ const el = $("ghostbar"); el.hidden = !P.ghost; if(!P.ghost) return;
-  const d = P.corpse ? Math.hypot(P.x - P.corpse.x, P.z - P.corpse.z) : 1e9, near = d <= CORPSE_RANGE;
-  const html = `<b>You are a spirit.</b> ${near ? "You are at your body." : `Your body is ${Math.round(d)} m away (the white light).`} <button id="gres" ${near ? "" : "disabled"}>Resurrect</button>`;
+  const cm = corpseMark2(), d = cm ? Math.hypot(P.x - cm.x, P.z - cm.z) : 1e9, near = !!cm && !cm.dg && P.corpse && Math.hypot(P.x - P.corpse.x, P.z - P.corpse.z) <= CORPSE_RANGE;
+  const html = cm && cm.dg ? `<b>You are dead.</b> Your corpse is inside ${cm.dg.name} (${Math.round(d)} m). Enter the dungeon to resurrect.`
+    : `<b>You are dead.</b> ${near ? "You are at your corpse." : `Corpse: ${Math.round(d)} m.`} <button id="gres" ${near ? "" : "disabled"}>Resurrect</button>`;
   if(el.dataset.h !== html){ el.dataset.h = html; el.innerHTML = html; } }
 $("ghostbar").addEventListener("click", e => { if(e.target.id === "gres") resurrectAtCorpse(); });
 // ---------------------------------------------------------------- going into and out of dungeons
-const dgReset = {};               // when you leave, everything inside comes back next time you enter
-const resetDungeon = d => { for(const m of mobs) if(m.dg && dungeonAt(m.hx) === d) respawn(m); dgReset[d.id] = false; };
-function enterDungeon(d){ dismount();
-  if(CO.COOP.role !== "guest" && dgReset[d.id] !== false && !CO.anyRemoteIn(regionOf(d.x0))) resetDungeon(d);   // in co-op the host's dungeon is the one everybody visits
-  dgReset[d.id] = false;
+// group scaling: every extra player inside a dungeon gives its monsters +70% health and +10% damage (the host decides; health keeps its share when it changes)
+function dgPlayers(d){ const reg = regionOf(d.x0); return (regionOf(P.x) === reg && !P.ghost ? 1 : 0) + Object.values(CO.COOP.remotes).filter(r => regionOf(r.x) === reg && !r.gh).length; }
+function scaleDungeons(){ if(CO.COOP.role === "guest") return;
+  for(const d of DUNGEONS){ const n = Math.max(1, dgPlayers(d)); d.players = n;
+    for(const m of mobs){ if(!m.dg || dungeonAt(m.hx) !== d || m.scaleN === n) continue; if(m.state === "chase" && n < m.scaleN) continue;   // (no weakening mid-fight)
+      const pct = m.maxHp ? m.hp / m.maxHp : 1; m.maxHp = Math.round(m.baseHp * (1 + GROUP_HP * (n - 1))); m.dmg = m.baseDmg * (1 + GROUP_DMG * (n - 1)); if(!m.dead) m.hp = Math.max(1, Math.round(m.maxHp * pct)); m.scaleN = n; } } }
+// a dungeon keeps its state: what you killed stays dead until you choose to reset it at the door
+const dgDead = d => mobs.filter(m => m.dg && dungeonAt(m.hx) === d);
+const resetDungeon = d => { for(const m of mobs) if(m.dg && dungeonAt(m.hx) === d){ respawn(m); m.dead = false; } saveWorld(); log(`${d.name} has been reset.`, "#e6bd5c"); };
+let dgAsk = null;
+function askEnter(d){ if(P.ghost) return ghostEnter(d); dgAsk = d; panelTab = "dgenter"; sureId = null; hideTip(); $("panel").hidden = false; renderPanel(); }
+function dgEnterHTML(d){ const all = dgDead(d), dead = all.filter(m => m.dead).length, guest = CO.COOP.role === "guest", inside = CO.anyRemoteIn(regionOf(d.x0));
+  const lv = DG_DOORS[d.id] ? DG_DOORS[d.id].lv : "";
+  return `<div style="text-align:right;margin:-2px -4px 0"><button class="sbtn" data-act="close">✕</button></div><h3>${d.name}</h3><div class="qt">${d.sub || ""}</div><div class="muted" style="margin:6px 0">Dungeon · Level ${lv} · Group recommended</div>
+    <div class="muted" style="margin-bottom:4px">${(() => { const n = CO.on() ? 1 + Object.keys(CO.COOP.remotes).length : 1; return n > 1 ? `Monster strength scales with group size (${n} players).` : "Monster strength scales with group size."; })()}</div>
+    <div class="muted" style="margin-bottom:8px">${dead ? `Defeated: ${dead} / ${all.length}. Reset the dungeon to respawn all monsters.` : `Monsters: ${all.length}.`}</div>
+    <div class="row" style="gap:6px"><button class="sbtn pri" data-act="dgenter">Enter</button>
+    <button class="sbtn" data-act="dgreset" ${dead && !guest && !inside ? "" : "disabled"} title="${guest ? "Only the host can reset a dungeon" : inside ? "Someone is inside" : ""}">${sureId === "dgreset" ? "Sure? Reset and enter" : "Reset and enter"}</button></div>
+    ${guest ? `<div class="muted" style="margin-top:6px;font-size:12px">Only the group host can reset the dungeon.</div>` : ""}`; }
+function enterDungeon(d){ dismount(); closePanel();
   const s = d.tileCenter(...d.start); P.x = s.x; P.z = s.z + 1; P.rot = 0; P.target = null; P.auto = false; P.path = null;
   cam.yaw = cam.yawT = Math.PI; banner(d.name, d.sub); log(`You enter ${d.name}.`, "#e6bd5c"); save(); }
+// a spirit at the door of the dungeon where its body lies: going in brings it back to life at the entrance
+function ghostEnter(d){ if(!P.corpse || dungeonAt(P.corpse.x) !== d) return err("Your corpse is not in this dungeon");
+  enterDungeon(d); comeBack(0.5); G.burst(P.px, P.py, "#ffffff", 20); log(`You have been resurrected at the entrance of ${d.name}.`, "#7be08a"); save(); }
 function exitDungeon(d){
   d = d || curDungeon(); if(!d) return;
-  P.x = d.door.x + d.door.fx * 3.2; P.z = d.door.z + d.door.fz * 3.2; P.rot = d.door.rot; P.target = null; P.auto = false; P.path = null; dgReset[d.id] = true;
+  P.x = d.door.x + d.door.fx * 3.2; P.z = d.door.z + d.door.fz * 3.2; P.rot = d.door.rot; P.target = null; P.auto = false; P.path = null;
   for(const m of mobs) if(m.dg && m.state === "chase" && dungeonAt(m.hx) === d) evade(m);
-  banner(zoneName(), ""); log(`You leave ${d.name}. Its monsters will be back when you return.`, "#93a4ad"); save(); }
+  banner(zoneName(), ""); log(`You leave ${d.name}.`, "#93a4ad"); save(); }
 $("revive").addEventListener("click", releaseSpirit);
 
 function refresh(){ if(!$("panel").hidden) renderPanel(); updTracker(); }
+// ---------------------------------------------------------------- dungeon loot rolls: Need / Greed / Pass (30 sec)
+const rollEls = new Map();
+function rollShow(d){ if(rollEls.has(d.rid)) return; const it = d.item, el = document.createElement("div"); el.className = "rollbox";
+  el.innerHTML = `<div class="rt">${d.from} dropped</div><div class="ri" data-tip="1">${gearImg(it)}<b style="color:${QUAL[it.q].color}">${it.n}</b></div><div class="rb"><button data-c="need">Need</button><button data-c="greed">Greed</button><button data-c="pass">Pass</button></div><div class="rbar"><i></i></div>`;
+  el.querySelector(".ri").onmouseenter = e => showTipAt(e, gearTip(it)); el.querySelector(".ri").onmouseleave = hideTip;
+  el.querySelectorAll("button").forEach(b => b.onclick = () => { CO.rollChoose(d.rid, b.dataset.c); el.querySelector(".rb").innerHTML = `<span class="muted">You chose ${b.dataset.c} – waiting for the others…</span>`; });
+  $("rolls").appendChild(el); rollEls.set(d.rid, {el, t: now}); }
+function rollHide(rid){ const r = rollEls.get(rid); if(r){ r.el.remove(); rollEls.delete(rid); hideTip(); } }
+function updRolls(){ for(const [rid, r] of rollEls){ const left = Math.max(0, 1 - (now - r.t) / 30); r.el.querySelector(".rbar i").style.width = left * 100 + "%"; if(now - r.t > 34) rollHide(rid); } }
 // ---------------------------------------------------------------- co-op chat: Enter opens the box, Enter sends, Esc cancels
 function openChat(){ if(!CO.on()) return;                                     /* (only in co-op) */ const box = $("chatbox"); box.hidden = false; down.clear(); setTimeout(() => $("chatin").focus(), 0); }
 function closeChat(){ $("chatbox").hidden = true; $("chatin").value = ""; $("chatin").blur(); }
@@ -639,12 +712,12 @@ $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("ch
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
 G.initEngine(scene, {floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount});
-CO.initCoop({scene, hud, log, err, save, floatText, chat: chatLine, mountMesh: k => MOUNTS[k] ? makeMount(MOUNTS[k]) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
+CO.initCoop({scene, hud, log, err, save, floatText, chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? makeMount(MOUNTS[k]) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t),
-  someoneEnters: reg => { const d = DUNGEONS.find(d => regionOf(d.x0) === reg); if(d && dgReset[d.id] !== false && regionOf(P.x) !== reg && !CO.anyRemoteIn(reg)) resetDungeon(d); }});
+  someoneEnters: () => {}});
 K.setOnSave(() => save());
-Q.initQuests({log, err, banner, save, refresh, buildBar, openPick, mobName: k => KINDS[k].name});
+Q.initQuests({shareExplore: CO.shareExplore, log, err, banner, save, refresh, buildBar, openPick, mobName: k => KINDS[k].name});
 
 // ---------------------------------------------------------------- targeting
 const selRing = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.95, 28), new THREE.MeshBasicMaterial({color: 0xff4a3a, transparent: true, opacity: 0.85, depthWrite: false}));
@@ -661,7 +734,7 @@ function doAction(a, e){
   if(a === "zoomIn") cam.distT = clamp(cam.distT - 3, 12, 48); else if(a === "zoomOut") cam.distT = clamp(cam.distT + 3, 12, 48);
   else if(a === "attack") startAttack(); else if(a === "target") cycleTarget(); else if(a === "rest") G.toggleRest();
   else if(a === "interact"){ if(P.ghost && P.corpse && Math.hypot(P.x - P.corpse.x, P.z - P.corpse.z) <= CORPSE_RANGE) return resurrectAtCorpse();
-    const n = nearestUsable(USE_RANGE); if(n) useThing(n); else err("There is nothing close enough to use"); }
+    const n = nearestUsable(USE_RANGE); if(n) useThing(n); else err("Nothing to interact with"); }
   else if(a === "potHp") G.usePotion("hp"); else if(a === "potMana") G.usePotion("mana");
   else if(a === "map") toggleMap();
   else if(a === "petAttack"){ if(S.cur.cls === "hunter") G.petAttackCmd(); } else if(a === "petFollow"){ if(S.cur.cls === "hunter") G.petFollowCmd(); }
@@ -677,11 +750,11 @@ addEventListener("keydown", e => {
   if(capture){ e.preventDefault(); if(e.code === "Escape"){ capture = null; renderPanel(); return; }
     const combo = (e.code === "Backspace" || e.code === "Delete") ? null : K.comboOf(e); if(combo === null && e.code !== "Backspace" && e.code !== "Delete") return;
     const took = K.setBind(capture.action, capture.slot, combo); capture = null;
-    if(took) log(`That key was taken from “${actionLabel(took)}”.`, "#e6bd5c"); buildBar(); updHelp(); renderPanel(); return; }
+    if(took) log(`Key binding removed from “${actionLabel(took)}”.`, "#e6bd5c"); buildBar(); updHelp(); renderPanel(); return; }
   if(!running) return;
   down.add(e.code);
   // Esc: close a window, then cancel a cast, then clear the target, then open the menu
-  if(e.code === "Escape"){ if(!$("bigmap").hidden) toggleMap(); else if(!$("gmenu").hidden) closeGameMenu(); else if(!$("panel").hidden) closePanel(); else if(P.casting) G.cancelCast(); else if(P.target){ P.target = null; P.auto = false; } else openGameMenu(); return; }
+  if(e.code === "Escape"){ if(!$("bigmap").hidden) toggleMap(); else if(!$("gmenu").hidden) closeGameMenu(); else if(!$("panel").hidden) closePanel(); else if(P.casting) G.cancelCast(); else if(P.target || P.ftarget || P.selfT){ P.target = null; P.auto = false; P.selfT = false; CO.select(null); } else openGameMenu(); return; }
   if(!$("gmenu").hidden) return;
   const combo = K.comboOf(e); if(!combo) return;
   const a = K.actionFor(combo) || (e.shiftKey || e.ctrlKey || e.altKey ? null : null);
@@ -703,7 +776,8 @@ const marker = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55, 20), new THREE.
 marker.rotation.x = -Math.PI / 2; marker.visible = false; scene.add(marker);
 function pick(e){ mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(mouse, camera);
   const meshes = []; for(const m of mobs) if(!m.dead) m.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
-  for(const n of npcs) n.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
+  if(!P.ghost) for(const n of npcs) n.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
+  else for(const gy of graveyards) gy.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });                // a spirit can talk to the Spirit Guide
   for(const n of nodes) if(n.active && n.mesh.visible) n.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
   for(const p of portals) meshes.push(p.mesh);
   for(const r of Object.values(CO.COOP.remotes)) if(r.mesh && r.mesh.visible) r.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
@@ -719,7 +793,7 @@ renderer.domElement.addEventListener("pointerdown", e => {
   if(e.button !== 0 || P.dead) return; const h = pick(e);
   if(h && h.mob){ P.target = h.mob; CO.select(null); }                                                 // left = select only
   else if(h && h.friend) CO.select(h.friend.id);                                                         // a friend: your heals go to them
-  else if(!h || h.point){ P.target = null; P.auto = false; CO.select(null); }                           // clicking nothing clears your target
+  else if(!h || h.point){ P.target = null; P.auto = false; CO.select(null); P.selfT = false; }                           // clicking nothing clears your target
 });
 renderer.domElement.addEventListener("pointermove", e => {
   if(!rmb.down) return; const dx = e.clientX - rmb.x, dy = e.clientY - rmb.y; rmb.x = e.clientX; rmb.y = e.clientY; rmb.moved += Math.abs(dx) + Math.abs(dy);
@@ -727,7 +801,7 @@ renderer.domElement.addEventListener("pointermove", e => {
 });
 renderer.domElement.addEventListener("pointerup", e => {
   if(e.button !== 2 || !rmb.down) return; rmb.down = false; renderer.domElement.style.cursor = "";
-  if(rmb.moved > 4 || P.dead || !running) return;                                                     // it was a camera turn, not a click
+  if(rmb.moved > 4 || (P.dead && !P.ghost) || !running) return;                                   // (a spirit can still right-click the Spirit Guide)                                                     // it was a camera turn, not a click
   const h = pick(e); if(!h) return;
   if(h.mob) startAttack(h.mob); else if(h.use) useThing(h.use); else if(h.friend) CO.tradeRequest(h.friend.id);   // right-click a friend: ask to trade
 });
@@ -758,13 +832,13 @@ function updMob(m, dt){
     const c = CO.mobTarget(m); if(!c){ evade(m); return; }                                   // nobody left to fight
     const tg = c.e, toPet = !!c.pet; m.tgtPet = toPet; m.tgtId = c.id;                        // you, a friend, or a pet – whoever holds the monster's attention
     if(c.me || c.mine) P.combatT = Math.max(P.combatT, 2);
-    if(Math.hypot(m.x - m.hx, m.z - m.hz) > 40 || (now - m.lastHit > 10 && distU(m, tg) > 30)){ evade(m); if(c.me) log(`${m.name} gives up and returns.`, "#93a4ad"); return; }
+    if(Math.hypot(m.x - m.hx, m.z - m.hz) > 40 || (now - m.lastHit > 10 && distU(m, tg) > 30)){ evade(m); if(c.me) log(`${m.name} is evading.`, "#93a4ad"); return; }
     if(!free) return;                                                                         // stunned
     const dt2 = distU(m, tg), seen = sees(m, tg), rg = m.K.ranged, reach = rg && !m.nova ? rg.range : m.K.reach + tg.r;   // casters stay at range and throw bolts
     if(m.nova){ m.nova.t -= dt; m.nova.mesh.scale.setScalar(1 - Math.max(0, m.nova.t) / m.K.nova.warn * 0.85); if(m.nova.t <= 0) novaBlast(m); else if(!m.K.nova.atTarget) return; }   // Morvane holds still while his nova builds
     else if(m.K.nova){ m.novaT -= dt; if(m.novaT <= 0 && dt2 < 14){ m.novaT = m.K.nova.every; startNova(m, tg); if(!m.K.nova.atTarget) return; } }
     if((dt2 > reach || !seen) && m.rootT <= 0){ const ok = moveMob(m, tg.x, tg.z, m.K.speed * (m.slowT > 0 ? 1 - m.slowPct : 1), dt);
-      m.stuckT = ok ? 0 : (m.stuckT || 0) + dt; if(m.stuckT > 3){ m.stuckT = 0; evade(m); if(c.me) log(`${m.name} cannot reach you and returns.`, "#93a4ad"); return; } }   // can't get there (a cliff in the way): give up
+      m.stuckT = ok ? 0 : (m.stuckT || 0) + dt; if(m.stuckT > 3){ m.stuckT = 0; evade(m); if(c.me) log(`${m.name} is evading.`, "#93a4ad"); return; } }   // can't get there (a cliff in the way): give up
     else m.stuckT = 0;
     if(dt2 <= reach + 0.5) turnTo(m, tg.x - m.x, tg.z - m.z, dt, 10);
     m.atkT -= dt;
@@ -887,11 +961,16 @@ function updHUD(dt){
   { const pf = $("pframe"), top = pf.offsetTop + pf.offsetHeight + 8 + "px"; if($("party").style.top !== top) $("party").style.top = top; }
   CO.partyHUD();
   const need = G.xpNeed(c.level); $("xpi").style.width = (c.xp / need * 100) + "%"; $("xpt").textContent = `${c.xp} / ${need} XP`;
-  const t = P.target, tf = $("tframe"), fr = !t && P.ftarget ? CO.remoteById(P.ftarget) : null; setAuras($("tauras"), t && !t.dead ? targetAuras(t) : []);
-  tf.classList.toggle("friend", !!fr);
+  if(P.target || P.ftarget) P.selfT = false;
+  { const pf = $("pframe"), left = pf.offsetLeft + pf.offsetWidth + 12 + "px"; if($("tframe").style.left !== left) $("tframe").style.left = left; }   // the target frame sits right of yours
+  const t = P.target, tf = $("tframe"), fr = !t && P.ftarget ? CO.remoteById(P.ftarget) : null, me = !t && !fr && P.selfT; setAuras($("tauras"), t && !t.dead ? targetAuras(t) : []);
+  tf.classList.toggle("friend", !!fr); tf.classList.toggle("self", !!me);
+  if(me){ tf.hidden = false; $("tname").textContent = c.name; $("tlvl").textContent = "Level " + c.level; $("tlvl").style.color = "#7be08a";
+    $("thpi").style.width = (P.hp / P.maxHp * 100) + "%"; $("thpt").textContent = `${Math.ceil(P.hp)} / ${P.maxHp}`; $("tstate").textContent = ""; }
+  else
   if(fr){ tf.hidden = false; $("tname").textContent = fr.name; $("tlvl").textContent = "Level " + fr.lvl; $("tlvl").style.color = "#7fc4ff";
     $("thpi").style.width = Math.max(0, Math.min(100, fr.hp / (fr.mhp || 1) * 100)) + "%"; $("thpt").textContent = `${Math.round(fr.hp)} / ${fr.mhp}`;
-    $("tstate").textContent = fr.gh ? "Spirit" : fr.dead ? "Dead" : `Friend · ${(CLASSES[fr.cls] || {}).name || ""} – your heals go to them`; }
+    $("tstate").textContent = fr.gh ? "Spirit" : fr.dead ? "Dead" : ""; }
   else if(t && !t.dead){ tf.hidden = false; $("tname").textContent = t.name; $("tlvl").textContent = "Level " + t.lvl; $("tlvl").style.color = lvlColor(t.lvl);
     $("thpi").style.width = (t.hp / t.maxHp * 100) + "%"; $("thpt").textContent = `${Math.ceil(t.hp)} / ${t.maxHp}`;
     $("tstate").textContent = t.stunT > 0 ? "Stunned" : t.rootT > 0 ? "Rooted" : t.slowT > 0 ? "Slowed" : t.state === "chase" ? (P.auto ? "Attacking" : "In combat") : t.state === "return" ? "Evading" : "Calm"; }
@@ -911,10 +990,10 @@ function updHUD(dt){
     const a = AB[x], own = P.cds[x] || 0, gcd = a.offGcd ? 0 : P.gcd;
     s.cd.textContent = own > 0 ? Math.ceil(own) : gcd > 0 ? " " : "";
     const type = a.res || G.resType(); s.el.classList.toggle("nores", !a.form && P[type] < G.costOf(x));
-    s.el.classList.toggle("oor", !!(a.tgt === "enemy" && t && !t.dead && (distU(P, t) - t.r) * PXU > a.range));
+    { const dd = t && !t.dead ? (distU(P, t) - t.r) * PXU : 0; s.el.classList.toggle("oor", !!(a.tgt === "enemy" && t && !t.dead && (dd > a.range || (a.minRange && dd < a.minRange)))); }   // red: too far, or too close for a bow
     s.el.classList.toggle("on", !!(a.form && P.form === x) || P.casting?.id === x); }
   // names and quest marks over the people
-  for(const n of npcs){ const p = npcPlate(n), s = distU(P, n) < 30 ? toScreen(n.x, height(n.x, n.z) + n.mesh.userData.height + 0.3, n.z) : {on: false};
+  for(const n of npcs){ const p = npcPlate(n), s = distU(P, n) < (P.ghost ? GHOST_SIGHT : 30) ? toScreen(n.x, height(n.x, n.z) + n.mesh.userData.height + 0.3, n.z) : {on: false};
     if(!s.on){ p.style.display = "none"; continue; } p.style.display = ""; p.style.left = s.x + "px"; p.style.top = s.y + "px";
     const mk = Q.npcMarker(n.id); p.firstChild.textContent = mk === "…" ? "?" : mk || ""; p.firstChild.className = "mk" + (mk === "…" ? " gray" : ""); }
   // names over sign posts (Rimhaven's districts and the places quests send you to)
@@ -922,7 +1001,7 @@ function updHUD(dt){
     if(!p){ if(!near) continue; p = document.createElement("div"); p.className = "plate sign"; p.innerHTML = `<span>${sg.name}</span>`; hud.appendChild(p); signPlates.set(sg, p); }
     const s = near ? toScreen(sg.x, height(sg.x, sg.z) + 2.3, sg.z) : {on: false}; if(!s.on){ p.style.display = "none"; continue; } p.style.display = ""; p.style.left = s.x + "px"; p.style.top = s.y + "px"; }
   // nameplates for monsters near you
-  for(const m of mobs){ const p = plateFor(m), qm = questMob(m), near = !m.dead && distU(P, m) < (qm ? 40 : 26);
+  for(const m of mobs){ const p = plateFor(m), qm = questMob(m), near = !m.dead && distU(P, m) < (P.ghost ? GHOST_SIGHT : qm ? 40 : 26);
     if(!near){ p.style.display = "none"; continue; } const s = toScreen(m.x, height(m.x, m.z) + m.mesh.userData.height + 0.3, m.z); if(!s.on){ p.style.display = "none"; continue; }
     p.style.display = ""; p.style.left = s.x + "px"; p.style.top = s.y + "px"; const sp = p.firstChild; sp.textContent = `${m.name} (${m.lvl}${m.boss ? " Boss" : m.elite ? " Elite" : ""})`; sp.style.color = lvlColor(m.lvl);
     p.lastChild.style.display = (m.hp < m.maxHp || m === P.target) ? "" : "none"; p.lastChild.firstChild.style.width = (m.hp / m.maxHp * 100) + "%"; p.classList.toggle("sel", m === P.target); p.classList.toggle("q", qm); }
@@ -950,17 +1029,18 @@ function drawMinimap(){
   const dg = curDungeon(); mm.fillStyle = "#0a0806"; mm.fillRect(0, 0, W, W);
   mm.setTransform(s / MM_PX * cy, s / MM_PX * sy, -s / MM_PX * sy, s / MM_PX * cy, ...(dg ? to(dg.x0, dg.z0) : to(B.x0, B.z0))); mm.drawImage(dg ? dgImgs.get(dg) : mapImg, 0, 0); mm.setTransform(1, 0, 0, 1, 0, 0);
   const dot = (x, z, r, col) => { const [px, py] = to(x, z); if(Math.hypot(px - c, py - c) > c - 2) return; mm.fillStyle = col; mm.beginPath(); mm.arc(px, py, r, 0, 7); mm.fill(); };
-  if(!dg){ mm.fillStyle = "rgba(255,216,74,.13)"; mm.strokeStyle = "rgba(255,216,74,.5)"; mm.lineWidth = 1;
+  const gh = P.ghost, seen = (x, z) => !gh || Math.hypot(x - P.x, z - P.z) < GHOST_SIGHT;   // a spirit sees only what is close
+  if(!dg && !gh){ mm.fillStyle = "rgba(255,216,74,.13)"; mm.strokeStyle = "rgba(255,216,74,.5)"; mm.lineWidth = 1;
     for(const a of questAreas()){ if(Math.hypot(a.x - P.x, a.z - P.z) > MM_R + a.r) continue; const [px, py] = to(a.x, a.z); mm.beginPath(); mm.arc(px, py, a.r * s, 0, 7); mm.fill(); mm.stroke(); } }
-  for(const n of nodes) if(n.active && n.mesh.visible){ if(needSet.has(n.item)) dot(n.x, n.z, 2.8, "#ffd84a"); else if(Q.gatherReq(n.item) && Q.canGather(n.item) === true) dot(n.x, n.z, 2, n.def.kind === "ore" ? "#e0a070" : "#8fe08a"); }
+  for(const n of nodes) if(n.active && n.mesh.visible && !gh){ if(needSet.has(n.item)) dot(n.x, n.z, 2.8, "#ffd84a"); else if(Q.gatherReq(n.item) && Q.canGather(n.item) === true) dot(n.x, n.z, 2, n.def.kind === "ore" ? "#e0a070" : "#8fe08a"); }
   for(const p of portals) dot(p.x, p.z, 3.5, "#9fd6e8");
-  if(P.ghost){ for(const gy of graveyards) dot(gy.x, gy.z, 3.5, "#9fd6ff"); if(P.corpse) dot(P.corpse.x, P.corpse.z, 4.5, "#ffffff"); }
-  if(!dg) for(const e of exploreTargets()) dot(e.x, e.z, 3.5, "#ffd84a");
-  for(const m of mobs) if(!m.dead) dot(m.x, m.z, m.boss ? 4.2 : m.elite ? 3.2 : 2.2, m.state === "chase" ? "#ff4a3a" : m === P.target ? "#ffffff" : questMob(m) ? "#ffd84a" : "#d8645a");
+  if(P.ghost){ for(const gy of graveyards) dot(gy.x, gy.z, 3.5, "#9fd6ff"); const cm = corpseMark2(); if(cm) dot(cm.x, cm.z, 4.5, "#ffffff"); }
+  if(!dg && !gh) for(const e of exploreTargets()) dot(e.x, e.z, 3.5, "#ffd84a");
+  for(const m of mobs) if(!m.dead && seen(m.x, m.z)) dot(m.x, m.z, m.boss ? 4.2 : m.elite ? 3.2 : 2.2, m.state === "chase" ? "#ff4a3a" : m === P.target ? "#ffffff" : questMob(m) ? "#ffd84a" : "#d8645a");
   const pet = G.getPet(); if(pet && !pet.dead) dot(pet.x, pet.z, 2.4, "#7be08a");
   for(const r of CO.visible()) dot(r.x, r.z, 3, "#7fc4ff");
   mm.font = "800 14px 'Alegreya Sans', sans-serif"; mm.textAlign = "center";
-  for(const n of npcs){ const mk = Q.npcMarker(n.id), [px, py] = to(n.x, n.z); if(Math.hypot(px - c, py - c) > c - 6) continue;
+  for(const n of npcs){ const mk = Q.npcMarker(n.id), [px, py] = to(n.x, n.z); if(Math.hypot(px - c, py - c) > c - 6 || !seen(n.x, n.z)) continue;
     if(mk && mk !== "…"){ mm.fillStyle = "#000"; mm.fillText(mk, px + 1, py + 6); mm.fillStyle = "#ffd84a"; mm.fillText(mk, px, py + 5); } else dot(n.x, n.z, 2, "#e8e0a0"); }
   // you: an arrow pointing the way you face
   mm.translate(c, c); mm.rotate(cam.yaw - P.rot); mm.fillStyle = "#fff"; mm.strokeStyle = "#000"; mm.lineWidth = 1.5;
@@ -1012,20 +1092,21 @@ function drawBigMap(){
   g.drawImage(img, -cx, -cz, img.width * fit * mapZoom, img.height * fit * mapZoom);
   const dot = (x, z, r, col, stroke) => { const [px, py] = to(x, z); g.fillStyle = col; g.beginPath(); g.arc(px, py, r, 0, 7); g.fill(); if(stroke){ g.strokeStyle = stroke; g.lineWidth = 1.5; g.stroke(); } };
   g.textAlign = "center"; g.font = "700 13px 'Alegreya Sans', sans-serif";
-  if(!dg){ const areas = questAreas(); g.setLineDash([6, 4]);
+  if(!dg && !P.ghost){ const areas = questAreas(); g.setLineDash([6, 4]);
     for(const a of areas){ const [px, py] = to(a.x, a.z), rr = a.r * sc, glow = a.nightK && nightNow; g.beginPath(); g.arc(px, py, rr, 0, 7); g.fillStyle = glow ? "rgba(159,180,255,.28)" : "rgba(255,216,74,.16)"; g.fill(); g.strokeStyle = glow ? "rgba(190,205,255,.95)" : "rgba(255,216,74,.85)"; g.lineWidth = glow ? 2.2 : 1.5; g.stroke(); }
     g.setLineDash([]); g.font = "italic 700 12px 'Alegreya Sans', sans-serif";
     const seen = new Set(); for(const a of areas){ const k = a.q.id + "|" + Math.round(a.x) + "|" + Math.round(a.z); if(seen.has(k)) continue; seen.add(k); const [px, py0] = to(a.x, a.z), py = py0 - a.r * sc - 5;
       g.lineWidth = 3; g.strokeStyle = "rgba(0,0,0,.8)"; g.strokeText(a.q.name, px, py); g.fillStyle = "#ffe48a"; g.fillText(a.q.name, px, py); } }
   if(!dg) for(const [name, x, z, size, col] of MAP_LABELS){ const [px, py] = to(x, z); g.font = `${size >= 15 ? 800 : 700} ${Math.round(size * (0.85 + mapZoom * 0.15))}px 'Alegreya Sans', sans-serif`; g.lineWidth = 3; g.strokeStyle = "rgba(0,0,0,.75)"; g.strokeText(name, px, py); g.fillStyle = col; g.fillText(name, px, py); }
-  if(!dg) for(const e of exploreTargets()){ dot(e.x, e.z, 6, "#ffd84a", "#000"); const [px, py] = to(e.x, e.z); g.font = "700 12px 'Alegreya Sans', sans-serif"; g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText(e.name, px, py - 9); g.fillStyle = "#ffd84a"; g.fillText(e.name, px, py - 9); }
+  if(!dg && !P.ghost) for(const e of exploreTargets()){ dot(e.x, e.z, 6, "#ffd84a", "#000"); const [px, py] = to(e.x, e.z); g.font = "700 12px 'Alegreya Sans', sans-serif"; g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText(e.name, px, py - 9); g.fillStyle = "#ffd84a"; g.fillText(e.name, px, py - 9); }
   for(const p of portals) if(!!dungeonAt(p.x) === !!dg && (!dg || dungeonAt(p.x) === dg)) dot(p.x, p.z, 5, "#9fd6e8", "#000");
-  for(const n of nodes) if(n.active && needSet.has(n.item) && !dg && (!n.def.night || nightNow)) dot(n.x, n.z, 3.5, "#ffd84a", "#000");
-  if(!dg){ g.font = "800 18px 'Alegreya Sans', sans-serif";
+  for(const n of nodes) if(n.active && needSet.has(n.item) && !dg && !P.ghost && (!n.def.night || nightNow)) dot(n.x, n.z, 3.5, "#ffd84a", "#000");
+  if(!dg && !P.ghost){ g.font = "800 18px 'Alegreya Sans', sans-serif";
     for(const n of npcs){ const mk = Q.npcMarker(n.id), [px, py] = to(n.x, n.z); if(mk && mk !== "…"){ g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText(mk, px, py + 6); g.fillStyle = "#ffd84a"; g.fillText(mk, px, py + 6); } } }
   for(const r of CO.visible()) dot(r.x, r.z, 4.5, "#7fc4ff", "#000");
   if(P.ghost && !dg){ for(const gy of graveyards) dot(gy.x, gy.z, 4, "#9fd6ff", "#000"); }
-  if(P.ghost && P.corpse && !!dungeonAt(P.corpse.x) === !!dg){ dot(P.corpse.x, P.corpse.z, 6, "#ffffff", "#000"); const [px, py] = to(P.corpse.x, P.corpse.z); g.font = "700 12px 'Alegreya Sans', sans-serif"; g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText("Your body", px, py - 10); g.fillStyle = "#fff"; g.fillText("Your body", px, py - 10); }
+  const cm2 = P.ghost ? corpseMark2() : null;
+  if(cm2 && !!dungeonAt(cm2.x) === !!dg){ dot(cm2.x, cm2.z, 6, "#ffffff", "#000"); const [px, py] = to(cm2.x, cm2.z); g.font = "700 12px 'Alegreya Sans', sans-serif"; g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText("Your body", px, py - 10); g.fillStyle = "#fff"; g.fillText("Your body", px, py - 10); }
   // you
   { const [px, py] = to(P.x, P.z); g.save(); g.translate(px, py); g.rotate(-P.rot); g.fillStyle = "#fff"; g.strokeStyle = "#000"; g.lineWidth = 2;
     g.beginPath(); g.moveTo(0, 9); g.lineTo(6, -6); g.lineTo(0, -2); g.lineTo(-6, -6); g.closePath(); g.stroke(); g.fill(); g.restore(); }
@@ -1046,8 +1127,9 @@ function update(dt){
     G.updPlayer(dt, moved);
     saveT += dt; if(saveT > 10){ saveT = 0; save(); }
     trackT += dt; if(trackT > 2){ trackT = 0; updTracker(); }
+    scaleT -= dt; if(scaleT <= 0){ scaleT = 1; scaleDungeons(); }
     nightT -= dt; if(nightT <= 0){ nightT = 2; const was = nightNow; nightNow = isNight();
-      if(was !== nightNow) log(nightNow ? "Night falls. Wolves, the undead and spirits come out in greater numbers." : "Dawn breaks over Rimfrost.", nightNow ? "#9fb4ff" : "#ffd36b");
+      if(was !== nightNow) log(nightNow ? "Night falls." : "Dawn breaks over Rimfrost.", nightNow ? "#9fb4ff" : "#ffd36b");
       for(const m of mobs){ if(!m.night || CO.guestMob(m)) continue;
         if(nightNow && m.dead && m.nightGone) respawn(m);
         else if(!nightNow && !m.dead && m.state === "idle" && Math.hypot(m.x - P.x, m.z - P.z) > 35){ m.dead = true; m.state = "dead"; m.deadT = 99; m.nightGone = true; m.mesh.visible = false; } } }        // (the "· place" hints change as you travel)
@@ -1062,22 +1144,23 @@ function update(dt){
   // monsters: only the ones near you (or a friend) are drawn and move about
   { const rs = CO.visible(), reg0 = curDungeon();
     for(const m of mobs){ const d = Math.hypot(m.x - P.x, m.z - P.z), dr = rs.length ? Math.min(...rs.map(r => Math.hypot(m.x - r.x, m.z - r.z))) : 1e9;
-      m.far = Math.min(d, dr) > 110 && m.state === "idle"; const show = running && d < 80 && dungeonAt(m.x) === reg0;
+      m.far = Math.min(d, dr) > 110 && m.state === "idle"; const show = running && d < (P.ghost ? GHOST_SIGHT : 80) && dungeonAt(m.x) === reg0;
       if(show !== m.inScene){ m.inScene = show; if(show) scene.add(m.mesh); else scene.remove(m.mesh); } } }
   for(const m of mobs) updMob(m, dt); separate();
   if(running && !inCrypt() && (exploreT -= dt) <= 0){ exploreT = 0.4; Q.questExplore(P.x, P.z); }
   if(running) G.updPet(dt, blocked, tryMove, turnTo);
-  CO.update(dt); if(running){ CO.render(); CO.tradeTick(); }
+  CO.update(dt); if(running){ CO.render(); CO.tradeTick(); CO.rollTick(); updRolls(); }
   if(running && P.pendingUse && !P.dead){ if(!P.dest) P.pendingUse = null; else if(distU(P, P.pendingUse) < USE_RANGE){ const n = P.pendingUse; P.dest = null; marker.visible = false; useThing(n); } }
   if(talkNpc && distU(P, talkNpc) > 7) closePanel();
-  for(const n of npcs){ const d = distU(P, n), want = d < 6 && running ? Math.atan2(P.x - n.x, P.z - n.z) : n.rot0; let dr = want - n.mesh.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); n.mesh.rotation.y += dr * Math.min(1, dt * 4); n.mesh.userData.animate(0, false, 0, null); }
+  for(const n of npcs){ const d = distU(P, n), want = talkNpc === n && running && !P.dead ? Math.atan2(P.x - n.x, P.z - n.z) : n.rot0;   // people only turn to you while you talk to them
+    n.mesh.visible = !P.ghost || d < GHOST_SIGHT; let dr = want - n.mesh.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); n.mesh.rotation.y += dr * Math.min(1, dt * 4); n.mesh.userData.animate(0, false, 0, null); }
   needSet = running ? Q.neededItems() : new Set(); mobNeedSet = running ? Q.neededMobs() : new Set();
   for(const n of nodes){ if(!n.active){ n.respawn -= dt; if(n.respawn <= 0) n.active = true; }
     const need = needSet.has(n.item), gath = running && Q.gatherReq(n.item) && Q.canGather(n.item) === true;
     n.mesh.visible = n.active && (!!n.glow || need) && (!n.def.night || nightNow);   // Moonbloom only shows at night
-    n.beam.visible = n.mesh.visible && need && Math.hypot(n.x - P.x, n.z - P.z) < 70;
+    n.beam.visible = n.mesh.visible && need && !P.ghost && Math.hypot(n.x - P.x, n.z - P.z) < 70;
     if(n.mesh.visible && n.glow){ const [on, off] = n.glow.userData.glow; n.glow.material.color.setHex(need || gath ? on : off); n.glow.scale.setScalar(need ? 1 + Math.sin(now * 4 + n.x) * 0.2 : gath ? 0.95 : 0.8); } }
-  { const ex = new Set(running && !inCrypt() ? exploreTargets() : []); for(const [e, b] of exploreBeams) b.visible = ex.has(e); }
+  { const ex = new Set(running && !inCrypt() && !P.ghost ? exploreTargets() : []); for(const [e, b] of exploreBeams) b.visible = ex.has(e); }
   beamMat.opacity = 0.26 + Math.sin(now * 2.5) * 0.08;
   updBolts(dt);
   // inside the crypt it is dark: torchlight around you and flickering braziers
@@ -1091,8 +1174,9 @@ function update(dt){
       torch.intensity = (1 - dl) * 9; torch.distance = 11; torch.position.set(P.x, height(P.x, P.z) + 3, P.z);          // a little lantern light around you at night
       const hb = Object.values(HUBS).find(h => Math.hypot(h.x - P.x, h.z - P.z) < h.R + 25);                      // towns and camps glow with fires at night
       townLight.intensity = hb ? (1 - dl) * 22 : 0; if(hb){ townLight.position.set(hb.x, height(hb.x, hb.z) + 5, hb.z); townLight.distance = hb.R * 1.9 + 6; } }
-    const k = Math.min(1, dt * 1.2); skyCol.setHex(S2[0]).lerp(NIGHT_SKY, (1 - dl) * 0.88); scene.background.lerp(skyCol, k); scene.fog.color.copy(scene.background);
-    scene.fog.near = lerp(scene.fog.near, S2[1] * (0.75 + dl * 0.25), k); scene.fog.far = lerp(scene.fog.far, S2[2] * (0.8 + dl * 0.2), k);
+    const k = Math.min(1, dt * 1.2); skyCol.setHex(S2[0]).lerp(NIGHT_SKY, (1 - dl) * 0.88); if(P.ghost) skyCol.lerp(GHOST_SKY, 0.7);   // the spirit world: dim blue mist scene.background.lerp(skyCol, k); scene.fog.color.copy(scene.background);
+    const gf = P.ghost ? 0.55 : 1;                                                    // a spirit sees less far
+    scene.fog.near = lerp(scene.fog.near, S2[1] * (0.75 + dl * 0.25) * gf, k); scene.fog.far = lerp(scene.fog.far, S2[2] * (0.8 + dl * 0.2) * gf, k);
     sunAng = dl > 0 ? (hr - 4.5) / 15 * Math.PI : (hr >= 21 ? hr - 21 : hr + 3) / 6 * Math.PI;
     if(ins){ torch.position.set(P.x, height(P.x, P.z) + 3.5, P.z); for(const db of dgBuilt) for(const b of db.braziers) b.fire.scale.setScalar(0.85 + Math.sin(now * 9 + b.x) * 0.15); } }
   { const pt = G.getPet(); if(pt){ pt.mesh.visible = !(pt.dead && pt.deadT > 3); pt.mesh.position.set(pt.x, height(pt.x, pt.z), pt.z); pt.mesh.rotation.set(0, pt.rot, pt.dead ? Math.min(1.4, pt.deadT * 4) : 0);
@@ -1101,9 +1185,9 @@ function update(dt){
     m.mesh.traverse(o => { if(o.isMesh){ if(m.flash > 0 && !o.userData.fl){ o.userData.fl = o.material; o.material = o.material.clone(); if(o.material.emissive) o.material.emissive.setHex(0x883322); } else if(m.flash <= 0 && o.userData.fl){ o.material = o.userData.fl; o.userData.fl = null; } } }); }
   G.updFx(dt);
   // the ring under your target: pulsing red while you attack it, calm yellow when you don't, green for a friend
-  { const fr = !P.target && P.ftarget ? CO.remoteById(P.ftarget) : null, tg = P.target && !P.target.dead ? P.target : fr && !fr.gh && CO.sameRegion(fr, P) ? fr : null;
+  { const fr = !P.target && P.ftarget ? CO.remoteById(P.ftarget) : null, tg = P.target && !P.target.dead ? P.target : fr && !fr.gh && CO.sameRegion(fr, P) ? fr : P.selfT && !P.dead ? P : null;
     if(tg){ selRing.visible = true; selRing.position.set(tg.x, height(tg.x, tg.z) + 0.08, tg.z); const base = (tg.r || 0.4) / 0.6 + 0.3, atk = tg === P.target && P.auto;
-      selRing.scale.setScalar(base * (atk ? 1 + Math.sin(now * 7) * 0.12 : 1)); selRing.material.color.setHex(fr ? 0x5adc6a : atk ? 0xff3a2a : 0xffc84a); selRing.material.opacity = atk ? 0.65 + Math.sin(now * 7) * 0.3 : 0.8; }
+      selRing.scale.setScalar(base * (atk ? 1 + Math.sin(now * 7) * 0.12 : 1)); selRing.material.color.setHex(fr || tg === P ? 0x5adc6a : atk ? 0xff3a2a : 0xffc84a); selRing.material.opacity = atk ? 0.65 + Math.sin(now * 7) * 0.3 : 0.8; }
     else selRing.visible = false; }
   // camera: angled from above, follows you, smooth zoom and turning
   cam.dist = lerp(cam.dist, cam.distT, Math.min(1, dt * 8)); cam.yaw = lerp(cam.yaw, cam.yawT, Math.min(1, dt * 8));
@@ -1140,6 +1224,5 @@ initDev({update, save, refresh, buildBar, buildHero, hubSpot, log, arena: ARENA,
   makeMob: (kind, p, lvl) => { const m = makeMob(kind, p, lvl, rng(7)); m.dev = true; return m; },
   removeMob: m => { const i = mobs.indexOf(m); if(i >= 0) mobs.splice(i, 1); scene.remove(m.mesh); const pl = plates.get(m); if(pl){ pl.remove(); plates.delete(m); } if(P.target === m) P.target = null; },
   restore: c => { G.clearFx(); play(c); }});
-if(DEV.on) document.querySelector("#gmenu .devb").hidden = false;
-window.R2 = {setReachFrom, graveyards, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
+window.R2 = {setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
 requestAnimationFrame(loop);

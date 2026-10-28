@@ -257,8 +257,27 @@ function buildCity(h){
     if(streets.some(s => { const d = Math.atan2(Math.sin(a - s), Math.cos(a - s)); return Math.abs(Math.sin(d)) * rr < 3.6 && Math.cos(d) > 0; })) continue;
     if(keep.some(o => Math.hypot(o.x - x, o.z - z) < 4.2) || SIGNS.some(o => Math.hypot(o.x - x, o.z - z) < 3.5)) continue;
     house(x, z, Math.atan2(h.x - x, h.z - z), 3.8, 3.4, walls[n % 4], roofs[n % 4]); n++; }
+  { const sx = h.x + STABLE_AT[0] * TS, sz = h.z + STABLE_AT[1] * TS; stable(sx, sz, Math.atan2(h.x - sx, h.z - sz)); }
 }
-export const CITY_KEEP = [[-2, -2], [2, -2], [-2, 2], [2, 2], [-3, -10], [3, -10], [10, -3], [10, 3], [-3, 10], [3, 10], [-10, -4], [-11, -1], [-11, 2], [-9, 5]];   // where Rimhaven's people stand (tiles from the centre)
+export const STABLE_AT = [7.6, 10.1];   // Rimhaven's stable (tiles from the centre); the stablemaster stands in front of it
+export const STABLE_HORSES = [];        // where the horses inside stand: {x, z, rot}
+function stable(x, z, rot){                                                     // open-front wooden stable with stalls, hay and a trough
+  const g = new THREE.Group(), w = 6, d = 3.4, hh = 2.4, wood = 0x6b4a2e, dark = 0x4a3220, plank = 0x8a6440, roof = 0x5a3a26;
+  for(const px of [-w / 2, -w / 6, w / 6, w / 2]) for(const pz of [-d / 2, d / 2]) g.add(mesh(new THREE.BoxGeometry(0.22, hh + (pz < 0 ? 0.5 : 0), 0.22), dark, px, (hh + (pz < 0 ? 0.5 : 0)) / 2, pz));
+  g.add(mesh(new THREE.BoxGeometry(w, hh + 0.5, 0.12), plank, 0, (hh + 0.5) / 2, -d / 2));                       // back wall
+  for(const sx of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.12, hh, d), plank, sx * w / 2, hh / 2, 0));        // side walls
+  for(const px of [-w / 6, w / 6]) g.add(mesh(new THREE.BoxGeometry(0.1, 1.2, d * 0.8), wood, px, 0.6, -d * 0.1)); // stall dividers
+  g.add(mesh(new THREE.BoxGeometry(w, 0.12, 0.14), dark, 0, hh, d / 2));                                            // front beam
+  const r = mesh(new THREE.BoxGeometry(w + 0.8, 0.16, d + 1.1), roof, 0, hh + 0.55, 0.05); r.rotation.x = Math.atan2(-0.5, d); g.add(r);
+  for(const [hx, hz, ry] of [[-w / 2 - 0.8, 0.6, 0.2], [-w / 2 - 0.7, -0.6, -0.1], [-w / 2 - 0.75, 0, 0.1]]){ const b = mesh(new THREE.BoxGeometry(0.9, 0.55, 0.6), 0xd8b860, hx, 0.27, hz); b.rotation.y = ry; g.add(b); }
+  g.add(mesh(new THREE.BoxGeometry(0.9, 0.55, 0.6), 0xd8b860, -w / 2 - 0.75, 0.82, 0));
+  g.add(mesh(new THREE.BoxGeometry(1.8, 0.45, 0.5), wood, w / 2 + 0.6, 0.22, 0.6), mesh(new THREE.BoxGeometry(1.6, 0.06, 0.36), new THREE.MeshLambertMaterial({color: 0x3f8fbf, emissive: 0x3f8fbf, emissiveIntensity: 0.1}), w / 2 + 0.6, 0.43, 0.6));
+  for(const px of [-w / 3, 0, w / 3]) g.add(mesh(new THREE.BoxGeometry(0.7, 0.08, 0.5), 0xd8b860, px, 0.05, -d / 2 + 0.5));   // hay in the stalls
+  seeThrough(place(g, x, z, rot));
+  for(const [lx, lz] of [[-w / 2, 0], [0, -d / 2], [w / 2, 0], [-w / 4, -d / 4], [w / 4, -d / 4]]){ const p = turn(x, z, rot, lx, lz); solid(p.x, p.z, 1.0, true); }
+  for(const px of [-w / 3, w / 3]){ const p = turn(x, z, rot, px, 0.1); STABLE_HORSES.push({x: p.x, z: p.z, rot}); }
+}
+export const CITY_KEEP = [[-2, -2], [2, -2], [-2, 2], [2, 2], [-3, -10], [3, -10], [10, -3], [10, 3], [-3, 10], [3, 10], [-10, -4], [-11, -1], [-11, 2], [-9, 5], [6.4, 8.4], [7.6, 10.1], [8.4, 11.5], [6.2, 11.6]];   // where Rimhaven's people stand (tiles from the centre)
 
 // ---------------------------------------------------------------- lairs, places to explore, dungeon doors
 function buildLair(id, l){
@@ -324,6 +343,7 @@ function buildDoor(id, D){
   if(id === "d_vault") for(let k = 0; k < 5; k++) g.add(mesh(new THREE.ConeGeometry(0.4, 2 + k % 2, 5), 0xdff4ff, -3 + k * 1.5, 4.6, -1.5));
   place(g, D.x, D.z, rot);
   for(const [dx, dz, r] of [[-1.6, 0, 0.6], [1.6, 0, 0.6], [0, -3.6, 4]]){ const p = turn(D.x, D.z, rot, dx, dz); solid(p.x, p.z, r, true); }
+  { const p = turn(D.x, D.z, rot, 4.4, 2.2); signpost(p.x, p.z, `${D.name} · Dungeon (level ${D.lv})`); }          // a sign so the way in is not mistaken for a quest spot
   for(const s of [-1, 1]){ const p = turn(D.x, D.z, rot, s * 2.8, 1.2); brazier(p.x, p.z, {d_mine: 0xffb060, d_temple: 0x7fffd4, d_forge: 0xff5a1a, d_vault: 0x9fd6ff, d_crypt: 0x9aff8a}[id]); }
   DOORS[id] = {x: D.x, z: D.z, rot, fx, fz};
 }

@@ -32,7 +32,7 @@ On Windows (Git Bash): `cd ~/Documents/GitHub/Rimfrost2 && python serve.py`. If 
 
 ## Dev tools
 
-Open the game with `?dev` at the end of the address (for example http://localhost:8000/?dev). Then press **F8**, or use **Dev tools** in the Esc menu:
+Open the game with `?dev` at the end of the address (for example http://localhost:8000/?dev). Then press **F8** to open them:
 
 - **Character:** set your level, add gold, learn every ability, give yourself Riding and all mounts, and equip a full set of gear of any quality.
 - **Cheats:** max out Mining and Herbalism, full health and mana, reset cooldowns, god mode, speed ×3, kill your target, die, finish your active quests, reset talents, and remove Resurrection Sickness.

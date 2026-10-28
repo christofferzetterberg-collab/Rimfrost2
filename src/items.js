@@ -6,15 +6,15 @@ export const ITEMS = {
   obsidian:{name:"Obsidian", sell:15, kind:"ore"}, rimkr:{name:"Rime Crystal", sell:22, kind:"ore"},
   ang:{name:"Meadow Bloom", sell:2, kind:"herb"}, silver:{name:"Silverweed", sell:5, kind:"herb"}, drake:{name:"Dragon's Eye", sell:10, kind:"herb"},
   fireflower:{name:"Fire Bloom", sell:15, kind:"herb"}, moonbloom:{name:"Moonbloom", sell:9, kind:"herb"}, iceflower:{name:"Ice Bloom", sell:22, kind:"herb"},
-  potHp:{name:"Healing Potion", sell:3, kind:"use", desc:"Restores 40% health."},
-  potHp2:{name:"Greater Healing Potion", sell:8, kind:"use", desc:"Restores 75% health."},
-  potHp3:{name:"Mighty Healing Potion", sell:20, kind:"use", desc:"Restores all health."},
-  potMana:{name:"Mana Potion", sell:3, kind:"use", desc:"Restores 50% mana."},
-  potMana2:{name:"Greater Mana Potion", sell:20, kind:"use", desc:"Restores all mana."},
-  elixir:{name:"Elixir of Strength", sell:10, kind:"use", desc:"+20% damage for 5 minutes."},
-  elixirIron:{name:"Elixir of Ironskin", sell:8, kind:"use", desc:"You take 15% less damage for 10 minutes."},
-  elixirKeen:{name:"Elixir of Keenness", sell:14, kind:"use", desc:"+5% critical strike chance for 10 minutes."},
-  elixirSage:{name:"Elixir of Wisdom", sell:18, kind:"use", desc:"+20% spell power (damage and healing from spells) for 10 minutes."},
+  potHp:{name:"Healing Potion", sell:3, kind:"use", desc:"Restores 40% of your health."},
+  potHp2:{name:"Greater Healing Potion", sell:8, kind:"use", desc:"Restores 75% of your health."},
+  potHp3:{name:"Mighty Healing Potion", sell:20, kind:"use", desc:"Fully restores your health."},
+  potMana:{name:"Mana Potion", sell:3, kind:"use", desc:"Restores 50% of your mana."},
+  potMana2:{name:"Greater Mana Potion", sell:20, kind:"use", desc:"Fully restores your mana."},
+  elixir:{name:"Elixir of Strength", sell:10, kind:"use", desc:"Increases damage dealt by 20% for 5 min."},
+  elixirIron:{name:"Elixir of Ironskin", sell:8, kind:"use", desc:"Reduces damage taken by 15% for 10 min."},
+  elixirKeen:{name:"Elixir of Keenness", sell:14, kind:"use", desc:"Increases critical strike chance by 5% for 10 min."},
+  elixirSage:{name:"Elixir of Wisdom", sell:18, kind:"use", desc:"Increases spell power by 20% for 10 min."},
   pelt:{name:"Wolf Pelt", sell:1, kind:"junk"}, tusk:{name:"Boar Tusk", sell:1, kind:"junk"}, silk:{name:"Spider Silk", sell:3, kind:"junk"},
   ring:{name:"Stolen Ring", sell:6, kind:"junk"}, tooth:{name:"Troll Tooth", sell:5, kind:"junk"}, gobtooth:{name:"Goblin Tooth", sell:4, kind:"junk"}, rune:{name:"Runestone", sell:7, kind:"junk"},
   cloth:{name:"Rotten Cloth", sell:6, kind:"junk"}, dust:{name:"Sprite Dust", sell:8, kind:"junk"}, crown:{name:"The Draug Crown", sell:150, kind:"junk"},
@@ -120,7 +120,8 @@ export function makeGear(opts){
   const add = (k, p) => { if(p <= 0) return; it.st[k] = (it.st[k]||0) + p; };
   let defShare = it.arm ? ARMOR[it.arm].def : it.wt==="shield" ? 0.4 : 0;
   add("def", pts*defShare); pts *= 1-defShare;
-  if(slot==="weapon"){ if(role==="phys") add("pow", pts*0.6); else if(role==="caster") add(cls==="priest" ? "sp" : r() < 0.5 ? "sp" : "sd", pts*0.6); else { add("pow", pts*0.3); add("sp", pts*0.3); } pts *= 0.4; }
+  // weapons: a big helping of the class's damage stat (Strength / Agility for fighters, Spell Power or Spell Damage for casters)
+  if(slot==="weapon"){ const fs = cls==="hunter" ? "agi" : "str"; if(role==="phys") add(fs, pts*0.6 * 0.17/0.4*2); else if(role==="caster") add(cls==="priest" ? "sp" : r() < 0.5 ? "sp" : "sd", pts*0.6); else { add(cls==="druid" ? "agi" : "str", pts*0.3 * 0.17/0.4*2); add(cls==="paladin" ? "sh" : "sp", pts*0.3); } pts *= 0.4; }
   else if(it.wt==="tome"){ add(cls==="mage" ? "sd" : cls==="priest" ? "sh" : "sp", pts*0.4); pts *= 0.6; }
   // spread the rest over 1-3 stats (better items get more): always one of the class's main stats first, then others it can use
   const main = CLASS_MAIN[cls], extra = EXTRA[cls], pool = [...main, ...extra];
@@ -131,9 +132,15 @@ export function makeGear(opts){
   // points -> real numbers
   const conv = {str:0.4, agi:0.4, int:0.4, sta:0.3, pow:0.17, sp:0.17, sd:0.17, sh:0.2, hp:2.4, mana:3, crit:0.07, def:0.1};
   for(const k of Object.keys(it.st)){ let v = it.st[k]*conv[k]; v = (k==="crit"||k==="def") ? Math.round(v*10)/10 : Math.round(v); if(v <= 0) delete it.st[k]; else it.st[k] = v; }
-  it.n = gearName(it, r); it.en = 1;
+  it.n = gearName(it, r); it.en = 1; it.v = 2;
   return it;
 }
+// gear from before the new stats: Attack Power becomes Strength (Agility for hunters), Health becomes Stamina, Mana becomes Intellect – worth the same as before
+export function upgradeGear(it, cls){ if(!it || !it.st || it.v >= 2) return it; const st = it.st;
+  if(st.pow){ const k = cls === "hunter" ? "agi" : "str"; st[k] = (st[k] || 0) + Math.max(1, Math.round(st.pow * 2)); delete st.pow; }
+  if(st.hp){ st.sta = (st.sta || 0) + Math.max(1, Math.round(st.hp / 10)); delete st.hp; }
+  if(st.mana){ st.int = (st.int || 0) + Math.max(1, Math.round(st.mana / 8)); delete st.mana; }
+  it.v = 2; return it; }
 // item name: [prefix] base [of Suffix], e.g. "Warden's Longsword of Power"
 function gearName(it, r){
   const base = it.wt ? pickR(WTYPES[it.wt].base, r) : (it.slot==="neck"||it.slot==="ring") ? pickR(JEWEL_BASE[it.slot], r) : ARMOR_BASE[it.arm][it.slot];

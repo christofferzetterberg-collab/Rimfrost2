@@ -1,5 +1,125 @@
 # Rimfrost 2 – Release notes
 
+## v0.15.2
+
+### New
+- Rimhaven now has a stable. Stablemaster Hrafn stands in front of it, with horses in the stalls.
+
+## v0.15.1
+
+### Changed
+- All ability, talent, item, quest, dungeon and interface texts rewritten to be clearer and more concise.
+
+## v0.15.0
+
+### New
+- **Dungeons scale with your group.** Every extra player inside gives the monsters +70% health and +10% damage. It updates as friends come and go, but monsters never get weaker in the middle of a fight.
+- **Loot rolls in dungeons.** Elites and bosses drop one piece of gear for the whole group. Everyone gets a window with **Need**, **Greed** or **Pass** and 30 seconds to choose. Need beats Greed, the highest roll wins, and everyone sees the rolls. Alone, the item is simply yours. Gold and other loot stay personal.
+- **Dungeon quests are marked:** a quest whose monsters live in a dungeon has a "Dungeon: name" tag in the quest window, at the quest giver and in the tracker.
+
+### Changed
+- Dungeon monsters are tougher: 60% more health and 30% more damage. You can still solo a dungeon, but it is easier a few levels above its level or with good gear.
+
+## v0.14.0
+
+### Changed
+- **Dungeons keep their state.** Monsters you defeat stay defeated when you leave and come back, and even after reloading the page.
+  - At the door you now get a choice: **Enter**, or **Reset and enter** to bring every monster back. The door window shows how many are already defeated.
+  - In co-op, only the host can reset a dungeon, and only when nobody is inside.
+- **Dying in a dungeon:** you now appear as a spirit at the nearest graveyard outside. Walk back to the dungeon door and go in to come back to life at the entrance with half your health and mana, or ask the Spirit Guide. The dungeon is not reset.
+- **Dungeon entrances** have a sign with the dungeon's name and levels.
+- The Broken Watchtower is now a little north of the Iron Mine, so the mine door and the quest spot are no longer in the same place.
+- **New look for gargoyles:** Ash Gargoyles and the Magma Gargoyle are now hunched stone beasts with bat wings, horns, claws and glowing eyes.
+- No welcome message when you log in.
+- The talent window no longer has the line about resetting at your trainer.
+- Hunter: Raptor Strike's tooltip now says "A quick melee strike".
+
+## v0.13.3
+
+### Changed
+- The Marsh Drake looks like a real drake now: a long neck, a horned head with glowing eyes, leathery wings that beat as it moves, spikes down its back and a long swaying tail. It lunges with its head when it attacks.
+
+## v0.13.2
+
+### Changed
+- **Hunter: bows need range.** Shots and the bow auto-attack only work 6 m or more from the target, up to 17 m. Tooltips show this as "6–17 m range", and the button turns red when you are too close.
+- **Hunter melee auto-attack:** it only hits within melee reach and does clearly less damage than the bow, about 60% of the bow's damage per second. Between melee reach and 6 m you can't attack at all, so step back, or use Raptor Strike, Wing Clip or Disengage.
+
+## v0.13.1
+
+### Changed
+- Hunter: Fire Arrow, Poison Arrow and Storm Arrow now grow with your attack power (Agility), like the hunter's other shots. Before, they only grew with your level.
+- Paladin: Holy Strike, Crusader Strike, Hammer of Judgment, Hallowed Ground and Heavenly Judgment now grow with both Strength and Intellect.
+
+## v0.13.0
+
+### New
+- **Co-op:** you now see your friends' spells and arrows: projectiles flying to their target, rings and ground effects like Blizzard.
+- **Co-op:** when a friend near you finds a place a quest sends you to, it counts for you too.
+
+### Changed
+- Co-op: herbs, ore and quest items stay personal. Each player picks up their own, and quest loot drops for each player separately. Kills already counted for everyone nearby.
+
+## v0.12.4
+
+### Fixed
+- Clicking your own portrait now targets you, and your portrait and the target portrait no longer overlap, even if the browser kept an older copy of the page.
+
+## v0.12.3
+
+### Changed
+- **Gear uses the new stats everywhere:**
+  - Weapons give Strength (Agility for hunters) instead of Attack Power, or Spell Power, Spell Damage or Spell Healing for casters.
+  - Older gear you already have changes over: Attack Power becomes Strength (Agility for hunters), Health becomes Stamina and Mana becomes Intellect. It is worth the same as before.
+- People in towns no longer turn to follow you as you walk by. They only face you while you talk to them.
+- **Target yourself:** click your own portrait. Clicking the ground or pressing Esc clears it. Heals and buffs without a friendly target still go to you.
+
+### Fixed
+- Your portrait and the target portrait no longer overlap.
+
+## v0.12.2
+
+### Fixed
+- Reloading the page or logging out no longer brings you back to life. If you were dead or a spirit, you still are, and your body stays where it fell.
+- Your health and mana stay as they were when you reload, and Resurrection Sickness keeps counting down.
+- Monsters you killed and herbs or ore you gathered no longer come back when you reload. They return when their normal respawn time is up, even after a reload.
+
+## v0.12.1
+
+### Fixed
+- The spirit world looks better:
+  - A dim blue mist instead of a white haze.
+  - A faint ring on the ground at the graveyard instead of a big pillar of light.
+  - A soft, thin light above your body.
+- The "You are a spirit" bar sits above the action bars, so it no longer covers windows.
+
+## v0.12.0
+
+### New
+- **Hunter – Beast Mastery remade** with more interesting talents:
+  - Endurance Training: your pet has more health.
+  - Go for the Throat: your critical hits give your pet rage or energy.
+  - Frenzy: your pet attacks faster.
+  - Improved Mend Pet: Mend Pet heals more and heals you too.
+  - Spirit Bond: you and your pet slowly heal, even in combat.
+  - Two new abilities that go into your spellbook: **Intimidation** (your pet stuns its target for 3 sec) and **Bestial Wrath** (your pet gets +50% damage and attacks faster for 10 sec).
+  - Hunters get their talent points back once to try them out.
+- **Hunter – Cripple Shot** replaces Ice Arrow. It deals no damage but slows the target for 8 sec, with an 8 sec cooldown. The Survival talent Crippling Arrows makes the slow stronger.
+
+### Changed
+- Shots and weapon attacks also start auto-attack. Spells don't.
+- Quest items, herbs, ore and monsters are spread over the whole zone instead of bunching up near the towns.
+- **As a spirit:** you see less far, and monsters and people only show up when you are close. The maps only show your body, the graveyards and dungeon doors.
+- Talents can only be reset at your class trainer, and it costs more gold the higher your level (50 gold at level 10, 170 at level 20, 370 at level 30).
+- Hunter: Dismiss Pet now takes 5 sec to cast.
+- New characters start with their first abilities already learned and on the action bar: Mighty Strike (Warrior), Smite and Healing Light (Priest), Holy Strike and Light's Mending (Paladin). Characters who didn't have them get them now.
+- **Co-op:** the extra line under a targeted friend is gone.
+
+### Fixed
+- You can now right-click the Spirit Guide to be brought back.
+- People in towns no longer turn to face you when you are dead.
+- New characters started without their first abilities.
+
 ## v0.11.0
 
 ### New

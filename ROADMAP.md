@@ -161,6 +161,57 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] 16. Key bindings are saved per character
 - [x] 17. Dev tools (?dev, F8): cheats, teleports and a class balance test
 
+### To fix – list 2
+
+#### Co-op
+- [x] 18. Remove the description line under a targeted friend in the target frame
+
+#### General
+- [x] 19. Every shot or melee attack also starts auto-attack (not spells)
+- [x] 20. Use more of each zone: spread quests and objectives out instead of keeping them close to the start
+- [x] 21. While dead (a spirit): reduced vision, showing only the land and your body's marker; monsters and people only show when a few yards away (also on the maps)
+- [x] 22. Talent reset only at the class trainer, for gold based on level (remove the free reset in the talent window)
+
+#### Bugs
+- [x] 23. You can't talk to the Spirit Guide to be resurrected with Resurrection Sickness
+- [x] 24. While dead, people in towns shouldn't turn to face you
+
+#### Classes
+- [x] 25. Hunter: replace Ice Arrow with Cripple Shot (no damage, slows the target for 8 sec, 8 sec cooldown)
+- [x] 26. Hunter: Dismiss Pet takes 5 sec to cast instead of being instant
+- [x] 27. Hunter: remake Beast Mastery with more fun talents than plain % bonuses, for example an active pet skill added to the spellbook
+- [x] 28. Paladin: start with Light's Mending, placed on the action bar
+- [x] 29. Warrior: start with Mighty Strike (no need to learn it)
+- [x] 30. Priest: start with Smite and Healing Light (no need to learn them)
+
+### To fix – list 3
+
+#### Co-op
+- [x] 31. Friends see your spells and arrows (projectiles, rings and ground effects)
+- [x] 32. Herbs, ore and quest items you pick up are your own; found places and kills count for friends nearby too
+
+#### General (done in v0.12.3 / v0.12.4)
+- [x] 33. People only look at you while you talk to them
+- [x] 34. Dev tools only through F8 (not in the menu)
+- [x] 35. Spells and buffs without a target go to yourself; click your own portrait to target yourself
+- [x] 36. Your portrait and the target portrait no longer overlap
+- [x] 37. Gear uses Stamina, Intellect, Agility, Strength, Spell Power and Spell Healing
+
+### To fix – list 4
+
+#### Dungeons
+- [x] 38. Dungeons keep their state: defeated monsters stay dead (also after leaving or reloading) until you choose "Reset and enter" at the door; you get a prompt before going in
+- [x] 39. Dying in a dungeon takes you to the nearest graveyard outside; entering the dungeon as a spirit brings you back to life at its entrance (or use the Spirit Guide); the dungeon is not reset
+
+#### General
+- [x] 40. No welcome message when you log in
+- [x] 41. No "reset at your class trainer" line in the talent window
+- [x] 42. Clear dungeon entrances with a sign (name, "Dungeon", levels); the Broken Watchtower moved away from the Iron Mine's door
+- [x] 43. Ash Gargoyles (and the Magma Gargoyle) look like gargoyles
+
+#### Classes
+- [x] 44. Hunter: Raptor Strike's text is "A quick melee strike"
+
 ### Stage 10 – day and night
 - [x] Game clock: a day lasts 80 minutes (night 20), the same for everyone in co-op; light, sky, mist, town firelight and a small light around you at night
 - [x] More wolves, undead and spirits at night (a level higher); monsters see you from a bit shorter range in the dark
@@ -170,7 +221,9 @@ Numbered so we can refer to them. Tick them off as they get done.
 
 ### Next
 - [ ] Sound effects (CC0 sounds from Rimfrost 1)
-- [ ] Rimfrost 1's dungeon puzzles (levers, runes and gates) and group scaling
+- [x] Dungeon group scaling: tougher dungeon monsters, +70% health and +10% damage per extra player, one gear drop per elite/boss with Need / Greed / Pass rolls
+- [ ] Rimfrost 1's dungeon puzzles (levers, runes and gates)
+- [ ] A raid for level 30 only (3–5 players): a new, bigger dungeon with bosses that have mechanics, and better rewards
 - [ ] The smith's weapon upgrades and other crafting (on hold)
 
 ### Art

@@ -1,6 +1,6 @@
 // Rimfrost 1's monsters: names, levels, sizes, speeds and special attacks, turned into 3D models and Rimfrost 2 stats.
 import * as THREE from "three";
-import {makeHumanoid, makeBeast, makeSpider, makeTroll, makeCultist, makeSkeleton, makeKobold, makeGolem, makeWisp, makeCritter, makeGhoul, makeDraug, makeDrowned} from "./models.js";
+import {makeHumanoid, makeBeast, makeSpider, makeTroll, makeCultist, makeSkeleton, makeKobold, makeGolem, makeWisp, makeCritter, makeGhoul, makeDraug, makeDrowned, makeDrake, makeGargoyle} from "./models.js";
 
 // r = size, sp = speed (Rimfrost 1 pixels), elite = strength, special = a big attack you must step away from
 const MOBS = {
@@ -112,8 +112,8 @@ const LOOKS = {
   troll: c => makeKobold({skin: c, shirt: 0x5a4a3a, ears: true, noCandle: true, helm: null, weaponType: "dagger", scale: 0.82}),
   goblin: c => makeKobold({skin: c, shirt: 0x3a4a2a, ears: true, noCandle: true, helm: null, weaponType: "axe", scale: 0.85}),
   goblinshaman: c => makeKobold({skin: 0x7a8a3a, shirt: c, robe: true, ears: true, noCandle: true, helm: null, weaponType: "staff", weapon: c, scale: 0.85}),
-  gargoyle: c => makeHumanoid({skin: c, shirt: c, pants: shade(c, 0.8), boots: shade(c, 0.7), hair: shade(c, 0.6), gloves: c, cape: shade(c, 0.6), gaunt: true, eyes: 0xff6a3a, weaponType: "none", ears: true}),
-  magmagargoyl: c => makeHumanoid({skin: 0x4a3a34, shirt: 0x3a2a24, pants: 0x2a2220, hair: 0x1a1410, gloves: c, cape: c, gaunt: true, eyes: 0xffd060, weaponType: "none", ears: true}),
+  gargoyle: c => makeGargoyle({color: c, dark: shade(c, 0.6), wing: shade(c, 0.75), eyes: 0xff6a3a}),
+  magmagargoyl: c => makeGargoyle({color: 0x4a3a34, dark: 0x2a2220, wing: c, eyes: 0xffd060}),
   kultist: c => makeCultist({shirt: c, cape: 0x1a2a1a, weapon: 0x7aff9a, mask: 0x1a2a1a}),
   drunknad: c => makeDrowned({shirt: c}),
   hagga: c => makeCultist({shirt: 0x3a2a3a, cape: 0x2a1a2a, hair: 0x8a8a8a, mask: null, skin: 0x8a9a6a, weapon: c}),
@@ -134,7 +134,7 @@ function makeModel(kind, d){
     case "ghoul": return makeGhoul({skin: c, shirt: shade(c, 0.6), scale: s * 0.95});
     case "golem": return makeGolem({skin: c, shirt: shade(c, 0.9), pants: shade(c, 0.8), boots: shade(c, 0.7), hair: shade(c, 0.9), gloves: shade(c, 1.1), shoulders: shade(c, 1.1), scale: 1.8 * d.r / 15, eyes: kind === "icegolem" ? 0x9fd6ff : 0xffb04a});
     case "troll": return makeTroll({skin: c, scale: 1.35 * d.r / 14, ...(kind === "garuk" ? {shirt: 0x3a2a1a, shoulders: 0x6a6a6a, helm: {type: "plate", color: 0x5a5a5a}} : {})});
-    case "drake": return scaled(makeBeast({w: 1.1, h: 0.8, l: 2.4, legH: 0.6, head: 0.7, color: c, snout: shade(c, 0.7), leg: shade(c, 0.7), ears: true, tail: 1.6}), 1.4);
+    case "drake": return scaled(makeDrake({color: c, dark: shade(c, 0.55), belly: shade(c, 1.6), wing: shade(c, 0.75)}), 1.25);
     case "critter": return scaled(makeCritter(kind === "deer" ? "deer" : kind === "rat" ? "rat" : "hare", c), kind === "deer" ? 1.1 : 1);
     case "draug": return makeDraug();
     default: { const look = LOOKS[kind]; const g = look ? look(c) : makeHumanoid({shirt: c, cape: null}); return s > 1.05 ? scaled(g, s) : g; }

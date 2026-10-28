@@ -45,7 +45,7 @@ add("jarnfastet", [   // Rimhaven: everyone has their own spot (tiles from the c
   {id: "oreman", name: "Hakon the Smith", title: "Blacksmith", color: "#7a5a40", shop: "smith", city: true, race: "human", at: [-11, -1]},
   {id: "apoth", name: "Yrsa the Apothecary", title: "Alchemy & Potions", color: "#6ab08a", shop: "goods", race: "elf", at: [-11, 2]},
   {id: "arvid", name: "Quartermaster Arvid", title: "Merchant", color: "#c09a40", shop: "goods", race: "dwarf", at: [-9, 5]},
-  {id: "stable", name: "Stablemaster Hrafn", title: "Riding Trainer & Mounts", color: "#8a6a4a", stable: true, race: "human", at: [7, 9]}]);
+  {id: "stable", name: "Stablemaster Hrafn", title: "Riding Trainer & Mounts", color: "#8a6a4a", stable: true, race: "human", at: [6.4, 8.4]}]);
 add("holgerstuga", [{id: "mattis", name: "Mattis the Peddler", title: "Merchant", color: "#a08a5a", shop: "basic", race: "human"}]);
 add("manglanta", [{id: "sylis", name: "Sylis the Wanderer", title: "Merchant", color: "#6a9a7a", shop: "basic", race: "elf"}]);
 add("snostugan", [{id: "gunnar", name: "Gunnar the Trapper", title: "Merchant", color: "#8a7a6a", shop: "basic", race: "dwarf"}]);
@@ -61,11 +61,11 @@ add("isporten", [{id: "hedda", name: "Hedda the Icewarden", title: "Quest Giver"
 { const byHub = {}; for(const n of list) if(!n.at) (byHub[n.hub] = byHub[n.hub] || []).push(n);
   for(const [hid, arr] of Object.entries(byHub)){ const h = HUBS[hid], rad = (h.kind === "town" ? 4.9 : 2.4) * TS;
     arr.forEach((n, i) => { const a = i / arr.length * Math.PI * 2 - Math.PI / 2 + 0.3; n.x = h.x + Math.cos(a) * rad; n.z = h.z + Math.sin(a) * rad; }); }
-  for(const n of list){ const h = HUBS[n.hub]; if(n.at){ n.x = h.x + n.at[0] * TS; n.z = h.z + n.at[1] * TS; } n.rot = Math.atan2(n.x - h.x, n.z - h.z); } }
-const HELLO = {quest: "Well met, traveller. We could use someone like you around here.", goods: "Potions and elixirs – have a look.", basic: "A few potions for the road?", smith: "Weapons and armor, made to last.",
-  aldric: "Rimhaven stands because heroes stand with it.", stable: "Tired feet? Every hero rides sooner or later – learn it here, and pick a good mount.", brenna: "Keep your blade sharp. The Ironclan never sleeps.", halvard: "Heroes from every people come through these gates. Good – we need them all."};
+  for(const n of list){ const h = HUBS[n.hub]; if(n.at){ n.x = h.x + n.at[0] * TS; n.z = h.z + n.at[1] * TS; } n.rot = Math.atan2(n.x - h.x, n.z - h.z) + (n.stable ? Math.PI : 0); } }
+const HELLO = {quest: "Well met, traveller.", goods: "Potions and elixirs.", basic: "Potions for the road.", smith: "Weapons and armor.",
+  aldric: "Rimhaven stands because heroes stand with it.", stable: "Riding lessons and mounts.", brenna: "Keep your blade sharp. The Ironclan never sleeps.", halvard: "Heroes from every people come through these gates. Rimhaven needs them all."};
 export const NPCS = list.map(n => ({...n, role: n.stable ? "stable" : n.trains ? "trainer" : n.shop ? "vendor" : "quest", maxIl: n.city ? null : HUB_IL[n.hub] || 30,
-  hello: HELLO[n.id] || (n.trains ? `I teach the ways of the ${CLASSES[n.trains].name}. Come back whenever you have grown.` : n.shop ? HELLO[n.shop] : HELLO.quest)}));
+  hello: HELLO[n.id] || (n.trains ? `I teach the ways of the ${CLASSES[n.trains].name}.` : n.shop ? HELLO[n.shop] : HELLO.quest)}));
 
 // ---------------------------------------------------------------- quest items and things to pick up
 export const QITEMS = {
@@ -226,7 +226,7 @@ export const QUESTS = [
   {id: "h9", npc: "holger", lvl: 6, name: "The Missing Patrol", text: "A patrol vanished in the forest. Find their patrol badges so the families can be told. Find 5.", obj: [["collect", "patrolbadge", 5]]},
   {id: "h10", npc: "holger", lvl: 7, req: ["h8"], to: "linnea", name: "Silk for Linnea", text: "Linnea in Frostwick makes bandages from fine spider silk. Gather 8 and take them to her.", obj: [["loot", "spidersilk", 8, "spider", 0.5]]},
   {id: "h11", npc: "holger", lvl: 7, req: ["h8"], name: "The Bandits", text: "Bandits have made camp deep in the forest to the southwest. Kill 8.", obj: [["kill", "bandit", 8]]},
-  {id: "h12", npc: "holger", lvl: 9, req: ["h11"], name: "Chieftain Grimm", text: "The bandit leader Grimm is dangerous. Get clear when you see the red circle! Defeat him.", obj: [["kill", "leader", 1]], mult: 2, items: {potHp2: 2}},
+  {id: "h12", npc: "holger", lvl: 9, req: ["h11"], name: "Chieftain Grimm", text: "The bandit leader Grimm is dangerous. Beware his Whirling Slash. Defeat him.", obj: [["kill", "leader", 1]], mult: 2, items: {potHp2: 2}},
   {id: "h13", npc: "holger", lvl: 10, req: ["h12"], to: "halvard", name: "Onward to Rimhaven", text: "You have outgrown the forest. Commander Halvard in Rimhaven, the great city in the mountains, needs heroes. Go there.", obj: [], mult: 0.4},
   {id: "e1", npc: "ilsa", lvl: 1, name: "The Foxes", text: "The forest foxes have started hunting near Leafhome. Drive them off – kill 6.", obj: [["kill", "lynx", 6]]},
   {id: "e2", npc: "faelin", lvl: 1, name: "Morning Dew", text: "Glittering dew gathers on the leaves of the grove. I need 6 drops for a potion.", obj: [["collect", "dewdrop", 6]], items: {potHp: 2}},
@@ -239,20 +239,20 @@ export const QUESTS = [
   {id: "e9", npc: "lyra", lvl: 6, name: "Lost Brothers", text: "Some druids have lost their minds and attack everyone. We cannot save them. Bring down 6.", obj: [["kill", "lostdruid", 6]]},
   {id: "e10", npc: "lyra", lvl: 7, name: "Moonstones", text: "Moonstones light up the forest at night. Gather 6 before the shadows take them.", obj: [["collect", "moonstone", 6]]},
   {id: "e11", npc: "lyra", lvl: 8, to: "faelin", name: "Silverweed for Faelin", text: "Faelin in Leafhome needs silverweed. Pick 5 and take them to him.", obj: [["collect", "silver", 5]]},
-  {id: "e12", npc: "lyra", lvl: 9, req: ["e9"], name: "Morvel the Nightwatcher", text: "Behind the madness stands Morvel the Nightwatcher. He unleashes a shadow wave – run out of the circle! Defeat him.", obj: [["kill", "morvel", 1]], mult: 2, items: {potHp2: 2}},
+  {id: "e12", npc: "lyra", lvl: 9, req: ["e9"], name: "Morvel the Nightwatcher", text: "Behind the madness stands Morvel the Nightwatcher. Beware his Shadow Wave. Defeat him.", obj: [["kill", "morvel", 1]], mult: 2, items: {potHp2: 2}},
   {id: "e13", npc: "lyra", lvl: 10, req: ["e12"], to: "halvard", name: "The Road to Rimhaven", text: "Commander Halvard in Rimhaven is gathering heroes from every people. Go there.", obj: [], mult: 0.4},
   {id: "d1", npc: "hjalmar", lvl: 1, name: "The Crag Boars", text: "The crag boars are rooting up the mine road. Kill 6.", obj: [["kill", "rocksvin", 6]]},
   {id: "d2", npc: "torvald", lvl: 1, name: "The First Ore", text: "Every dwarf starts with copper. Mine 6 copper ore.", obj: [["collect", "copper", 6]]},
   {id: "d3", npc: "hjalmar", lvl: 2, req: ["d1"], name: "Kobolds in the Mine", text: "Cave kobolds have moved into the mines. Throw them out – kill 8.", obj: [["kill", "kobold", 8]]},
-  {id: "d4", npc: "ingrid", lvl: 3, name: "Mushrooms for the Ale", text: "My finest ale needs cave mushrooms. Pick 7 for me.", obj: [["collect", "mushroom", 7]], items: {potHp: 2}},
+  {id: "d4", npc: "ingrid", lvl: 3, name: "Mushrooms for the Ale", text: "My finest ale needs cave mushrooms. Gather 7.", obj: [["collect", "mushroom", 7]], items: {potHp: 2}},
   {id: "d5", npc: "torvald", lvl: 4, req: ["d2"], name: "Stolen Tools", text: "The kobolds stole our tools. Take back 5.", obj: [["loot", "tools", 5, "kobold", 0.5]]},
-  {id: "d6", npc: "bodil", lvl: 4, name: "Beetle Shell", text: "Stone beetle shells make fine shields. I'll buy 6.", obj: [["loot", "beetleshell", 6, "beetle", 0.6]]},
+  {id: "d6", npc: "bodil", lvl: 4, name: "Beetle Shell", text: "Stone beetle shells make fine shields. Bring me 6.", obj: [["loot", "beetleshell", 6, "beetle", 0.6]]},
   {id: "d7", npc: "hjalmar", lvl: 5, req: ["d3"], to: "sune", name: "A Message for Snow Cabin", text: "Sune the Hunter in Snowvale to the south needs a strong arm. Go to Snow Cabin.", obj: [], mult: 0.4},
   {id: "d8", npc: "sune", lvl: 5, req: ["d7"], name: "The Ice Bears", text: "There are far too many ice bears. Bring down 6.", obj: [["kill", "icebear", 6]]},
   {id: "d9", npc: "sune", lvl: 6, name: "Frozen Supplies", text: "The blizzard scattered our supply crates across the vale. Recover 5.", obj: [["collect", "supply", 5]]},
   {id: "d10", npc: "sune", lvl: 7, req: ["d8"], name: "The Frost Kobolds", text: "Frost kobolds are raiding the traps. Kill 10.", obj: [["kill", "frostkobold", 10]]},
   {id: "d11", npc: "sune", lvl: 8, to: "torvald", name: "Iron for Torvald", text: "Torvald in Mountdale wants iron. Mine 5 iron ore and take it to him.", obj: [["collect", "iron", 5]]},
-  {id: "d12", npc: "sune", lvl: 9, req: ["d10"], name: "Snorre the Kobold King", text: "Snorre the Kobold King leads them. He can unleash an avalanche – stay out of the circle! Defeat him.", obj: [["kill", "snorre", 1]], mult: 2, items: {potHp2: 2}},
+  {id: "d12", npc: "sune", lvl: 9, req: ["d10"], name: "Snorre the Kobold King", text: "Snorre the Kobold King leads them. Beware his Avalanche. Defeat him.", obj: [["kill", "snorre", 1]], mult: 2, items: {potHp2: 2}},
   {id: "d13", npc: "sune", lvl: 10, req: ["d12"], to: "halvard", name: "Down to Rimhaven", text: "Commander Halvard in Rimhaven needs dwarves like you. Go there.", obj: [], mult: 0.4},
   {id: "o1", npc: "ragna", lvl: 1, name: "The Jackals", text: "The jackals are stealing meat from the camp. Kill 6.", obj: [["kill", "jackal", 6]]},
   {id: "o2", npc: "urk", lvl: 1, name: "Spirit Totems", text: "Our ancestors' totems stand out on the plains. Bring 4 so I can awaken the spirits.", obj: [["collect", "totem", 4]], items: {potHp: 2}},
@@ -265,7 +265,7 @@ export const QUESTS = [
   {id: "o9", npc: "kruk", lvl: 6, name: "Stolen Weapons", text: "The raiders have hidden stolen weapon crates in the canyon. Recover 5.", obj: [["collect", "weaponcrate", 5]]},
   {id: "o10", npc: "kruk", lvl: 7, req: ["o8"], name: "The Sand Golems", text: "Something has awakened the sand golems. Smash 8.", obj: [["kill", "sandgolem", 8]]},
   {id: "o11", npc: "kruk", lvl: 8, name: "The War Banner", text: "The raiders carry a war banner that shows whom they serve. Take it from one of them.", obj: [["loot", "warbanner", 1, "raider", 0.25]]},
-  {id: "o12", npc: "kruk", lvl: 9, req: ["o10"], name: "Warlord Garuk", text: "The banner bears Garuk's mark. He can stomp until the ground shakes – get out of the circle! Defeat him.", obj: [["kill", "garuk", 1]], mult: 2, items: {potHp2: 2}},
+  {id: "o12", npc: "kruk", lvl: 9, req: ["o10"], name: "Warlord Garuk", text: "The banner bears Garuk's mark. Beware his War Stomp. Defeat him.", obj: [["kill", "garuk", 1]], mult: 2, items: {potHp2: 2}},
   {id: "o13", npc: "kruk", lvl: 10, req: ["o12"], to: "halvard", name: "To Rimhaven", text: "Commander Halvard in Rimhaven is gathering strong warriors. Go there.", obj: [], mult: 0.4},
   {id: "u1", npc: "morten", lvl: 1, name: "Rats in the Crypts", text: "The grave rats gnaw on everything, even us. Kill 6 before they breed any further.", obj: [["kill", "rat", 6]]},
   {id: "u2", npc: "hilde", lvl: 1, name: "Graveblooms", text: "Pale graveblooms grow where the dead rest. Pick 6 for me – they hold our bodies together.", obj: [["collect", "graveflower", 6]], items: {potHp: 2}},
@@ -278,7 +278,7 @@ export const QUESTS = [
   {id: "u9", npc: "ulvar", lvl: 6, name: "Stolen Urns", text: "The robbers have hidden stolen urns out on the fields. Bring back 5.", obj: [["collect", "urn", 5]]},
   {id: "u10", npc: "ulvar", lvl: 7, req: ["u8"], name: "The Bone Guardians", text: "Someone has awakened the old bone guardians and turned them against us. Smash 8.", obj: [["kill", "boneguard", 8]]},
   {id: "u11", npc: "ulvar", lvl: 8, name: "The Plague Bears", text: "The plague has reached the bears. They are sick and dangerous – bring down 6.", obj: [["kill", "plaguebear", 6]]},
-  {id: "u12", npc: "ulvar", lvl: 9, req: ["u10"], name: "Vex the Necromancer", text: "Behind it all stands Vex the Necromancer in the southeast. His death wave strikes everything around him – run out of the circle! Defeat him.", obj: [["kill", "vex", 1]], mult: 2, items: {potHp2: 2}},
+  {id: "u12", npc: "ulvar", lvl: 9, req: ["u10"], name: "Vex the Necromancer", text: "Behind it all stands Vex the Necromancer in the southeast. Beware his Death Wave. Defeat him.", obj: [["kill", "vex", 1]], mult: 2, items: {potHp2: 2}},
   {id: "u13", npc: "ulvar", lvl: 10, req: ["u12"], to: "halvard", name: "The Road to Rimhaven", text: "Commander Halvard in Rimhaven welcomes all who can fight, even us undead. Go there.", obj: [], mult: 0.4},
   {id: "j1", npc: "halvard", lvl: 10, name: "Goblins of Iron Ridge", text: "Goblins from the mountains are plundering our caravans. Kill 10.", obj: [["kill", "troll", 10]]},
   {id: "j2", npc: "halvard", lvl: 11, name: "Iron for the Hold", text: "The city needs iron for new gates. Mine 6 iron ore.", obj: [["collect", "iron", 6]]},
@@ -292,14 +292,14 @@ export const QUESTS = [
   {id: "s3", npc: "mora", lvl: 17, name: "Glimmering Dust", text: "The mist sprites' dust glows in the dark. Gather 6 for me.", obj: [["loot", "wispdust", 6, "wisp", 0.6]]},
   {id: "s4", npc: "sigvard", lvl: 17, name: "Names of the Dead", text: "The graves in the marsh bear name plaques. Bring 5 so that we may remember them.", obj: [["collect", "gravename", 5]]},
   {id: "s5", npc: "sigvard", lvl: 18, req: ["s1"], name: "The Mist Sprites", text: "The mist sprites lead travellers astray. Snuff out 8.", obj: [["kill", "wisp", 8]]},
-  {id: "s6", npc: "sigvard", lvl: 19, req: ["s5"], name: "The Draug King", text: "In the crypt in the far south, the Draug King has awakened. His Grave Strike crushes everything in a large circle – run! Defeat him.", obj: [["kill", "boss", 1]], mult: 2.5},
+  {id: "s6", npc: "sigvard", lvl: 19, req: ["s5"], name: "The Draug King", text: "The Draug King has awakened in his crypt in the far south. Beware his Grave Strike. Defeat him.", obj: [["kill", "boss", 1]], mult: 2.5},
   {id: "s7", npc: "sigvard", lvl: 20, req: ["s6"], to: "runa", name: "To Ashwatch", text: "Runa the Warden at Ashwatch in the northeast needs you now. Go there.", obj: [], mult: 0.4},
   {id: "a1", npc: "runa", lvl: 20, name: "The Ash Hounds", text: "The ash hounds hunt in packs on the Ashfields. Kill 10.", obj: [["kill", "hound", 10]]},
   {id: "a2", npc: "runa", lvl: 21, name: "Black Glass", text: "We need obsidian for new weapons. Mine 6.", obj: [["collect", "obsidian", 6]]},
   {id: "a3", npc: "runa", lvl: 22, req: ["a1"], name: "Embers in the Night", text: "Ember spirits are hurling fire at our scouts. Snuff out 8.", obj: [["kill", "elemental", 8]]},
   {id: "a4", npc: "siv", lvl: 23, name: "Fire Blooms", text: "The fire bloom grows amid the lava. Pick 6.", obj: [["collect", "fireflower", 6]]},
   {id: "a5", npc: "runa", lvl: 23, req: ["a3"], name: "Magma Cores", text: "The ember spirits carry magma cores we can forge with. Gather 5.", obj: [["loot", "magmacore", 5, "elemental", 0.5]]},
-  {id: "a6", npc: "runa", lvl: 24, req: ["a3"], name: "The Magma Lord", text: "The Magma Lord rules in the far north. His Lava Eruption strikes everything around him. Defeat him.", obj: [["kill", "magma", 1]], mult: 2.5, items: {potHp3: 2}},
+  {id: "a6", npc: "runa", lvl: 24, req: ["a3"], name: "The Magma Lord", text: "The Magma Lord rules in the far north. Beware his Lava Eruption. Defeat him.", obj: [["kill", "magma", 1]], mult: 2.5, items: {potHp3: 2}},
   {id: "a7", npc: "runa", lvl: 25, req: ["a6"], to: "hedda", name: "To Icegate", text: "Hedda the Icewarden at Icegate in the east awaits you.", obj: [], mult: 0.4},
   {id: "f1", npc: "hedda", lvl: 25, name: "Wolves in the Snow", text: "The frost wolves here are bigger than anything you have ever seen. Kill 10.", obj: [["kill", "frostwolf", 10]]},
   {id: "f2", npc: "hedda", lvl: 26, name: "Living Ice", text: "Ice golems roam the glacier. Smash 8.", obj: [["kill", "icegolem", 8]]},
@@ -307,7 +307,7 @@ export const QUESTS = [
   {id: "f4", npc: "hedda", lvl: 27, name: "Rime Crystals", text: "Rime crystal makes the strongest weapons. Mine 5.", obj: [["collect", "rimkr", 5]]},
   {id: "f5", npc: "hedda", lvl: 27, req: ["f2"], name: "The Rime Trolls", text: "The rime trolls guard the road to the giant's throne. Kill 10.", obj: [["kill", "rimtroll", 10]]},
   {id: "f6", npc: "frode", lvl: 28, name: "Ice Blooms", text: "Ice blooms make the strongest potions. Pick 6.", obj: [["collect", "iceflower", 6]]},
-  {id: "f7", npc: "hedda", lvl: 29, req: ["f5"], name: "Hrimgar the Ice Giant", text: "Hrimgar sits upon his throne in the heart of Frostcrown. His Glacier Crush is devastating – run out of the circle. Defeat him and save the land.", obj: [["kill", "giant", 1]], mult: 3},
+  {id: "f7", npc: "hedda", lvl: 29, req: ["f5"], name: "Hrimgar the Ice Giant", text: "Hrimgar sits upon his throne in the heart of Frostcrown. Beware his Glacier Crush. Defeat him and free the land.", obj: [["kill", "giant", 1]], mult: 3},
   {id: "z1", npc: "olle", lvl: 2, name: "The Silent Windmill", text: "Old Aldric's windmill east of the village has stopped turning, and nobody has seen him for days. Walk out to the Old Windmill and take a look.", obj: [["explore", "windmill", 1]], n: 1},
   {id: "z2", npc: "edda", lvl: 2, name: "Signs of the Pack", text: "The sheep were found torn up near Wolf Hill, in the southwest. Go and see what is going on out there.", obj: [["explore", "wolfhill", 1]], n: 1},
   {id: "z3", npc: "edda", lvl: 3, req: ["z2"], name: "Thinning the Pack", text: "It is as I feared: the wolves have made a den on Wolf Hill. Kill 8 of them before winter.", obj: [["kill", "wolf", 8]], n: 1},
@@ -370,7 +370,7 @@ export const QUESTS = [
   {id: "z62", npc: "kira", lvl: 21, name: "The Cinder Obelisk", text: "There is an obelisk east of the watch that glows red at night. I want to know why. Go to the Cinder Obelisk.", obj: [["explore", "obelisk", 1]], n: 1},
   {id: "z63", npc: "kira", lvl: 22, req: ["z62"], name: "Obelisk Shards", text: "The gargoyles that guard the obelisk are breaking pieces off it. Bring me 6 shards, and we will learn what it is made of.", obj: [["loot", "obeliskshard", 6, "gargoyle", 0.45]], n: 1},
   {id: "z65", npc: "kira", lvl: 23, req: ["z63"], to: "runa", name: "Shards for Runa", text: "The shards are forge-stone, from a forge beneath the ashes. Take them to Runa.", obj: [], mult: 0.4, n: 1},
-  {id: "z66", npc: "runa", lvl: 24, req: ["z65"], name: "Free the Forge Slaves", text: "Whoever runs that forge keeps slaves in the dark. Go into the Ember Forge and put 10 of the forge slaves out of their misery, since they cannot be freed.", obj: [["kill", "smedjeorc", 10]], mult: 2.2, pick: {q: 3}, n: 1},
+  {id: "z66", npc: "runa", lvl: 24, req: ["z65"], name: "Free the Forge Slaves", text: "The forge slaves of the Ember Forge are beyond saving. Enter the forge and put 10 of them to rest.", obj: [["kill", "smedjeorc", 10]], mult: 2.2, pick: {q: 3}, n: 1},
   {id: "z67", npc: "siv", lvl: 21, name: "The Scorched Bridge", text: "The bridge in the north burned down overnight, and no merchants can get through. Go to the Scorched Bridge and see how bad it is.", obj: [["explore", "scorchbridge", 1]], n: 1},
   {id: "z68", npc: "siv", lvl: 22, req: ["z67"], name: "Singed Pelts", text: "Hounds burned the bridge. Their pelts are good for fireproofing, so bring me 5 of them.", obj: [["loot", "emberpelt", 5, "hound", 0.4]], n: 1},
   {id: "z69", npc: "orm", lvl: 26, name: "The Frozen Camp", text: "A camp of pilgrims was last seen to the northeast, heading for the vault. Go to the Frozen Camp and see what is left.", obj: [["explore", "frozencamp", 1]], n: 1},
@@ -420,16 +420,16 @@ export const QUESTS = [
 ];
 // gathering quests: raise your Mining and Herbalism (from the smiths and alchemists of the race towns, then Rimhaven's smith and apothecary)
 for(const [smith, alch] of [["bror", "linnea"], ["elvar", "faelin"], ["torvald", "ingrid"], ["grosh", "urk"], ["knota", "hilde"]]){
-  QUESTS.push({id: "pm_" + smith, npc: smith, lvl: 2, n: true, mult: 0.6, name: "The Miner's Pick", text: "Every adventurer should know how to work a pick. Mine the ore veins around town until your Mining skill reaches 15.", obj: [["skill", "mining", 15]]},
-    {id: "ph_" + alch, npc: alch, lvl: 2, n: true, mult: 0.6, name: "The Herbalist's Eye", text: "Learn to tell a herb from a weed. Pick the herbs that grow around town until your Herbalism skill reaches 15.", obj: [["skill", "herb", 15]], items: {potHp: 1}}); }
+  QUESTS.push({id: "pm_" + smith, npc: smith, lvl: 2, n: true, mult: 0.6, name: "The Miner's Pick", text: "Every adventurer should know how to mine. Raise your Mining skill to 15.", obj: [["skill", "mining", 15]]},
+    {id: "ph_" + alch, npc: alch, lvl: 2, n: true, mult: 0.6, name: "The Herbalist's Eye", text: "Every adventurer should know the herbs of the land. Raise your Herbalism skill to 15.", obj: [["skill", "herb", 15]], items: {potHp: 1}}); }
 QUESTS.push(
-  {id: "pm40", npc: "oreman", lvl: 11, n: true, mult: 0.7, name: "Deeper Veins", text: "Gold runs through Iron Ridge, but only a skilled miner can work it. Come back when your Mining skill is 40.", obj: [["skill", "mining", 40]]},
-  {id: "pm80", npc: "oreman", lvl: 18, req: ["pm40"], n: true, mult: 0.7, name: "Black Glass and Fire", text: "Obsidian from the Ashfields breaks a careless pick. Raise your Mining skill to 80.", obj: [["skill", "mining", 80]]},
-  {id: "pm110", npc: "oreman", lvl: 24, req: ["pm80"], n: true, mult: 0.8, name: "Master of the Pick", text: "Rime crystal in Frostcrown is the hardest stone there is. Raise your Mining skill to 110.", obj: [["skill", "mining", 110]]},
-  {id: "night1", npc: "apoth", lvl: 10, n: true, mult: 0.8, nightOnly: true, name: "Moonbloom", text: "Moonbloom opens only under the night sky – in daylight you won't even see it. Pick 5 for me some night, in Iron Ridge or out in the wilds. Needs Herbalism 20.", obj: [["collect", "moonbloom", 5]], items: {potMana2: 1, potHp2: 1}},
-  {id: "ph40", npc: "apoth", lvl: 11, n: true, mult: 0.7, name: "Rarer Herbs", text: "The rare herbs of the marsh wilt in clumsy hands. Come back when your Herbalism skill is 40.", obj: [["skill", "herb", 40]], items: {potHp2: 1}},
-  {id: "ph80", npc: "apoth", lvl: 18, req: ["ph40"], n: true, mult: 0.7, name: "Flowers of the Ashfields", text: "Fire blooms burn the fingers of beginners. Raise your Herbalism skill to 80.", obj: [["skill", "herb", 80]], items: {potHp2: 2}},
-  {id: "ph110", npc: "apoth", lvl: 24, req: ["ph80"], n: true, mult: 0.8, name: "Master Herbalist", text: "Ice blooms in Frostcrown can only be picked by a master. Raise your Herbalism skill to 110.", obj: [["skill", "herb", 110]], items: {potHp3: 1}});
+  {id: "pm40", npc: "oreman", lvl: 11, n: true, mult: 0.7, name: "Deeper Veins", text: "Gold ore in Iron Ridge requires a skilled miner. Raise your Mining skill to 40.", obj: [["skill", "mining", 40]]},
+  {id: "pm80", npc: "oreman", lvl: 18, req: ["pm40"], n: true, mult: 0.7, name: "Black Glass and Fire", text: "Obsidian in the Ashfields requires an experienced miner. Raise your Mining skill to 80.", obj: [["skill", "mining", 80]]},
+  {id: "pm110", npc: "oreman", lvl: 24, req: ["pm80"], n: true, mult: 0.8, name: "Master of the Pick", text: "Rime crystal in Frostcrown can only be mined by a master. Raise your Mining skill to 110.", obj: [["skill", "mining", 110]]},
+  {id: "night1", npc: "apoth", lvl: 10, n: true, mult: 0.8, nightOnly: true, name: "Moonbloom", text: "Moonbloom only blooms at night. Gather 5 in Iron Ridge, Moonwood, the Bonefields or Mistmarsh. Requires Herbalism 20.", obj: [["collect", "moonbloom", 5]], items: {potMana2: 1, potHp2: 1}},
+  {id: "ph40", npc: "apoth", lvl: 11, n: true, mult: 0.7, name: "Rarer Herbs", text: "The rare herbs of the marsh require a skilled herbalist. Raise your Herbalism skill to 40.", obj: [["skill", "herb", 40]], items: {potHp2: 1}},
+  {id: "ph80", npc: "apoth", lvl: 18, req: ["ph40"], n: true, mult: 0.7, name: "Flowers of the Ashfields", text: "Fire blooms in the Ashfields require an experienced herbalist. Raise your Herbalism skill to 80.", obj: [["skill", "herb", 80]], items: {potHp2: 2}},
+  {id: "ph110", npc: "apoth", lvl: 24, req: ["ph80"], n: true, mult: 0.8, name: "Master Herbalist", text: "Ice blooms in Frostcrown can only be gathered by a master. Raise your Herbalism skill to 110.", obj: [["skill", "herb", 110]], items: {potHp3: 1}});
 
 // ---------------------------------------------------------------- riding: learn it at level 20 from the stablemaster in Rimhaven, then buy a mount (60% faster)
 export const RIDING_LVL = 20, RIDING_COST = 120, MOUNT_SPEED = 1.6;
@@ -443,4 +443,4 @@ export const MOUNTS = {
 export const GOODS = [["potHp", 12], ["potHp2", 35], ["potHp3", 90], ["potMana", 12], ["potMana2", 90], ["elixir", 60], ["elixirIron", 70], ["elixirKeen", 70], ["elixirSage", 70]];
 export const GOODS_BASIC = GOODS.filter(([k]) => k.startsWith("pot"));
 export const trainCost = lvl => lvl <= 1 ? 0 : Math.round(lvl * lvl * 1.2 + 4);
-export const respecCost = level => level * 6;
+export const respecCost = level => Math.round(10 + level * level * 0.4);   // 50 gold at level 10, 170 at 20, 370 at 30

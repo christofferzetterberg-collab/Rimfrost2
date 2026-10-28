@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Rimfrost 2</title>
+<meta http-equiv="Cache-Control" content="no-store">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Uncial+Antiqua&family=Alegreya+Sans:wght@400;700;800&display=swap">
 <style>
   :root{--frost:#9fd6e8;--text:#e8eef1;--mute:#93a4ad;--panel:rgba(16,22,27,.9);--line:#2c3a43;--mana:#3f7fe0;--rage:#d0453a;--focus:#d8963a;--energy:#e2c63e}
@@ -11,13 +12,13 @@
   canvas{display:block}
   #hud{position:fixed;inset:0;pointer-events:none}
   .frame{position:absolute;top:12px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px;width:220px}
-  #pframe{left:12px} #tframe{left:250px} #tframe[hidden]{display:none}
+  #pframe{left:12px;cursor:pointer;pointer-events:auto} #tframe{left:266px} #tframe[hidden]{display:none}
   .frame .n{display:flex;justify-content:space-between;font-weight:800}
   .frame .s{color:var(--mute);font-size:12px;margin-top:2px}
   .bar{position:relative;height:14px;background:#0d1216;border:1px solid var(--line);border-radius:3px;margin-top:4px;overflow:hidden}
   .bar i{position:absolute;inset:0 auto 0 0;background:#3fbf5a}
   .bar b{position:absolute;inset:0;text-align:center;font-size:11px;line-height:14px;text-shadow:0 1px 2px #000}
-  #tframe .bar i{background:#d84a42} #tframe.friend .bar i{background:#3fbf5a} #tframe.friend{border-color:#7fc4ff}
+  #tframe .bar i{background:#d84a42} #tframe.friend .bar i{background:#3fbf5a} #tframe.friend{border-color:#7fc4ff} #tframe.self{border-color:#7be08a} #tframe.self .bar i{background:#3fbf5a}
   #xpbar{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);width:min(520px,70vw);height:8px}
   #xpbar i{background:#8a6fd8} #xpbar b{font-size:9px;line-height:8px}
   #title{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:'Uncial Antiqua',serif;font-size:26px;color:var(--frost);text-shadow:0 2px 8px #000}
@@ -27,6 +28,12 @@
   #help b{color:var(--text)}
   #log{position:absolute;bottom:22px;left:12px;width:340px;font-size:13px;text-shadow:0 1px 3px #000}
   #chatbox{position:absolute;bottom:4px;left:12px;width:340px;display:flex;gap:6px;align-items:center;z-index:3;background:var(--panel);border:1px solid #7fc4ff;border-radius:6px;padding:3px 8px}
+  .dgtag{display:inline-block;margin-left:6px;padding:0 5px;border-radius:4px;background:#3a2a1a;border:1px solid #c88a3a;color:#ffb860;font:700 11px 'Alegreya Sans';vertical-align:1px}
+  #rolls{position:absolute;right:12px;bottom:200px;width:300px;display:flex;flex-direction:column;gap:6px;pointer-events:auto;z-index:3}
+  .rollbox{background:var(--panel);border:1px solid #c88a3a;border-radius:8px;padding:8px 10px;font-size:13px} .rollbox .rt{color:var(--mute);font-size:12px}
+  .rollbox .ri{display:flex;align-items:center;gap:8px;margin:4px 0} .rollbox .ri img{width:32px;height:32px} .rollbox .rb{display:flex;gap:6px}
+  .rollbox button{font:800 13px 'Alegreya Sans';padding:4px 12px;border-radius:5px;border:1px solid #4a5a64;background:#1c262d;color:var(--text);cursor:pointer} .rollbox button:hover{border-color:#ffd36b}
+  .rollbox .rbar{height:4px;background:#0d1216;border-radius:2px;margin-top:6px;overflow:hidden} .rollbox .rbar i{display:block;height:100%;background:#c88a3a}
   #chatbox[hidden]{display:none} #chatbox span{color:#7fc4ff;font-weight:800;font-size:13px} #chatbox input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font:600 13px 'Alegreya Sans'}
   #log .chat b{color:#7fc4ff}
   #bar{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:6px;pointer-events:auto}
@@ -45,7 +52,7 @@
   .ft.big{font-size:22px}
   #dead{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(40,46,52,.5);backdrop-filter:grayscale(1);z-index:4}
   #dead[hidden]{display:none}
-  #ghostbar{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid #9fd6ff;border-radius:8px;padding:8px 14px;z-index:4;font-size:14px;color:#dff4ff;display:flex;gap:10px;align-items:center;white-space:nowrap}
+  #ghostbar{position:fixed;bottom:200px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid #9fd6ff;border-radius:8px;padding:8px 14px;z-index:4;font-size:14px;color:#dff4ff;display:flex;gap:10px;align-items:center;white-space:nowrap}
   #ghostbar[hidden]{display:none} #ghostbar button{font:800 14px 'Alegreya Sans';padding:5px 14px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer} #ghostbar button:disabled{opacity:.4;cursor:default}
   #dead .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 26px;text-align:center}
   #dead h2{font-family:'Uncial Antiqua',serif;font-weight:400;color:#ff6b5e;margin:0 0 12px}
@@ -141,10 +148,10 @@
   #load[hidden]{display:none}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261029c", "./src/dungeon.js": "./src/dungeon.js?v=20261029c", "./src/dev.js": "./src/dev.js?v=20261029c", "./src/clock.js": "./src/clock.js?v=20261029c", "./src/coop.js": "./src/coop.js?v=20261029c", "./src/content.js": "./src/content.js?v=20261029c", "./src/engine.js": "./src/engine.js?v=20261029c", "./src/items.js": "./src/items.js?v=20261029c", "./src/keys.js": "./src/keys.js?v=20261029c", "./src/main.js": "./src/main.js?v=20261029c", "./src/models.js": "./src/models.js?v=20261029c", "./src/nav.js": "./src/nav.js?v=20261029c", "./src/quests.js": "./src/quests.js?v=20261029c", "./src/rimdata.js": "./src/rimdata.js?v=20261029c", "./src/state.js": "./src/state.js?v=20261029c", "./src/util.js": "./src/util.js?v=20261029c", "./src/world.js": "./src/world.js?v=20261029c", "./src/worlddata.js": "./src/worlddata.js?v=20261029c", "./src/mobs.js": "./src/mobs.js?v=20261029c" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261101e", "./src/dungeon.js": "./src/dungeon.js?v=20261101e", "./src/dev.js": "./src/dev.js?v=20261101e", "./src/clock.js": "./src/clock.js?v=20261101e", "./src/coop.js": "./src/coop.js?v=20261101e", "./src/content.js": "./src/content.js?v=20261101e", "./src/engine.js": "./src/engine.js?v=20261101e", "./src/items.js": "./src/items.js?v=20261101e", "./src/keys.js": "./src/keys.js?v=20261101e", "./src/main.js": "./src/main.js?v=20261101e", "./src/models.js": "./src/models.js?v=20261101e", "./src/nav.js": "./src/nav.js?v=20261101e", "./src/quests.js": "./src/quests.js?v=20261101e", "./src/rimdata.js": "./src/rimdata.js?v=20261101e", "./src/state.js": "./src/state.js?v=20261101e", "./src/util.js": "./src/util.js?v=20261101e", "./src/world.js": "./src/world.js?v=20261101e", "./src/worlddata.js": "./src/worlddata.js?v=20261101e", "./src/mobs.js": "./src/mobs.js?v=20261101e" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
-  addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Cmd+Shift+R.</div>`; });
+  addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
 </script>
 </head>
 <body>
@@ -157,6 +164,7 @@
   <div id="mini"><canvas id="minimap" width="180" height="180"></canvas><div id="zone"></div><div id="clock"></div></div>
   <div id="banner"></div>
   <div id="log"></div>
+  <div id="rolls"></div>
   <div id="chatbox" hidden><span>Say:</span><input id="chatin" maxlength="200" autocomplete="off" placeholder="Type a message – Enter sends, Esc cancels"></div>
   <div id="tracker"></div>
   <div id="barwrap"><div class="bar" id="cast" style="visibility:hidden"><i></i><b></b></div><div class="abar" id="petbar" hidden></div><div class="abar" id="bar2"></div><div class="abar" id="bar1"></div></div>
@@ -167,7 +175,7 @@
 <div id="bigmap" hidden><div class="mbox"><div class="mhead"><b id="mapTitle">World map</b><span class="muted">M or Esc to close · mouse wheel to zoom</span></div><canvas id="mapcv"></canvas></div></div>
 <div id="gmenu" hidden><div class="box"><h2>Menu</h2>
   <button data-g="map">World map</button><button data-g="quests">Quests</button><button data-g="char">Character</button><button data-g="bag">Bag</button><button data-g="spells">Spellbook</button>
-  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="coop">Co-op</button><button data-g="dev" class="devb" hidden>Dev tools (F8)</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
+  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="coop">Co-op</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
 <div id="panel" hidden><div class="tabs"><button data-tab="quests">Quests</button><button data-tab="char">Character</button><button data-tab="bag">Bag</button><button data-tab="spells">Spellbook</button><button data-tab="tal">Talents</button><button data-tab="keys">Keys</button><button data-tab="coop">Co-op</button><button class="x" title="Close (Esc)">✕</button></div><div id="pbody"></div></div>
 <div id="chars" hidden><div class="box">
   <h1>Rimfrost 2</h1>
@@ -182,6 +190,6 @@
 </div></div>
 <div id="ghostbar" hidden></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button></div></div>
-<script type="module" src="./src/main.js?v=20261029c"></script>
+<script type="module" src="./src/main.js?v=20261101e"></script>
 </body>
 </html>

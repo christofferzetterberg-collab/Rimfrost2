@@ -2,7 +2,7 @@
 // Rimfrost 1 measured everything in pixels; here 1 world unit = PXU pixels, so the ability data can be reused unchanged.
 import * as THREE from "three";
 import {P, S, E, mobs, PXU} from "./state.js";
-import {AB, BARS, CLASSES, CLASS_DMG, PLAYER_DMG, MANA_COST_MULT, RES_NAME, SCHOOL_COLOR, TALENTS, TIER_NEED, TREES, TALENT_VERSION, HEAL_AB} from "./rimdata.js";
+import {AB, BARS, CLASSES, HUNTER_MIN, CLASS_DMG, PLAYER_DMG, MANA_COST_MULT, RES_NAME, SCHOOL_COLOR, TALENTS, TIER_NEED, TREES, TALENT_VERSION, TALENT_CLASS_VER, HEAL_AB} from "./rimdata.js";
 import {ITEMS, LOOT, BEASTS, QUAL, GEAR_MAX, makeGear, rollQuality, canWear, gearTypeName} from "./items.js";
 import {makeBearForm, makeWolf} from "./models.js";
 import {steer} from "./nav.js";
@@ -71,7 +71,7 @@ export function tmul(ab, school){
   let m = 1; const cls = C().cls;
   if(cls === "mage"){ if(school === "fire") m *= 1 + 0.08*T("impFire"); if(school === "frost") m *= 1 + 0.08*T("iceShards"); }
   if(cls === "warrior"){ if(ab === "heroic") m *= 1 + 0.1*T("impHS"); if(ab === "whirlwind" || ab === "execute") m *= 1 + 0.1*T("bloodFury"); }
-  if(cls === "hunter"){ if(ab === "firearrow") m *= 1 + 0.15*T("fireArrows"); if(ab === "icearrow") m *= 1 + 0.15*T("iceArrows"); }
+  if(cls === "hunter"){ if(ab === "firearrow") m *= 1 + 0.15*T("fireArrows"); }
   if(cls === "priest"){ if(ab === "swp") m *= 1 + 0.1*T("impSWP"); if(school === "shadow") m *= (1 + 0.06*T("shadowWeave")) * (T("shadowform") ? 1.15 : 1); }
   if(cls === "paladin" && school === "holy") m *= 1 + 0.08*T("palHoly");
   if(cls === "druid"){ if(["wrath", "moonfire", "starfire"].includes(ab)) m *= 1 + 0.08*T("moonfury"); if(P.form) m *= 1 + 0.08*T("feral"); }
@@ -141,13 +141,14 @@ export function hit(m, base, school, ab){
   if(ld > 0 && Math.random() < Math.min(0.35, 0.06 * ld)){ H.floatText(m, "Miss", "#cfd8dc"); engage(m); return null; }
   let amt = base * genMult() * tmul(ab, school) * rand(0.92, 1.08) * lvlPenalty(m);
   const crit = Math.random() < critChance(m, school); if(crit) amt *= 2 * (1 + 0.1*T("mortal"));
+  if(crit && pet && !pet.dead && T("h_throat")) pet.res = Math.min(100, pet.res + 10 * T("h_throat"));   // Go for the Throat
   amt = Math.max(1, Math.round(amt));
   damageMob(m, amt, crit, school);
   if(crit){
     if(school === "holy" && T("lightbringer")) healP(amt * 0.3);
     if(school === "fire" && T("ignite")) dot(m, "ignite", amt * 0.15 * T("ignite"), 4, "fire", true);
     if(C().cls === "warrior" && school === "phys" && T("deepWounds")) dot(m, "deep", amt * 0.15 * T("deepWounds"), 4, "phys", true);
-    if(T("hotStreak") && (ab === "fireball" || ab === "fireblast")){ buff("hotstreak", 15); H.log("Hot Streak! Your next Sunflare is instant.", "#ffb347"); }
+    if(T("hotStreak") && (ab === "fireball" || ab === "fireblast")){ buff("hotstreak", 15); H.log("Hot Streak: your next Sunflare is instant.", "#ffb347"); }
   }
   return {amt, crit};
 }
@@ -167,6 +168,7 @@ export function killMob(m){
   m.thMe = m.thPet = 0; m.tauntT = 0; m.threat = null;
   const share = CO.killShare(m);                // in co-op everyone near shares the XP (loot is personal)
   if(share > 0) killRewards(m, share);
+  if(m.dg && (m.elite || m.boss)) CO.dungeonLoot(m);   // a dungeon elite or boss: one piece of gear for the group to roll for
 }
 // what you get for a kill (share = how many players split the XP)
 export function killRewards(m, share = 1){
@@ -178,7 +180,7 @@ export function killRewards(m, share = 1){
   if(m.elite && Math.random() < 0.7){ addItem("potHp2", 1); got.push(ITEMS.potHp2.name); }
   H.log(got.length ? `${m.name} defeated. You looted ${got.join(", ")}.` : `${m.name} defeated.`, "#d9e3e7");
   // equipment: elites often, people sometimes, animals rarely
-  const gearChance = m.elite ? 0.6 : BEASTS.has(m.kind) ? 0.02 : 0.08;
+  const gearChance = m.dg && (m.elite || m.boss) ? 0 : m.elite ? 0.6 : BEASTS.has(m.kind) ? 0.02 : 0.08;   // (dungeon elites and bosses: see the group roll)
   if(Math.random() < gearChance) gainGear(makeGear({q: rollQuality(m.elite ? "elite" : "normal"), il: m.lvl, cls: Math.random() < 0.7 ? C().cls : null}), "Loot");
   burst(m.px, m.py, "#d9c49a", 10);
   if(m.elite) H.banner(`${m.name} has fallen!`, "");
@@ -195,12 +197,11 @@ export function gainXP(n){
 }
 function levelUp(){
   recompute(true); ring(P.px, P.py, 70, "#ffd36b"); burst(P.px, P.py, "#ffd36b", 30);
-  const canTrain = allBarIds().some(id => AB[id].lvl === C().level && !C().learned.includes(id));
-  let sub = canTrain ? "Your class trainer has something new to teach you." : "You feel stronger.";
-  if(C().level === 10) sub = "Talents unlocked! Press N." + (canTrain ? " Also visit your trainer." : ""); else if(C().level > 10) sub += " +1 talent point.";
-  H.banner(`Level ${C().level}!`, sub);
+  const canTrain = allBarIds().some(id => AB[id].lvl === C().level && !AB[id].talent && !C().learned.includes(id));
+  const bits = []; if(C().level === 10) bits.push("Talents unlocked"); else if(C().level > 10) bits.push("+1 talent point"); if(canTrain) bits.push("New abilities available at your class trainer");
+  H.banner(`Level ${C().level}`, bits.join(" · "));
   H.log(`You reached level ${C().level}.`, "#ffd36b");
-  if(canTrain) H.log("You can learn something new from your trainer.", "#9fd6e8");
+  if(canTrain) H.log("New abilities are available from your class trainer.", "#9fd6e8");
   H.buildBar(); H.save();
 }
 export function dot(m, key, total, dur, school, raw, final){
@@ -305,6 +306,8 @@ function finishAbility(id, t){
   else if(P.form) P.attackAnim = 1;
   // a monster notices a melee attack at once; a spell or arrow from range only when it lands
   if(t){ faceTo(t); P.combatT = 6; if(P.target !== t) P.target = t; if(a.tgt === "enemy" && t.state === "idle" && a.range <= 70) engage(t); }
+  // shots and weapon attacks (not spells) also start auto-attack
+  if(t && a.tgt === "enemy" && (C().cls === "hunter" || a.school === "phys" || a.range <= 70 || a.res === "rage" || a.res === "energy")) P.auto = true;
 }
 export function cancelCast(why){ if(!P.casting) return; if(why) H.err(why); if(P.casting.kind !== "gather") P.gcd = 0; P.casting = null; }   // a cancelled cast frees the global cooldown
 function completeCast(){
@@ -322,7 +325,7 @@ export function autoInfo(){
   if(P.form === "cat") return {range: 52, spd: 1.1, mult: 0.55};
   const cls = C().cls;
   if(cls === "warrior") return {range: 52, spd: 2.2, mult: 1.0, rage: 9};
-  if(cls === "hunter") return {range: 400, minRange: 70, spd: 2.0, mult: 0.85, ranged: true};
+  if(cls === "hunter") return {range: 400, minRange: HUNTER_MIN, spd: 2.0, mult: 0.85, ranged: true};
   if(cls === "paladin") return {range: 52, spd: 2.4, mult: 1.0};
   return {range: 52, spd: 2.4, mult: 0.6};
 }
@@ -332,9 +335,10 @@ function autoAttack(dt){
   if(!P.auto || !t || t.dead || t.state === "return" || P.form === "leopard" || P.casting || P.dash || P.autoT > 0) return;
   const d = rangePx(t); if(d > ai.range) return;
   if(!sees(P, t)) return;
-  const mel = !!(ai.minRange && d < ai.minRange);                 // too close to shoot: hunters strike in melee instead
-  P.autoT = mel ? 1.5 : ai.spd; P.attackAnim = 1; P.attackKind = ai.ranged && !mel ? "bow" : "melee"; faceTo(t);
-  if(mel) hit(t, pow() * 0.6, "phys", "auto");
+  const close = !!(ai.minRange && d < ai.minRange), mel = close && d <= 52;   // too close to shoot: within melee reach hunters strike with a knife (weaker than the bow), a little further out they can't do either
+  if(close && !mel) return;
+  P.autoT = ai.spd; P.attackAnim = 1; P.attackKind = ai.ranged && !mel ? "bow" : "melee"; faceTo(t);
+  if(mel) hit(t, pow() * 0.5, "phys", "auto");
   else if(ai.ranged) proj(t, "#e9e2c8", 3, () => hit(t, pow() * ai.mult, "phys", "auto"), "arrow");
   else { hit(t, pow() * ai.mult, "phys", "auto"); if(ai.rage) addRes("rage", ai.rage); }
   P.combatT = 6;
@@ -349,7 +353,7 @@ export function updPlayer(dt, moving){
   P.gcd = Math.max(0, P.gcd - dt); P.potCd = Math.max(0, (P.potCd || 0) - dt);
   for(const k in P.cds){ P.cds[k] -= dt; if(P.cds[k] <= 0) delete P.cds[k]; }
   for(const k in P.buffs){ P.buffs[k] -= dt; if(P.buffs[k] <= 0) delete P.buffs[k]; }
-  if(P.sickOn && !P.buffs.ressick){ P.sickOn = false; recompute(false); H.log("Resurrection Sickness has worn off. You are at full strength again.", "#7be08a"); }
+  if(P.sickOn && !P.buffs.ressick){ P.sickOn = false; recompute(false); H.log("Resurrection Sickness has faded.", "#7be08a"); }
   if(P.shield > 0){ P.shieldT -= dt; if(P.shieldT <= 0) P.shield = 0; }
   if(P.casting && moving) cancelCast("Interrupted – you moved");
   if(P.casting){ const a = AB[P.casting.id], t = P.casting.t; if(a && a.minRange && t && !t.dead && rangePx(t) < a.minRange) cancelCast("Too close"); }
@@ -389,8 +393,17 @@ export function proj(t, color, size, onHit, kind, sp){
   if(!arrow) m.scale.setScalar(0.08 + size * 0.03);
   m.position.set(P.x + Math.sin(P.rot) * 0.4, height(P.x, P.z) + 1.4, P.z + Math.cos(P.rot) * 0.4); scene.add(m);
   fx.push({kind: "proj", m, t, onHit, sp: (sp || (arrow ? 680 : 540)) / PXU, arrow});
+  if(CO.isMe() && t && t.nid != null) CO.sendVfx({k: "p", n: t.nid, c: color, s: size, a: arrow ? 1 : 0});   // friends see it fly
 }
-export function ring(x, y, r, color){
+// what a friend cast: only the picture
+export function vfxProj(x, z, t, color, size, arrow){ const m = new THREE.Mesh(arrow ? arrowGeo : sphereGeo, gmat(color)); if(!arrow) m.scale.setScalar(0.08 + size * 0.03);
+  m.position.set(x, height(x, z) + 1.4, z); scene.add(m); fx.push({kind: "proj", m, t, onHit: () => {}, sp: (arrow ? 680 : 540) / PXU, arrow}); }
+export function vfxRing(x, z, r, color){ ringAt(x * PXU, z * PXU, r, color, true); }
+export function vfxZone(x, z, r, dur, color){ const g = new THREE.CircleGeometry(r / PXU, 32); g.rotateX(-Math.PI / 2); const m = new THREE.Mesh(g, gmat(color).clone()); m.material.opacity = 0.22; m.material.depthWrite = false;
+  m.position.set(x, height(x, z) + 0.12, z); scene.add(m); zones.push({x: x * PXU, y: z * PXU, r, left: dur, tick: 1e9, m, visual: true}); }
+export function ring(x, y, r, color){ ringAt(x, y, r, color, false); }
+function ringAt(x, y, r, color, remote){
+  if(!remote && CO.isMe()) CO.sendVfx({k: "r", x: +(x / PXU).toFixed(2), z: +(y / PXU).toFixed(2), r, c: color});
   const g = new THREE.RingGeometry(0.85, 1, 40); g.rotateX(-Math.PI / 2);
   const m = new THREE.Mesh(g, gmat(color).clone()); m.material.side = THREE.DoubleSide; m.material.depthWrite = false;
   const cx = x / PXU, cz = y / PXU; m.position.set(cx, height(cx, cz) + 0.15, cz); scene.add(m);
@@ -412,6 +425,7 @@ export function zone(x, y, r, dur, dmg, school, ab, slows){
   const m = new THREE.Mesh(g, gmat(SCHOOL_COLOR[school] || "#fff").clone()); m.material.opacity = 0.22; m.material.depthWrite = false;
   m.position.set(cx, height(cx, cz) + 0.12, cz); scene.add(m);
   zones.push({x, y, r, left: dur, tick: 0.4, dmg, school, ab, slows, m});
+  if(CO.isMe()) CO.sendVfx({k: "z", x: +cx.toFixed(2), z: +cz.toFixed(2), r, d: dur, c: SCHOOL_COLOR[school] || "#fff"});
 }
 function kill(o){ scene.remove(o.m); if(o.kind === "ring" || o.kind === "slash"){ o.m.geometry.dispose(); o.m.material.dispose(); } o.done = true; }
 export function updFx(dt){
@@ -429,7 +443,7 @@ export function updFx(dt){
   }
   for(let i = fx.length - 1; i >= 0; i--) if(fx[i].done) fx.splice(i, 1);
   for(const z of zones){ z.left -= dt; z.tick -= dt;
-    if(z.tick <= 0){ z.tick += 1; aoe(z.x, z.y, z.r, m => { hit(m, z.dmg, z.school, z.ab); if(z.slows) slow(m, 0.5, 2); }); }
+    if(z.tick <= 0 && !z.visual){ z.tick += 1; aoe(z.x, z.y, z.r, m => { hit(m, z.dmg, z.school, z.ab); if(z.slows) slow(m, 0.5, 2); }); }
     z.m.material.opacity = 0.22 * Math.min(1, z.left * 2) + Math.sin(H.now() * 6) * 0.03;
     if(z.left <= 0){ scene.remove(z.m); z.m.geometry.dispose(); z.m.material.dispose(); } }
   for(let i = zones.length - 1; i >= 0; i--) if(zones[i].left <= 0) zones.splice(i, 1);
@@ -441,17 +455,18 @@ export function clearFx(){ for(const o of fx) kill(o); fx.length = 0; for(const 
 export const treePoints = tree => TALENTS[C().cls].filter(t => t.tree === tree).reduce((a, t) => a + T(t.id), 0);
 export function canLearnTalent(t){ const r = T(t.id), left = talentPoints() - talentsSpent(); return C().level >= 10 && left > 0 && r < t.max && treePoints(t.tree) >= TIER_NEED[t.tier]; }
 // talents were redesigned into specializations: older characters get their points back once
-export function migrateTalents(){ const c = C(); if(c.talVer === TALENT_VERSION) return false; const had = talentsSpent(); c.talents = {}; c.talVer = TALENT_VERSION; return had > 0; }
+export function migrateTalents(){ const c = C(), v = TALENT_CLASS_VER[c.cls] || TALENT_VERSION; if(c.talVer === v) return false; const had = talentsSpent(); c.talents = {}; if(c.learned) dropTalentAbilities(); c.talVer = v; return had > 0; }
 export {TREES};
 export function learnTalent(id){ const t = TALENTS[C().cls].find(x => x.id === id); if(!t || !canLearnTalent(t)) return;
-  C().talents[id] = T(id) + 1; recompute(false); H.log(`Talent: ${t.name} ${C().talents[id]}/${t.max}`, "#e6bd5c"); H.save(); H.refresh(); }
-export function resetTalents(){ if(!talentsSpent()) return; C().talents = {}; recompute(false); burst(P.px, P.py, "#ffd36b", 16); H.log("Your talents have been reset.", "#e6bd5c"); H.save(); H.refresh(); }
+  C().talents[id] = T(id) + 1; if(t.grants && !C().learned.includes(t.grants)){ C().learned.push(t.grants); H.log(`You have learned ${AB[t.grants].name}.`, "#9fd6e8"); H.buildBar(); } recompute(false); H.log(`Talent: ${t.name} ${C().talents[id]}/${t.max}`, "#e6bd5c"); H.save(); H.refresh(); }
+const dropTalentAbilities = () => { C().learned = C().learned.filter(id => !AB[id] || !AB[id].talent); };
+export function resetTalents(){ if(!talentsSpent()) return; C().talents = {}; dropTalentAbilities(); H.buildBar(); recompute(false); burst(P.px, P.py, "#ffd36b", 16); H.log("Your talents have been reset.", "#e6bd5c"); H.save(); H.refresh(); }
 
 // ---------------------------------------------------------------- bag, gear, gold and potions
 export function addItem(k, n){ C().bag[k] = (C().bag[k] || 0) + n; }
 export function removeItem(k, n){ C().bag[k] = (C().bag[k] || 0) - n; if(C().bag[k] <= 0) delete C().bag[k]; }
 export function gainGear(it, how){
-  if(C().gear.length >= GEAR_MAX){ H.log(`Your bag is full – ${it.n} was lost.`, "#ff6b5e"); return false; }
+  if(C().gear.length >= GEAR_MAX){ H.log(`Your bag is full. ${it.n} was lost.`, "#ff6b5e"); return false; }
   C().gear.push(it); H.log(`${how || "You received"}: [${it.n}]`, QUAL[it.q].color);
   if(it.q >= 4) H.banner(QUAL[it.q].name + " item!", it.n);
   H.refresh(); return true;
@@ -502,9 +517,9 @@ export const PETS = {
 };
 // the pet's own skills (shown on the pet bar): each can be switched off so the pet doesn't use it
 export const PET_SKILLS = {
-  bear: [{id: "growl", name: "Growl", icon: "horn", color: "#e6bd5c", desc: "Forces the enemy to attack the bear for 3 sec. Free, every 12 sec."},
-         {id: "sweep", name: "Sweep", icon: "whirl", color: "#d84a42", desc: "40 rage: hits every enemy around the bear (used when 2 or more are close)."}],
-  wolf: [{id: "claw", name: "Claw", icon: "claw", color: "#e8c84a", desc: "40 energy: a strong extra strike."}]
+  bear: [{id: "growl", name: "Growl", icon: "horn", color: "#e6bd5c", desc: "Taunts the target, forcing it to attack your bear for 3 sec. 12 sec cooldown."},
+         {id: "sweep", name: "Sweep", icon: "whirl", color: "#d84a42", desc: "Costs 40 rage. Strikes all nearby enemies. Used when two or more enemies are close."}],
+  wolf: [{id: "claw", name: "Claw", icon: "claw", color: "#e8c84a", desc: "Costs 40 energy. A powerful strike."}]
 };
 export const petSkillOn = id => !(C().petOff && C().petOff[id]);
 export function togglePetSkill(id){ const o = C().petOff || (C().petOff = {}); if(o[id]) delete o[id]; else o[id] = true;
@@ -528,13 +543,18 @@ export function petCallCheck(kind){ if(petFight()) return "You cannot call a pet
 export function petCall(kind){ if(petFight()) return H.err("You cannot call a pet right now");
   petRemove(); C().petType = kind; pet = petMake(kind); E.pet = pet; burst(pet.px, pet.py, "#e6bd5c", 14); H.floatText(pet, PETS[kind].name + " called", "#8fe39a", true); H.log(`You call your ${PETS[kind].name.toLowerCase()}.`, "#8fe39a"); H.save(); }
 export function petDismiss(){ if(!pet) return; H.log(`You dismiss your ${PETS[pet.kind].name.toLowerCase()}.`, "#9fd6e8"); burst(pet.px, pet.py, "#9fd6e8", 10); petRemove(); C().petType = null; H.save(); }
-export function petMend(){ if(!pet || pet.dead) return; const h = Math.round(pet.maxHp * 0.4); pet.hp = Math.min(pet.maxHp, pet.hp + h); H.floatText(pet, "+" + h, "#62d36b"); burst(pet.px, pet.py, "#62d36b", 8); }
+export function petMend(){ if(!pet || pet.dead) return; const h = Math.round(pet.maxHp * 0.4 * (1 + 0.25 * T("h_mend"))); if(T("h_mend")) healP(h * 0.15 * T("h_mend")); pet.hp = Math.min(pet.maxHp, pet.hp + h); H.floatText(pet, "+" + h, "#62d36b"); burst(pet.px, pet.py, "#62d36b", 8); }
 export function petDamage(raw, src){ if(!pet || pet.dead) return; const amt = Math.max(1, Math.round(raw * rand(0.9, 1.1) * PETS[pet.kind].taken));
   pet.hp -= amt; pet.flash = 0.15; if(pet.kind === "bear") pet.res = Math.min(100, pet.res + 5); H.floatText(pet, "" + amt, "#ff9a7a");
-  if(pet.hp <= 0){ pet.hp = 0; pet.dead = true; pet.deadT = 0; H.log(`Your ${pet.name.toLowerCase()} has fallen. Call it again when the fight is over.`, "#ff8a7a"); } }
+  if(pet.hp <= 0){ pet.hp = 0; pet.dead = true; pet.deadT = 0; H.log(`Your ${pet.name.toLowerCase()} has died.`, "#ff8a7a"); } }
 export const petAtk = () => PET_ATK;
-function petStrike(t, coef){ if(!t || t.dead) return; const amt = Math.max(1, Math.round(pow() * coef * genMult() * (1 + teff("petdmg")) * rand(0.92, 1.08) * lvlPenalty(t)));
+function petStrike(t, coef){ if(!t || t.dead) return; const amt = Math.max(1, Math.round(pow() * coef * genMult() * (1 + teff("petdmg")) * (pet && pet.wrathT > 0 ? 1.5 : 1) * rand(0.92, 1.08) * lvlPenalty(t)));
   PET_ATK = true; try{ damageMob(t, amt, false, "phys"); } finally{ PET_ATK = false; } }
+// Beast Mastery's active skills: Intimidation (the pet stuns its target) and Bestial Wrath (the pet goes berserk)
+const petFoe = () => pet && pet.curT && !pet.curT.dead ? pet.curT : P.target && !P.target.dead ? P.target : null;
+export function petIntimidateCheck(){ if(!pet || pet.dead) return "You have no pet"; const t = petFoe(); if(!t) return "Your pet has no target"; if(distU(pet, t) > pet.r + t.r + 3) return "Your pet is too far from its target"; return true; }
+export function petIntimidate(){ const t = petFoe(); if(!t) return; stun(t, 3); pet.attackAnim = 1; H.floatText(pet, "Intimidation!", "#e0a050", true); ring(pet.px, pet.py, 35, "#e0a050"); }
+export function petWrath(){ if(!pet || pet.dead) return; pet.wrathT = 10; H.floatText(pet, "Bestial Wrath!", "#ff5a3a", true); burst(pet.px, pet.py, "#ff5a3a", 16); }
 // your pet goes away while you are a spirit (it comes back when you do)
 export function petStash(){ petRemove(); }
 // call when the character changes: brings back the pet you had
@@ -543,6 +563,8 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
   if(!pet) return;
   const d = PETS[pet.kind];
   { const mh = petMaxHp(pet.kind); if(mh !== pet.maxHp){ pet.hp = Math.min(mh, pet.hp * mh / pet.maxHp); pet.maxHp = mh; } }
+  pet.wrathT = Math.max(0, (pet.wrathT || 0) - dt);
+  if(T("h_bond") && !pet.dead && !P.dead){ const k = 0.006 * T("h_bond") * dt; pet.hp = Math.min(pet.maxHp, pet.hp + pet.maxHp * k); P.hp = Math.min(P.maxHp, P.hp + P.maxHp * k); }   // Spirit Bond
   pet.flash = Math.max(0, pet.flash - dt); pet.attackAnim = Math.max(0, pet.attackAnim - dt * 3); pet.atkT -= dt; pet.growl = Math.max(0, pet.growl - dt); pet.clawT = Math.max(0, pet.clawT - dt); pet.sweepT = Math.max(0, pet.sweepT - dt);
   pet.moving = false;
   if(distU(pet, P) > 45 || (P.dead && !pet.dead)){ pet.x = P.x - Math.sin(P.rot) * 1.4; pet.z = P.z - Math.cos(P.rot) * 1.4; pet.path = null; }
@@ -558,6 +580,7 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
   if(pet.mode === "assist"){
     t = (P.target && !P.target.dead && P.target.state !== "return" && P.combatT > 0 && distU(P.target, P) < 26) ? P.target : null;
     if(!t){ let bd = 18; for(const m of mobs){ if(m.dead || m.state !== "chase") continue; const dd = distU(m, P); if(dd < bd){ bd = dd; t = m; } } } }
+  pet.curT = t;
   if(pet.kind === "bear" && petSkillOn("growl") && pet.growl <= 0 && t && distU(pet, t) < pet.r + t.r + 1.7){   // Growl: free, forces the enemy onto the bear for a few seconds
     pet.growl = GROWL_CD; if(CO.coopMob(t)) CO.taunt(t); else { t.tauntT = GROWL_TAUNT; t.thPet = Math.max(t.thPet || 0, (t.thMe || 0) * 1.3 + 40); }
     H.floatText(pet, "Growl!", "#e6bd5c", true); ring(pet.px, pet.py, 40, "#e6bd5c"); pet.attackAnim = 1; }
@@ -569,7 +592,7 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
     const reach = pet.r + t.r + 0.5;
     if(distU(pet, t) > reach){ const dir = steer(pet, t.x, t.z, dt, blockedFn); if(dir && tryMoveFn(pet, dir.dx * sp / PXU * dt, dir.dz * sp / PXU * dt)){ pet.moving = true; turnTo(pet, dir.dx, dir.dz, dt, 12); } }
     else { turnTo(pet, t.x - pet.x, t.z - pet.z, dt, 12);
-      if(pet.atkT <= 0){ pet.atkT = d.atk; pet.attackAnim = 1; petStrike(t, d.coef); if(pet.kind === "bear") pet.res = Math.min(100, pet.res + 8); }
+      if(pet.atkT <= 0){ pet.atkT = d.atk / ((1 + 0.07 * T("h_frenzy")) * (pet.wrathT > 0 ? 1.3 : 1)); pet.attackAnim = 1; petStrike(t, d.coef); if(pet.kind === "bear") pet.res = Math.min(100, pet.res + 8); }
       if(pet.kind === "wolf" && petSkillOn("claw") && pet.res >= 40 && pet.clawT <= 0 && !t.dead){ pet.res -= 40; pet.clawT = 1.2; pet.attackAnim = 1; H.floatText(pet, "Claw", "#e8c84a"); petStrike(t, 0.55); } }
   } else if(distU(pet, P) > 3){                                              // follow you at your speed (faster when far behind)
     const gx = P.x - Math.sin(P.rot) * 1.6, gz = P.z - Math.cos(P.rot) * 1.6, spd = playerSpeed() * (distU(pet, P) > 9 ? 1.3 : 1);
@@ -592,4 +615,4 @@ export function mobTarget(m){
 }
 
 // the helper table the Rimfrost 1 ability code calls
-Object.assign(E, {coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});
+Object.assign(E, {coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});

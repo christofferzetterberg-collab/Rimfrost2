@@ -1,4 +1,4 @@
-// Dev tools (open the game with ?dev in the address, then press F8 or use the Dev tools button in the Esc menu).
+// Dev tools (open the game with ?dev in the address, then press F8).
 // Cheats for testing, teleports, and a class balance test that fights the same monsters with every class.
 import {P, S, mobs, PXU} from "./state.js";
 import {AB, CLASSES, HEAL_AB, TALENTS, TREES, TALENT_VERSION} from "./rimdata.js";
@@ -57,7 +57,7 @@ function act(a, v){
   const c = S.cur; if(!c && a !== "bt" && a !== "btcopy") return;
   if(a === "setlvl"){ const l = +document.getElementById("devlvl").value; c.level = l; c.xp = 0; G.recompute(true); H.buildBar(); }
   else if(a === "gold") c.gold += 1000;
-  else if(a === "learn"){ for(const id of G.allBarIds()) if(AB[id].lvl <= c.level && !c.learned.includes(id)) c.learned.push(id); H.buildBar(); }
+  else if(a === "learn"){ for(const id of G.allBarIds()) if(AB[id].lvl <= c.level && !AB[id].talent && !c.learned.includes(id)) c.learned.push(id); H.buildBar(); }
   else if(a === "riding"){ c.riding = true; c.mounts = ["horse", "gray", "ram", "wolf"]; }
   else if(a === "gear"){ const q = +document.getElementById("devq").value; equipSet(c, q, c.level, Math.random() * 1e9 | 0); G.recompute(true); H.buildHero(); }
   else if(a === "prof"){ c.prof = {mining: 150, herb: 150}; }
@@ -115,7 +115,7 @@ function think(key, m){
 // one fight: returns {win, t, hp, dps, taken}
 function fight(v, sc, lvl, q, spec, seed){
   const [cls, , opt = {}] = v, key = cls === "druid" && opt.form ? "druid_" + opt.form : cls;
-  const c = {id: "__sim", name: "Test", race: "human", cls, level: lvl, xp: 0, gold: 0, learned: G.allBarIdsFor(cls).filter(id => AB[id].lvl <= lvl), bag: {}, gear: [], eq: {}, world: 2, talents: {}, talVer: TALENT_VERSION, quests: {}, qbag: {}};
+  const c = {id: "__sim", name: "Test", race: "human", cls, level: lvl, xp: 0, gold: 0, learned: G.allBarIdsFor(cls).filter(id => AB[id].lvl <= lvl && !AB[id].talent), bag: {}, gear: [], eq: {}, world: 2, talents: {}, talVer: TALENT_VERSION, quests: {}, qbag: {}};
   equipSet(c, q, lvl, seed);
   if(spec && lvl >= 10){ const tree = TREES[cls][spec - 1].id; let pts = lvl - 9; const list = TALENTS[cls].filter(t => t.tree === tree).sort((a, b) => a.tier - b.tier);
     for(let pass = 0; pass < 4 && pts > 0; pass++) for(const t of list){ while(pts > 0 && (c.talents[t.id] || 0) < t.max){ S.cur = c; if(!G.canLearnTalent(t)) break; c.talents[t.id] = (c.talents[t.id] || 0) + 1; pts--; } } }

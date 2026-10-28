@@ -205,3 +205,98 @@ export function makeMount(d){
   g.userData.saddle = top + 0.1;
   return g;
 }
+// ---------------- a drake: long neck, horned head, leathery wings, spiked back and a long tapering tail
+export function makeDrake(o = {}){
+  const c = o.color ?? 0x3a8a4a, belly = o.belly ?? 0xb8c070, dark = o.dark ?? 0x1f4a2a, wingC = o.wing ?? 0x2a5a38;
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const legH = 0.75;
+  // body: a chest that is taller at the front, and a pale belly
+  const torso = part(new THREE.BoxGeometry(1.15, 0.95, 2.0), c, 0, legH + 0.55, 0); body.add(torso);
+  body.add(part(new THREE.BoxGeometry(0.95, 0.25, 1.8), belly, 0, legH + 0.1, 0.05));
+  // neck (two segments rising forward) and head
+  const neck = pivot(0, legH + 0.85, 0.85); body.add(neck);
+  const n1 = part(new THREE.BoxGeometry(0.5, 0.5, 0.9), c, 0, 0.25, 0.35); n1.rotation.x = -0.7; neck.add(n1);
+  const headP = pivot(0, 0.75, 0.8); neck.add(headP);
+  const head = part(new THREE.BoxGeometry(0.6, 0.5, 0.75), c, 0, 0, 0.15); headP.add(head);
+  headP.add(part(new THREE.BoxGeometry(0.45, 0.28, 0.55), dark, 0, -0.08, 0.7));                       // snout
+  const jaw = part(new THREE.BoxGeometry(0.42, 0.12, 0.6), belly, 0, -0.28, 0.6); headP.add(jaw);
+  for(const s of [-1, 1]){
+    const horn = part(new THREE.ConeGeometry(0.08, 0.55, 5), 0xe8e0c8, s * 0.2, 0.35, -0.2); horn.rotation.x = -0.9; horn.rotation.z = s * 0.25; headP.add(horn);
+    headP.add(part(new THREE.BoxGeometry(0.08, 0.08, 0.08), 0xffd84a, s * 0.22, 0.08, 0.38));            // glowing eyes
+  }
+  // spikes along the back
+  for(let i = 0; i < 5; i++){ const sp = part(new THREE.ConeGeometry(0.1, 0.35, 4), dark, 0, legH + 1.12, 0.75 - i * 0.4); body.add(sp); }
+  // wings: an arm bone with a skin sail, folded half open
+  const wings = [];
+  for(const s of [-1, 1]){
+    const w = pivot(s * 0.5, legH + 1.0, 0.35); body.add(w);
+    const bone = part(new THREE.BoxGeometry(1.5, 0.1, 0.12), dark, s * 0.75, 0, 0); w.add(bone);
+    const sail = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(s * 1.5, 0, 0), new THREE.Vector3(s * 1.1, -0.1, -1.3),
+      new THREE.Vector3(0, 0, 0), new THREE.Vector3(s * 1.1, -0.1, -1.3), new THREE.Vector3(s * 0.3, -0.05, -1.0)]), new THREE.MeshLambertMaterial({color: wingC, side: THREE.DoubleSide, flatShading: true}));
+    sail.geometry.computeVertexNormals(); sail.castShadow = true; w.add(sail); wings.push([w, s]); }
+  // tail: three shrinking pieces that sway
+  const tail = []; let tp = body, tz = -1.0;
+  for(let i = 0; i < 3; i++){ const pv = pivot(0, i ? 0 : legH + 0.55, tz); tp.add(pv); const sz = 0.5 - i * 0.13;
+    pv.add(part(new THREE.BoxGeometry(sz, sz * 0.9, 0.85), c, 0, 0, -0.42)); tail.push(pv); tp = pv; tz = -0.82; }
+  tp.add(part(new THREE.ConeGeometry(0.16, 0.4, 4), dark, 0, 0, -0.95));
+  const tip = tp.children[tp.children.length - 1]; tip.rotation.x = -Math.PI / 2;
+  // four legs with claws
+  const legs = [];
+  for(const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]){
+    const lg = pivot(sx * 0.48, legH, sz * 0.65, part(new THREE.BoxGeometry(0.26, legH, 0.3), dark, 0, -legH / 2, 0), part(new THREE.BoxGeometry(0.32, 0.1, 0.42), 0xe8e0c8, 0, -legH + 0.05, 0.08));
+    legs.push(lg); body.add(lg); }
+  let t = 0;
+  g.userData.animate = (walk, moving, attack) => { t += 0.03;
+    const sw = Math.sin(walk * 1.2) * (moving ? 0.6 : 0);
+    legs[0].rotation.x = sw; legs[3].rotation.x = sw; legs[1].rotation.x = -sw; legs[2].rotation.x = -sw;
+    for(const [w, s] of wings) w.rotation.z = s * (0.35 + Math.sin(t * (moving ? 3 : 1.4)) * (moving ? 0.25 : 0.08) + (attack > 0 ? Math.sin(attack * Math.PI) * 0.5 : 0));
+    tail.forEach((pv, i) => { pv.rotation.y = Math.sin(t * 1.6 - i * 0.8) * 0.25; pv.rotation.x = i ? 0.1 : -0.15; });
+    neck.rotation.x = attack > 0 ? Math.sin(attack * Math.PI) * 0.6 : Math.sin(t) * 0.05;                    // lunge with the head
+    jaw.rotation.x = attack > 0 ? Math.sin(attack * Math.PI) * 0.5 : 0;
+  };
+  g.userData.height = legH + 2.2;
+  return g;
+}
+// ---------------- a gargoyle: a hunched stone beast with bat wings, horns, claws and a tail
+export function makeGargoyle(o = {}){
+  const c = o.color ?? 0x7a7a72, dark = o.dark ?? 0x4a4a44, eyes = o.eyes ?? 0xff6a3a, wingC = o.wing ?? 0x5a5a54;
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  // crouched legs (bent backwards like a beast's)
+  const legs = [];
+  for(const s of [-1, 1]){ const hip = pivot(s * 0.3, 0.95, 0); body.add(hip);
+    const thigh = part(new THREE.BoxGeometry(0.28, 0.55, 0.3), c, 0, -0.2, 0.12); thigh.rotation.x = 0.6; hip.add(thigh);
+    const shin = part(new THREE.BoxGeometry(0.22, 0.55, 0.22), dark, 0, -0.62, -0.05); shin.rotation.x = -0.45; hip.add(shin);
+    hip.add(part(new THREE.BoxGeometry(0.3, 0.1, 0.42), dark, 0, -0.9, 0.1)); legs.push(hip); }
+  // a torso leaning forward, with a heavy chest
+  const torso = pivot(0, 1.0, 0); body.add(torso); torso.rotation.x = 0.45;
+  torso.add(part(new THREE.BoxGeometry(0.8, 0.85, 0.55), c, 0, 0.45, 0));
+  // head: snout, horns and glowing eyes
+  const head = pivot(0, 1.0, 0.18); torso.add(head);
+  head.add(part(new THREE.BoxGeometry(0.46, 0.4, 0.44), c, 0, 0.15, 0.05), part(new THREE.BoxGeometry(0.3, 0.2, 0.3), dark, 0, 0.05, 0.32));
+  for(const s of [-1, 1]){ const h = part(new THREE.ConeGeometry(0.07, 0.45, 5), 0xd8d0c0, s * 0.18, 0.45, -0.05); h.rotation.x = -0.7; h.rotation.z = s * 0.35; head.add(h);
+    head.add(new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.04), new THREE.MeshBasicMaterial({color: eyes})).translateX(s * 0.12).translateY(0.2).translateZ(0.27)); }
+  // long arms with claws, hanging forward
+  const arms = [];
+  for(const s of [-1, 1]){ const sh = pivot(s * 0.5, 0.8, 0.05); torso.add(sh); sh.add(part(new THREE.BoxGeometry(0.22, 0.75, 0.22), c, 0, -0.35, 0));
+    for(let k = -1; k <= 1; k++){ const cl = part(new THREE.ConeGeometry(0.04, 0.2, 4), 0xd8d0c0, k * 0.06, -0.8, 0.05); cl.rotation.x = Math.PI; sh.add(cl); }
+    arms.push(sh); }
+  // bat wings: two bones and a stretched sail
+  const wings = [];
+  for(const s of [-1, 1]){ const w = pivot(s * 0.3, 0.75, -0.28); torso.add(w);
+    w.add(part(new THREE.BoxGeometry(1.3, 0.08, 0.08), dark, s * 0.65, 0.35, 0));
+    const pts = [[0, 0], [s * 1.3, 0.35], [s * 1.1, -0.6], [0, 0], [s * 1.1, -0.6], [s * 0.4, -0.55]].map(([x, y]) => new THREE.Vector3(x, y, 0));
+    const sail = new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(pts), new THREE.MeshLambertMaterial({color: wingC, side: THREE.DoubleSide, flatShading: true})); sail.geometry.computeVertexNormals(); sail.castShadow = true; w.add(sail);
+    w.rotation.y = s * 0.5; wings.push([w, s]); }
+  // tail
+  const tail = pivot(0, 0.95, -0.25); body.add(tail); const tl = part(new THREE.BoxGeometry(0.12, 0.12, 0.9), dark, 0, 0, -0.45); tail.add(tl);
+  tail.add(part(new THREE.ConeGeometry(0.12, 0.25, 4), dark, 0, 0, -0.95).rotateX(-Math.PI / 2));
+  let t = 0;
+  g.userData.animate = (walk, moving, attack) => { t += 0.03; const sw = Math.sin(walk * 1.3) * (moving ? 0.5 : 0);
+    legs[0].rotation.x = sw; legs[1].rotation.x = -sw;
+    for(const [w, s] of wings) w.rotation.z = s * (0.25 + Math.sin(t * (moving ? 4 : 1.2)) * (moving ? 0.35 : 0.08));
+    arms[0].rotation.x = attack > 0 ? -Math.sin(attack * Math.PI) * 1.4 : -0.3 + sw * 0.4; arms[1].rotation.x = attack > 0 ? -Math.sin(attack * Math.PI) * 1.1 : -0.3 - sw * 0.4;
+    tail.rotation.y = Math.sin(t * 1.5) * 0.3; head.rotation.x = attack > 0 ? 0.3 : -0.25;
+  };
+  g.userData.height = 2.3;
+  return g;
+}
