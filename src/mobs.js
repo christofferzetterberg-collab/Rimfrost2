@@ -3,6 +3,7 @@ import * as THREE from "three";
 import {makeHumanoid, makeBeast, makeSpider, makeTroll, makeCultist, makeSkeleton, makeKobold, makeGolem, makeWisp, makeCritter, makeGhoul, makeDraug, makeDrowned, makeDrake, makeGargoyle} from "./models.js";
 
 // r = size, sp = speed (Rimfrost 1 pixels), elite = strength, special = a big attack you must step away from
+const ELITE_HP = 1.5, BOSS_HP = 1.5;   // extra health for elites (on top of their strength) and bosses
 const MOBS = {
   // human start zones
   wolf: {name: "Gray Wolf", lv: [1, 3], color: "#8b9196", r: 11, sp: 95, shape: "wolf"},
@@ -143,7 +144,7 @@ function makeModel(kind, d){
 // Rimfrost 2 stats: health and damage multipliers like Rimfrost 1; sizes and speeds turned into world units
 export const KINDS = {};
 for(const [id, d] of Object.entries(MOBS)){ const ru = d.r / 20;
-  KINDS[id] = {id, name: d.name, lv: d.lv, make: () => makeModel(id, d), hp: (d.elite || 1) * (d.hpm || 1), dmg: (d.elite ? 1.25 : 1) * (d.passive ? 0.6 : 1) * (d.dmm || 1),
+  KINDS[id] = {id, name: d.name, lv: d.lv, make: () => makeModel(id, d), hp: (d.elite ? d.elite * ELITE_HP : 1) * (d.boss ? BOSS_HP : 1) * (d.hpm || 1), dmg: (d.elite ? 1.25 : 1) * (d.passive ? 0.6 : 1) * (d.dmm || 1),
     speed: d.sp * 0.068, r: ru, reach: 1.4 + ru, elite: !!d.elite, boss: !!d.boss, passive: !!d.passive, dg: !!d.dg,
     ranged: d.ranged ? {range: d.ranged >= 220 ? 12 : 11, color: d.color} : null,
     nova: d.special ? {every: d.special.every, r: d.special.r / 23, warn: d.special.windup, dmg: d.special.mult, name: d.special.name, she: /Queen|Witch/.test(d.name)} : null}; }

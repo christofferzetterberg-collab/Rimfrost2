@@ -114,7 +114,7 @@ function lookKey(){ const eq = S.cur.eq || {}, o = {}; for(const k of ["head", "
 function state(){
   const pet = G.getPet();
   return {t: "st", id: COOP.peer.id, name: S.cur.name, race: S.cur.race, cls: S.cur.cls, lvl: S.cur.level, x: +P.x.toFixed(2), z: +P.z.toFixed(2), rot: +P.rot.toFixed(2), mv: !!P.moving,
-    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!P.buffs.meld, mt: P.mount || null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
+    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, mt: P.mount || null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
     pet: pet ? {k: pet.kind, x: +pet.x.toFixed(2), z: +pet.z.toFixed(2), rot: +pet.rot.toFixed(2), hp: Math.round(pet.hp), mhp: pet.maxHp, dead: !!pet.dead, mv: !!pet.moving, atk: +(pet.attackAnim || 0).toFixed(2), res: Math.round(pet.res || 0)} : null};
 }
 function sendState(){ if(!on() || !COOP.peer || !S.cur) return; broadcast(state()); }
@@ -179,14 +179,14 @@ const nidMap = new Map(); export function mobByNid(nid){ if(nidMap.size !== mobs
 export function op(kind, m, a){ broadcast({t: "op", op: kind, nid: m.nid, a, from: myId()}); }
 function hostOp(d){ const m = mobByNid(d.nid); if(!m || m.dead) return; const a = d.a || [];
   asAttacker(d.from, () => {
-    if(d.op === "dmg"){ hostPetAtk = !!a[3]; G.damageMob(m, a[0], a[1], a[2]); hostPetAtk = false; }
+    if(d.op === "dmg"){ hostPetAtk = !!a[3]; hostThMult = a[4] || 1; G.damageMob(m, a[0], a[1], a[2]); hostPetAtk = false; hostThMult = 1; }
     else if(d.op === "taunt") hostTaunt(m, d.from + ":pet");
     else if(d.op === "dot") G.dot(m, a[0], a[1], a[2], a[3], true, true);
     else if(d.op === "slow") G.slow(m, a[0], a[1]); else if(d.op === "root") G.root(m, a[0]); else if(d.op === "stun") G.stun(m, a[0]); }); }
-let hostPetAtk = false;
+let hostPetAtk = false, hostThMult = 1;
 const PET_THREAT = {bear: [4, 0.8], wolf: [0.5, 1]};
-export function threat(m, amt, petAtkLocal){
-  const id = attacker(), mine = id === myId(), r = COOP.remotes[id], petAtk = petAtkLocal || hostPetAtk;
+export function threat(m, amt, petAtkLocal, mult = 1){
+  const id = attacker(), mine = id === myId(), r = COOP.remotes[id], petAtk = petAtkLocal || hostPetAtk; amt *= mult * hostThMult;
   const pk = mine ? (G.getPet() && !G.getPet().dead ? G.getPet().kind : null) : (r && r.pet && !r.pet.dead ? r.pet.k : null);
   m.threat = m.threat || {};
   if(petAtk){ const k = id + ":pet"; m.threat[k] = (m.threat[k] || 0) + amt * (pk ? PET_THREAT[pk][0] : 1); return; }
@@ -198,18 +198,14 @@ export function taunt(m){ if(COOP.role === "guest") op("taunt", m, []); else hos
 // everyone a monster could go after: you, your pet, friends and their pets in the same place
 export function cands(m){
   const L = [], inC = reg(m.x), pet = G.getPet();
-  if(H.running() && !P.dead && !P.buffs.meld && reg(P.x) === inC) L.push({id: myId(), e: P, me: true, lvl: S.cur.level});
+  if(H.running() && !P.dead && reg(P.x) === inC) L.push({id: myId(), e: P, me: true, lvl: S.cur.level});
   if(pet && !pet.dead && reg(pet.x) === inC) L.push({id: on() ? myId() + ":pet" : "pet", e: pet, pet: true, mine: true});
   if(coopMob(m)) for(const r of Object.values(COOP.remotes)){
-    if(!r.dead && !r.meld && reg(r.x) === inC) L.push({id: r.id, e: r, lvl: r.lvl});
+    if(!r.dead && reg(r.x) === inC) L.push({id: r.id, e: r, lvl: r.lvl});
     const po = r.petObj; if(po && !po.dead && reg(po.x) === inC) L.push({id: r.id + ":pet", e: po, pet: true, owner: r.id}); }
   return L; }
 export function mobTarget(m){
-  const L = cands(m); if(!L.length) return null;
-  // Shadowmeld: the one it was fighting faded away and nobody else has fought it – it gives up instead of running to someone new
-  if(m.threat && !L.some(c => (m.threat[c.id] || 0) > 0)){ const melded = id => id === myId() ? !!P.buffs.meld : !!(COOP.remotes[id] && COOP.remotes[id].meld);
-    if(Object.keys(m.threat).some(id => m.threat[id] > 0 && melded(id))) return null; }
-  if(L.length === 1) return L[0];
+  const L = cands(m); if(!L.length) return null; if(L.length === 1) return L[0];
   if(!coopMob(m)){ const e = G.mobTarget(m); return L.find(c => c.e === e) || L[0]; }      // alone: you and your pet (old rules)
   if(m.tauntT > 0 && m.tauntId){ const c = L.find(c => c.id === m.tauntId); if(c) return c; }
   if(m.threat){ let best = null, bv = 0; for(const c of L){ const v = m.threat[c.id] || 0; if(v > bv && Math.hypot(m.x - c.e.x, m.z - c.e.z) < 30){ bv = v; best = c; } } if(best) return best; }
@@ -260,13 +256,13 @@ function hostMobs(){ const rs = Object.values(COOP.remotes); if(!rs.length) retu
   for(const m of mobs){ if(m.nid == null) continue;
     if(!rs.some(r => reg(r.x) === reg(m.x) && Math.hypot(r.x - m.x, r.z - m.z) < 90)) continue;
     out.push([m.nid, +m.x.toFixed(2), +m.z.toFixed(2), Math.round(m.hp), ST[m.state] || 0, m.dead ? 1 : 0, +m.rot.toFixed(2), m.moving ? 1 : 0, m.tgtId || 0,
-      m.nova ? [+m.nova.t.toFixed(2), +m.nova.x.toFixed(1), +m.nova.z.toFixed(1)] : 0, +m.stunT.toFixed(1), +m.rootT.toFixed(1), +m.slowT.toFixed(1), m.dots.map(d => [d.key, d.left]), +(m.attackAnim || 0).toFixed(2), m.slowPct || 0, m.maxHp]); }
+      m.nova ? [+m.nova.t.toFixed(2), +m.nova.x.toFixed(1), +m.nova.z.toFixed(1)] : 0, +m.stunT.toFixed(1), +m.rootT.toFixed(1), +m.slowT.toFixed(1), m.dots.map(d => [d.key, d.left]), +(m.attackAnim || 0).toFixed(2), m.slowPct || 0, m.maxHp, m.state === "chase" && m.threat ? Object.entries(m.threat).map(([k, v]) => [k, Math.round(v)]) : 0]); }
   broadcast({t: "mobs", m: out}); }
 function applyMobs(list){
   for(const s of list){ const m = mobByNid(s[0]); if(!m) continue;
     const wasDead = m.dead;
     m.nx = s[1]; m.nz = s[2]; if(s[5] || wasDead || Math.hypot(m.nx - m.x, m.nz - m.z) > 15){ m.x = m.nx; m.z = m.nz; }
-    if(s[3] < m.hp) m.flash = 0.15; m.hp = s[3]; if(s[16]) m.maxHp = s[16];             // (dungeon monsters grow with the group)
+    if(s[3] < m.hp) m.flash = 0.15; m.hp = s[3]; if(s[16]) m.maxHp = s[16]; m.thSync = s[17] || null;             // (dungeon monsters grow with the group)
     if(s[5] && !wasDead){ m.dead = true; m.state = "dead"; m.deadT = 0; m.dots = []; if(P.target === m){ P.target = null; P.auto = false; } G.burst(m.px, m.py, "#d9c49a", 10); }
     else if(!s[5] && wasDead){ H.respawnVis(m); }
     if(!s[5]){ m.dead = false; m.state = ["idle", "chase", "return"][s[4]]; }
@@ -398,3 +394,19 @@ export function tradeHTML(){
   if(!gear.length && !items.length) h += `<div class="muted">Your bag is empty.</div>`;
   return h;
 }
+
+// ---------------------------------------------------------------- threat meter: everyone's threat on a monster, highest first
+const PETNAME = {bear: "Bear", wolf: "Wolf"};
+function thName(id){ const pet = id.endsWith(":pet"), oid = pet ? id.slice(0, -4) : id, me = oid === myId();
+  const r = COOP.remotes[oid], who = me ? S.cur.name : r ? r.name : "Unknown";
+  if(!pet) return who; const k = me ? (G.getPet() && G.getPet().kind) : r && r.pet && r.pet.k; return `${who}'s ${PETNAME[k] || "Pet"}`; }
+export function threatList(m){
+  if(!m || m.dead) return [];
+  let L;
+  if(coopMob(m)){ const src = COOP.role === "guest" ? m.thSync : m.threat && Object.entries(m.threat); if(!src) return [];
+    L = src.map(([id, v]) => ({id, name: thName(id), v, me: id === myId(), mine: id === myId() + ":pet"})); }
+  else { const pet = G.getPet(); L = [{id: "me", name: S.cur.name, v: m.thMe || 0, me: true}];
+    if(pet && !pet.dead) L.push({id: "pet", name: `${S.cur.name}'s ${PETNAME[pet.kind]}`, v: m.thPet || 0, mine: true}); }
+  L = L.filter(e => e.v > 0).sort((a, b) => b.v - a.v);
+  const top = L.length ? L[0].v : 1; for(const e of L) e.pct = Math.round(e.v / top * 100);
+  return L; }

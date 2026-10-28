@@ -65,7 +65,7 @@ export const pow = () => 6 + C().level * 2.6 + gearStat("pow") + strAP() + agiAP
 export const spow = () => (6 + C().level * 2.6 + gearStat("sp") + intSP() + (HEALING ? 0 : gearStat("sd"))) * (P.buffs.sage ? 1.2 : 1);
 // how much stronger your heals are: spell healing and spell power on gear, Intellect, and healing talents
 export const healMult = () => sickM() * (1 + teff("heal") + (gearStat("sh") + gearStat("sp") * 0.5 + intSP()) / (40 + 8 * C().level));
-function genMult(){ let m = (1 + teff("dmg")) * (CLASS_DMG[C().cls] || 1) * PLAYER_DMG; if(C().race === "orc") m *= 1.03; if(P.buffs.bloodrage) m *= 1.2; if(P.buffs.shout) m *= 1.15; if(P.buffs.elixir) m *= 1.2;
+function genMult(){ let m = (1 + teff("dmg")) * (CLASS_DMG[C().cls] || 1) * PLAYER_DMG; if(C().race === "orc") m *= 1.1; if(P.buffs.shout) m *= 1.15; if(P.buffs.elixir) m *= 1.2;
   if(P.buffs.avenging) m *= 1.2; if(T("trueshot")) m *= 1.1; if(T("heartWild")) m *= 1.1; return m * sickM(); }
 export function tmul(ab, school){
   let m = 1; const cls = C().cls;
@@ -79,7 +79,7 @@ export function tmul(ab, school){
   return m;
 }
 export function critChance(m, school){
-  let c = 0.05 + gearStat("crit") / 100 + (P.buffs.keen ? 0.05 : 0);
+  let c = 0.05 + gearStat("crit") / 100 + (P.buffs.keen ? 0.05 : 0); if(C().race === "elf") c += 0.05;
   c += (school === "phys" || !school ? attr("agi") : attr("int")) / 3000;             // 30 Agility = +1% attack crit, 30 Intellect = +1% spell crit
   c += 0.03*T("cruelty") + 0.03*T("lethal") + teff("crit");
   if(school === "holy") c += 0.03*T("holySpec");
@@ -87,7 +87,7 @@ export function critChance(m, school){
   return c;
 }
 export function takenMult(){ let m = CLASSES[C().cls].armor; if(P.form === "bear") m = 0.7 * (1 - 0.05*T("thickHide")); if(P.form === "cat") m = 0.9; if(T("shadowform")) m *= 0.85;
-  if(P.buffs.bark) m *= 0.75; m *= 1 - teff("def"); m *= 1 - Math.min(0.25, gearStat("def") / 100); if(P.buffs.ironskin) m *= 0.85; if(P.buffs.stoneform) m *= 0.8; return m; }
+  if(P.buffs.bark) m *= 0.75; m *= 1 - teff("def"); m *= 1 - Math.min(0.25, gearStat("def") / 100); if(P.buffs.ironskin) m *= 0.85; return m; }
 const manaScale = () => (100 + C().level * 22) / 122 * MANA_COST_MULT;
 export function costOf(id){ const a = AB[id]; let c = a.cost || 0; if(C().cls === "hunter") c *= 1 - 0.1*T("efficiency"); if((a.res || CLASSES[C().cls].res) === "mana") c *= manaScale(); return Math.round(c); }
 export function castTime(id){ let c = AB[id].cast || 0; if(!c) return 0;
@@ -97,16 +97,16 @@ export function castTime(id){ let c = AB[id].cast || 0; if(!c) return 0;
   if(id === "palheal") c -= 0.3*T("palQuick");
   if(id === "pyroblast" && P.buffs.hotstreak) c = 0;
   return Math.max(0, c); }
-export function playerSpeed(){ return 7 * (P.form === "cat" ? 1.3 : P.form === "leopard" ? 1.6 : 1) * (P.mount ? 1.6 : 1) * (P.buffs.dash ? 1.7 : 1) * (P.buffs.sprint ? 1.4 : 1) * (P.ghost ? 1.25 : 1) * (P.devSpeed || 1); }
+export function playerSpeed(){ return 7 * (P.form === "cat" ? 1.3 : P.form === "leopard" ? 1.6 : 1) * (P.mount ? 1.6 : 1) * (P.buffs.dash ? 1.7 : 1) * (P.ghost ? 1.25 : 1) * (P.devSpeed || 1); }
 export function recompute(full){
   const c = CLASSES[C().cls]; let hp = (80 + C().level * 22) * c.hp + gearStat("hp") + gearStat("sta") * 10;
-  if(C().race === "dwarf") hp *= 1.08;
+  if(C().race === "dwarf") hp *= 1.15;
   hp *= 1 + 0.06*T("toughness") + 0.06*T("endurance") + 0.05*T("naturalist") + teff("hp");
   if(P.form === "bear") hp *= 1.6 * (1 + 0.1*T("heartWild"));
   const pct = P.maxHp ? P.hp / P.maxHp : 1;
   hp *= sickM();
   P.maxHp = Math.round(hp); P.hp = full ? P.maxHp : Math.max(1, P.maxHp * pct);
-  let mana = 100 + C().level * 22 + gearStat("mana") + gearStat("int") * 8; mana *= 1 + 0.1*T("arcMind") + 0.1*T("spiritual") + 0.1*T("palWis") + teff("mana");
+  let mana = 100 + C().level * 22 + gearStat("mana") + gearStat("int") * 8; if(C().race === "elf") mana *= 1.1; mana *= 1 + 0.1*T("arcMind") + 0.1*T("spiritual") + 0.1*T("palWis") + teff("mana");
   mana *= sickM();
   P.maxMana = Math.round(mana); P.mana = full ? P.maxMana : Math.min(P.mana, P.maxMana);
 }
@@ -154,10 +154,10 @@ export function hit(m, base, school, ab){
 }
 export function damageMob(m, amt, crit, school){
   if(m.dead) return;
-  if(CO.guestMob(m)){ H.floatText(m, crit ? amt + "!" : "" + amt, crit ? "#ffd36b" : (SCHOOL_COLOR[school] || "#fff"), crit); m.flash = 0.15; P.combatT = 6; CO.op("dmg", m, [amt, crit, school, PET_ATK ? 1 : 0]); return; }   // a friend hosts this monster
+  if(CO.guestMob(m)){ H.floatText(m, crit ? amt + "!" : "" + amt, crit ? "#ffd36b" : (SCHOOL_COLOR[school] || "#fff"), crit); m.flash = 0.15; P.combatT = 6; CO.op("dmg", m, [amt, crit, school, PET_ATK ? 1 : 0, TH_MULT]); return; }   // a friend hosts this monster
   m.hp -= amt; m.flash = 0.15; m.lastHit = H.now();
-  if(CO.coopMob(m)) CO.threat(m, amt, PET_ATK);
-  else if(pet){ if(PET_ATK) m.thPet = (m.thPet || 0) + amt * PETS[pet.kind].threat; else m.thMe = (m.thMe || 0) + amt * (pet.dead ? 1 : PETS[pet.kind].ownerThreat); }
+  if(CO.coopMob(m)) CO.threat(m, amt, PET_ATK, TH_MULT);
+  else { if(PET_ATK && pet) m.thPet = (m.thPet || 0) + amt * PETS[pet.kind].threat * TH_MULT; else m.thMe = (m.thMe || 0) + amt * (!pet || pet.dead ? 1 : PETS[pet.kind].ownerThreat); }
   if(CO.isMe()) H.floatText(m, crit ? amt + "!" : "" + amt, crit ? "#ffd36b" : (SCHOOL_COLOR[school] || "#fff"), crit);
   engage(m);
   if(m.hp <= 0) killMob(m);
@@ -191,7 +191,7 @@ export function killRewards(m, share = 1){
 }
 export function gainXP(n){
   if(C().level >= MAX_LVL) return;
-  n = Math.round(n * (C().race === "human" ? 1.05 : 1)); C().xp += n; H.floatText(P, `+${n} XP`, "#b79bff");
+  n = Math.round(n * (C().race === "human" ? 1.1 : 1)); C().xp += n; H.floatText(P, `+${n} XP`, "#b79bff");
   while(C().level < MAX_LVL && C().xp >= xpNeed(C().level)){ C().xp -= xpNeed(C().level); C().level++; levelUp(); }
   if(C().level >= MAX_LVL) C().xp = 0;
 }
@@ -234,7 +234,7 @@ export function setForm(f){
 // ---------------------------------------------------------------- the player taking damage
 export function avoidChances(){
   const cls = C().cls, pb = (cls === "warrior" || cls === "paladin") ? 0.04 : cls === "hunter" ? 0.02 : (cls === "druid" && P.form === "bear") ? 0.02 : 0;
-  return {dodge: 0.04 + teff("dodge") + (P.form === "cat" ? 0.03 : 0) + (C().race === "elf" ? 0.03 : 0) + attr("agi") / 4000, parry: pb > 0 ? pb + teff("parry") : 0};
+  return {dodge: 0.04 + teff("dodge") + (P.form === "cat" ? 0.03 : 0) + (C().race === "elf" ? 0.01 : 0) + attr("agi") / 4000, parry: pb > 0 ? pb + teff("parry") : 0};
 }
 const mobMiss = m => m ? clamp(0.05 + (C().level - m.lvl) * 0.01, 0.01, 0.1) : 0.05;
 export function playerDamage(raw, src, kind = "melee"){
@@ -267,14 +267,14 @@ function die(){
 export function nearestEnemy(range){ let best = null, bd = range; for(const m of mobs){ if(m.dead || m.state === "return") continue; const d = distU(P, m) - m.r; if(d < bd && sees(P, m)){ bd = d; best = m; } } return best; }
 const rangePx = t => (distU(P, t) - t.r) * PXU;
 export function tryUse(id){
-  if(!id) return;
-  const a = AB[id]; if(!a || !C().learned.includes(id) || (P.dead && !a.whileDead)) return;
+  if(!id || P.dead) return;
+  const a = AB[id]; if(!a || !C().learned.includes(id)) return;
   if(P.casting){ if(P.casting.kind === "gather" || P.casting.kind === "mount") cancelCast(); else return; }
   if(P.mount) H.dismount();                                                     // using an ability gets you off your mount
   if(P.sitting) standUp();
-  if(P.form === "leopard" && !a.form && !a.racial) return H.err("You cannot attack or cast spells in Travel Form");
+  if(P.form === "leopard" && !a.form) return H.err("You cannot attack or cast spells in Travel Form");
   if(C().cls === "druid"){ if(a.res === "rage" && P.form !== "bear") return H.err("Requires Bear Form"); if(a.res === "energy" && P.form !== "cat") return H.err("Requires Wolf Form");
-    if(P.form && !a.form && !a.res && !a.racial) return H.err("Return to your normal form first"); }
+    if(P.form && !a.form && !a.res) return H.err("Return to your normal form first"); }
   if(!a.offGcd && P.gcd > 0) return;
   if((P.cds[id] || 0) > 0) return H.err("Not ready yet");
   let t = null;
@@ -296,7 +296,7 @@ export function tryUse(id){
   else { P[type] -= cost; finishAbility(id, t); }
 }
 function faceTo(t){ P.rot = Math.atan2(t.x - P.x, t.z - P.z); }
-function finishAbility(id, t){ if(id !== "meld") delete P.buffs.meld;
+function finishAbility(id, t){
   const a = AB[id];
   if(a.cd) P.cds[id] = a.cd;
   if(id === "pyroblast" && P.buffs.hotstreak) delete P.buffs.hotstreak;
@@ -356,7 +356,6 @@ export function updPlayer(dt, moving){
   if(P.sickOn && !P.buffs.ressick){ P.sickOn = false; recompute(false); H.log("Resurrection Sickness has faded.", "#7be08a"); }
   if(P.shield > 0){ P.shieldT -= dt; if(P.shieldT <= 0) P.shield = 0; }
   if(P.casting && moving) cancelCast("Interrupted – you moved");
-  if(P.buffs.meld && (moving || P.auto || P.casting || P.dash)) delete P.buffs.meld;      // Shadowmeld ends when you move or act
   if(P.casting){ const a = AB[P.casting.id], t = P.casting.t; if(a && a.minRange && t && !t.dead && rangePx(t) < a.minRange) cancelCast("Too close"); }
   if(P.casting && (P.casting.kind === "gather" || P.casting.kind === "mount") && P.combatT > 0){ const k = P.casting.kind; P.casting = null; H.err(k === "mount" ? "You cannot mount in combat" : "You cannot pick that up in combat"); }
   if(P.casting){ P.casting.el += dt; if(P.casting.el >= P.casting.total){ const c = P.casting;
@@ -519,7 +518,8 @@ export const PETS = {
 // the pet's own skills (shown on the pet bar): each can be switched off so the pet doesn't use it
 export const PET_SKILLS = {
   bear: [{id: "growl", name: "Growl", icon: "horn", color: "#e6bd5c", desc: "Taunts the target, forcing it to attack your bear for 3 sec. 12 sec cooldown."},
-         {id: "sweep", name: "Sweep", icon: "whirl", color: "#d84a42", desc: "Costs 40 rage. Strikes all nearby enemies. Used when two or more enemies are close."}],
+         {id: "sweep", name: "Sweep", icon: "whirl", color: "#d84a42", desc: "Costs 40 rage. Strikes all nearby enemies. Used when two or more enemies are close."},
+         {id: "maul", name: "Maul", icon: "claw", color: "#c8783a", desc: "Costs 25 rage. A heavy strike against a single target that causes a high amount of threat."}],
   wolf: [{id: "claw", name: "Claw", icon: "claw", color: "#e8c84a", desc: "Costs 40 energy. A powerful strike."}]
 };
 export const petSkillOn = id => !(C().petOff && C().petOff[id]);
@@ -530,7 +530,8 @@ export function petAttackCmd(){ if(!pet || pet.dead) return H.err("You have no p
   if(!t || t.dead || t.state === "return") return H.err("You have no target");
   if(distU(t, P) > 40) return H.err("Too far away"); pet.mode = "attack"; pet.cmdT = t; H.floatText(pet, "Attack!", "#e6bd5c"); }
 export function petFollowCmd(){ if(!pet || pet.dead) return H.err("You have no pet"); pet.mode = "follow"; pet.cmdT = null; pet.path = null; H.floatText(pet, "Follow", "#9fd6e8"); }
-let pet = null, PET_ATK = false;
+let pet = null, PET_ATK = false, TH_MULT = 1;   /* TH_MULT: extra threat for the current hit (Maul) */
+const MAUL_COST = 25, MAUL_CD = 3, MAUL_COEF = 0.45, MAUL_THREAT = 2;
 export const getPet = () => pet;
 export function petFight(){ return P.combatT > 0 || mobs.some(m => !m.dead && m.state === "chase" && distU(m, P) < 40); }
 const petMaxHp = kind => Math.round(P.maxHp * PETS[kind].hp * (1 + teff("pethp")));
@@ -549,8 +550,8 @@ export function petDamage(raw, src){ if(!pet || pet.dead) return; const amt = Ma
   pet.hp -= amt; pet.flash = 0.15; if(pet.kind === "bear") pet.res = Math.min(100, pet.res + 5); H.floatText(pet, "" + amt, "#ff9a7a");
   if(pet.hp <= 0){ pet.hp = 0; pet.dead = true; pet.deadT = 0; H.log(`Your ${pet.name.toLowerCase()} has died.`, "#ff8a7a"); } }
 export const petAtk = () => PET_ATK;
-function petStrike(t, coef){ if(!t || t.dead) return; const amt = Math.max(1, Math.round(pow() * coef * genMult() * (1 + teff("petdmg")) * (pet && pet.wrathT > 0 ? 1.5 : 1) * rand(0.92, 1.08) * lvlPenalty(t)));
-  PET_ATK = true; try{ damageMob(t, amt, false, "phys"); } finally{ PET_ATK = false; } }
+function petStrike(t, coef, thm = 1){ if(!t || t.dead) return; const amt = Math.max(1, Math.round(pow() * coef * genMult() * (1 + teff("petdmg")) * (pet && pet.wrathT > 0 ? 1.5 : 1) * rand(0.92, 1.08) * lvlPenalty(t)));
+  PET_ATK = true; TH_MULT = thm; try{ damageMob(t, amt, false, "phys"); } finally{ PET_ATK = false; TH_MULT = 1; } }
 // Beast Mastery's active skills: Intimidation (the pet stuns its target) and Bestial Wrath (the pet goes berserk)
 const petFoe = () => pet && pet.curT && !pet.curT.dead ? pet.curT : P.target && !P.target.dead ? P.target : null;
 export function petIntimidateCheck(){ if(!pet || pet.dead) return "You have no pet"; const t = petFoe(); if(!t) return "Your pet has no target"; if(distU(pet, t) > pet.r + t.r + 3) return "Your pet is too far from its target"; return true; }
@@ -566,7 +567,7 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
   { const mh = petMaxHp(pet.kind); if(mh !== pet.maxHp){ pet.hp = Math.min(mh, pet.hp * mh / pet.maxHp); pet.maxHp = mh; } }
   pet.wrathT = Math.max(0, (pet.wrathT || 0) - dt);
   if(T("h_bond") && !pet.dead && !P.dead){ const k = 0.006 * T("h_bond") * dt; pet.hp = Math.min(pet.maxHp, pet.hp + pet.maxHp * k); P.hp = Math.min(P.maxHp, P.hp + P.maxHp * k); }   // Spirit Bond
-  pet.flash = Math.max(0, pet.flash - dt); pet.attackAnim = Math.max(0, pet.attackAnim - dt * 3); pet.atkT -= dt; pet.growl = Math.max(0, pet.growl - dt); pet.clawT = Math.max(0, pet.clawT - dt); pet.sweepT = Math.max(0, pet.sweepT - dt);
+  pet.flash = Math.max(0, pet.flash - dt); pet.attackAnim = Math.max(0, pet.attackAnim - dt * 3); pet.atkT -= dt; pet.growl = Math.max(0, pet.growl - dt); pet.clawT = Math.max(0, pet.clawT - dt); pet.sweepT = Math.max(0, pet.sweepT - dt); pet.maulT = Math.max(0, (pet.maulT || 0) - dt);
   pet.moving = false;
   if(distU(pet, P) > 45 || (P.dead && !pet.dead)){ pet.x = P.x - Math.sin(P.rot) * 1.4; pet.z = P.z - Math.cos(P.rot) * 1.4; pet.path = null; }
   if(pet.dead){ pet.deadT += dt; return; }
@@ -594,6 +595,8 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
     if(distU(pet, t) > reach){ const dir = steer(pet, t.x, t.z, dt, blockedFn); if(dir && tryMoveFn(pet, dir.dx * sp / PXU * dt, dir.dz * sp / PXU * dt)){ pet.moving = true; turnTo(pet, dir.dx, dir.dz, dt, 12); } }
     else { turnTo(pet, t.x - pet.x, t.z - pet.z, dt, 12);
       if(pet.atkT <= 0){ pet.atkT = d.atk / ((1 + 0.07 * T("h_frenzy")) * (pet.wrathT > 0 ? 1.3 : 1)); pet.attackAnim = 1; petStrike(t, d.coef); if(pet.kind === "bear") pet.res = Math.min(100, pet.res + 8); }
+      if(pet.kind === "bear" && petSkillOn("maul") && pet.res >= MAUL_COST && pet.maulT <= 0 && !t.dead && !(petSkillOn("sweep") && pet.sweepT <= 0 && mobs.filter(m => !m.dead && m.state === "chase" && distU(m, pet) < 3.9).length >= 2)){   // Maul (25 rage): single target, extra threat; Sweep goes first when several enemies are close
+        pet.res -= MAUL_COST; pet.maulT = MAUL_CD; pet.attackAnim = 1; H.floatText(pet, "Maul", "#e8a060"); petStrike(t, MAUL_COEF, MAUL_THREAT); }
       if(pet.kind === "wolf" && petSkillOn("claw") && pet.res >= 40 && pet.clawT <= 0 && !t.dead){ pet.res -= 40; pet.clawT = 1.2; pet.attackAnim = 1; H.floatText(pet, "Claw", "#e8c84a"); petStrike(t, 0.55); } }
   } else if(distU(pet, P) > 3){                                              // follow you at your speed (faster when far behind)
     const gx = P.x - Math.sin(P.rot) * 1.6, gz = P.z - Math.cos(P.rot) * 1.6, spd = playerSpeed() * (distU(pet, P) > 9 ? 1.3 : 1);
@@ -611,9 +614,9 @@ export function mobTarget(m){
   if(m.tauntT > 0) return pet;
   const tm = m.thMe || 0, tp = m.thPet || 0;
   if(!tm && !tp) return distU(m, pet) < distU(m, P) ? pet : P;
-  if(m.tgtPet) return tm > tp * 1.1 ? P : pet;
-  return tp > tm * 1.1 ? pet : P;
+  if(m.tgtPet) return tm > tp ? P : pet;          // the monster always goes after whoever has the most threat
+  return tp > tm ? pet : P;
 }
 
 // the helper table the Rimfrost 1 ability code calls
-Object.assign(E, {willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});
+Object.assign(E, {coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});

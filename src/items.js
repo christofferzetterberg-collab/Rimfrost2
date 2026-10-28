@@ -132,15 +132,21 @@ export function makeGear(opts){
   // points -> real numbers
   const conv = {str:0.4, agi:0.4, int:0.4, sta:0.3, pow:0.17, sp:0.17, sd:0.17, sh:0.2, hp:2.4, mana:3, crit:0.07, def:0.1};
   for(const k of Object.keys(it.st)){ let v = it.st[k]*conv[k]; v = (k==="crit"||k==="def") ? Math.round(v*10)/10 : Math.round(v); if(v <= 0) delete it.st[k]; else it.st[k] = v; }
-  it.n = gearName(it, r); it.en = 1; it.v = 2;
+  it.n = gearName(it, r); it.en = 1; it.v = 3;
+  addSta(it);
   return it;
 }
+// every item also carries Stamina on top of its other stats, so better gear means noticeably more health
+export const staBonus = it => Math.max(1, Math.round(it.il * 0.35 * (SLOTS[it.slot] ? SLOTS[it.slot].w : 0.4) * QUAL[it.q].mult));
+function addSta(it){ it.st.sta = (it.st.sta || 0) + staBonus(it); }
 // gear from before the new stats: Attack Power becomes Strength (Agility for hunters), Health becomes Stamina, Mana becomes Intellect – worth the same as before
-export function upgradeGear(it, cls){ if(!it || !it.st || it.v >= 2) return it; const st = it.st;
+export function upgradeGear(it, cls){ if(!it || !it.st || it.v >= 3) return it; const st = it.st;
+  if(!(it.v >= 2)){
   if(st.pow){ const k = cls === "hunter" ? "agi" : "str"; st[k] = (st[k] || 0) + Math.max(1, Math.round(st.pow * 2)); delete st.pow; }
   if(st.hp){ st.sta = (st.sta || 0) + Math.max(1, Math.round(st.hp / 10)); delete st.hp; }
   if(st.mana){ st.int = (st.int || 0) + Math.max(1, Math.round(st.mana / 8)); delete st.mana; }
-  it.v = 2; return it; }
+  }
+  addSta(it); it.v = 3; return it; }
 // item name: [prefix] base [of Suffix], e.g. "Warden's Longsword of Power"
 function gearName(it, r){
   const base = it.wt ? pickR(WTYPES[it.wt].base, r) : (it.slot==="neck"||it.slot==="ring") ? pickR(JEWEL_BASE[it.slot], r) : ARMOR_BASE[it.arm][it.slot];

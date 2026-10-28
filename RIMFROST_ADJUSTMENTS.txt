@@ -1,0 +1,39 @@
+Add to list: 
+- Co-op:
+ - 
+
+- Dungeons:
+ - Iron mine:
+  - 
+  - 
+  - 
+
+- General:
+ - 
+ - 
+ - 
+
+- Bugs:
+ - 
+
+- Classes:
+ - Hunters:
+  - Pet health regain as well as player's regain during combat is way to high when pet is active and spirit bond is used, we nearly does not loose any health in 1 on 1 combat. instead of every second, it should be every 5 sec.
+ 
+- Druid:
+  - Set Entangling roots to a 20 sec cooldown. 
+
+ - Paladin:
+  - 
+
+ - Warrior:
+  - 
+
+ - Priest:
+  - 
+
+ - Mage:
+  - Ice barrier talent should be a skill that learns with the talent and as a active skill that absorbs some damage. it should last for 60 seconds or until the damaged is absorbed only castable on self and not on co-op teammates and have a cooldown of 60 seconds
+  - Shatter talent should only be aplied to frozen target, not slowed.
+  - Frost Ring should freeze targets for 8 seconds and have cooldown of 25 sec
+

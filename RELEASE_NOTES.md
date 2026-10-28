@@ -1,27 +1,30 @@
 # Rimfrost 2 – Release notes
 
+## v0.16.3
+
+### Changed
+- Monster health now scales more steeply with level. Low-level monsters are nearly unchanged; level 15 monsters have about 90% more health and level 25 monsters about 150% more.
+- Elite monsters have 50% more health, and bosses an additional 50%.
+
+## v0.16.2
+
+### Fixed
+- You can no longer get stuck in pits or on ledges below steep slopes. If you cannot move for a few seconds, you are moved to the nearest open ground.
+
+## v0.16.1
+
+### Changed
+- All equipment now carries additional Stamina based on item level, quality and slot. A full set of level 17 Uncommon gear gives about 40 Stamina (+400 health).
+- Equipment you already own has been updated with the new Stamina bonus.
+
 ## v0.16.0
 
 ### New
-- **Racial abilities.** Every race has a racial ability from level 1. It appears in the spellbook under "Racial" and is placed on your action bar automatically. Racial abilities cost nothing and do not trigger the global cooldown.
-  - **Human – Sprint:** Increases movement speed by 40%. Lasts 8 sec. 2 min cooldown.
-  - **Orc – Bloodrage:** Increases damage dealt by 20%. Lasts 8 sec. 2 min cooldown.
-  - **Elf – Shadowmeld:** Enemies lose track of you and you leave combat. Lasts up to 60 sec. Moving or acting cancels the effect. 2 min cooldown. In co-op, an enemy only resets if no other player has fought it.
-  - **Dwarf – Stoneform:** Reduces damage taken by 20%. Lasts 8 sec. 2 min cooldown.
-  - **Undead – Will of the Dead:** Returns you to life at your corpse with 30% of your health, without Resurrection Sickness. Usable only while dead. 30 min cooldown. Also available from the death window.
-- Each racial ability has its own visual effect: a coloured ring around your character, plus a speed trail (Sprint), a red glow (Bloodrage), a stone skin (Stoneform), a shadowy fade (Shadowmeld) or a column of green light (Will of the Dead).
-- Ability tooltips now show long cooldowns in minutes.
+- **Maul** (hunter bear): costs 25 rage. A heavy strike against a single target that causes a high amount of threat. Can be toggled on the pet bar (default key Ctrl+5).
+- **Threat meter:** shows the threat of everyone fighting your target, below the target frame. Toggle it in the menu (Esc → Threat meter).
 
 ### Changed
-- **Racial bonuses lowered:**
-  - Human: experience +5% (was 10%).
-  - Orc: damage +3% (was 10%).
-  - Elf: dodge +3% (was +5% critical strike, +10% mana and +1% dodge).
-  - Dwarf: maximum health +8% (was 15%); no longer starts with Mining 25.
-  - Undead: unchanged (health and mana regeneration out of combat +50%).
-
-### Fixed
-- Loading a character could skip setting up its quest log and quest items (a code comment had swallowed that line).
+- Monsters now always attack whoever has the most threat. Warriors and Bear Form still generate extra threat.
 
 ## v0.15.2
 

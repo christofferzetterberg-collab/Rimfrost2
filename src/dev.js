@@ -30,6 +30,7 @@ function build(){
   el.addEventListener("change", e => { const s = e.target.closest("[data-set]"); if(s){ BT[s.dataset.set] = s.type === "checkbox" ? s.checked : s.value; } });
 }
 const BT = {lvl: "10", q: "2", spec: "0", trials: "3", res: null, busy: false, prog: ""};
+if(DEV.on) window.__devBT = {BT, run: () => runBalance()};
 function render(){
   if(!el || el.hidden) return; const c = S.cur;
   const hubs = Object.entries(HUBS).map(([id, h]) => `<option value="hub:${id}">${esc(h.name)}</option>`).join("") + Object.entries(DG_DOORS).map(([id]) => `<option value="dg:${id}">Door: ${id.replace("d_", "")}</option>`).join("");
