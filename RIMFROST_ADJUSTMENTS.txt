@@ -3,7 +3,7 @@ Add to list:
  - 
 
 - Dungeons:
- - 
+ - in general, some stuff, for example getting hit by mine cart in Iron Mine should instantly kill, to make things harder. 
  - 
   - Iron mine:
    - 
@@ -11,37 +11,48 @@ Add to list:
    - 
 
 - General:
- - Adjust the combo point system for druid wolf form and rogues. Combo points should be saved only during the fight and per target. 
+ - 
  - 
  - 
 
 - Feature:
- - New class: Warlock, using curses, DoTs with Shadow & Fire magic. Should have an Imp pet that cast firebolts, no taunt. And a voidwalker pet similar to hunter bear pet.
- - New class: Rogue, Dual wield, fast attackspeed, uses combopoints, similar to druid wolf form.
- - New class: Shaman, Using totems and Nature specialization.
+ - 
+ - 
+ - 
 
 - Bugs:
- - Buff/debuffs on the player's hunter pet is not showing, for example when casting the talent active skill Bestial wrath, it does not show. And I'm also not able to target the pet which should be possible to do. 
+ - 
 
 - Classes:
- - Hunters:
-  - 
-  - 
+  - Hunters:
+   - 
+   - 
 
-- Druid:
-  -  
+  - Druid:
+   - Should have a resurrect spell at lvl 10 to be used for Co-op and the resurrected player will spawn at the caster and with 20% health and mana, 10 sec cast and outside combat only. 
 
- - Paladin:
-  - 
+  - Paladin:
+   - Should have a resurrect spell at lvl 12 to be used for Co-op and the resurrected player will spawn at the caster and with 20% health and mana, 10 sec cast and outside combat only. 
 
- - Warrior:
-  - 
+  - Warrior:
+   - 
 
- - Priest:
-  - 
+  - Priest:
+   - Should have a resurrect spell at lvl 10 to be used for Co-op and the resurrected player will spawn at the caster and with 20% health and mana, 10 sec cast and outside combat only. 
 
- - Mage:
-  - 
-  - 
-  - 
+  - Mage:
+   - 
+   - 
+   - 
 
+  - Warlock:
+   - The imp has Energy. it should use mana.
+   - The imp also teleports to the caster when in combat. it should stand still casting a firebolt (using mana) when in range, and if outranged, it should cancel and follow to continue to cast, (unless told otherwise)
+   - The voidwalker has rage, it should also use mana and the skills should have cooldowns instead of rage requirements.
+
+  - Rogue:
+   - Stealth should not have a 60 min "buff" it should still show that it's a buff, but with no time limit and only removed when attacking, using the skill again or discovered by enemies.
+   - When using stealth enemies can still aggro but they aggro on shorter range. 
+   - when using stealth, the character should be somewhat faded (like ghost) so it can be seen in both Co-op and the palyer itself that stealth is active.
+   - The stealth Cooldown should only start when it breaks, not on "activating"
+   - Stealth should break if taking damage from environmental stuff.

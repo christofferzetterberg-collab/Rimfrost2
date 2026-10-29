@@ -1,5 +1,55 @@
 # Rimfrost 2 – Release notes
 
+## v0.28.0
+
+### New
+- **New dungeon walls, floors and pillars** in all five dungeons:
+  - **The Iron Mine:** packed earth floors and rough stone walls.
+  - **The Drowned Temple:** green-tinted tiles and carved pillars.
+  - **The Ember Forge:** heat-stained tiles and walls.
+  - **The Frost Vault:** pale, frosted stone.
+  - **The Draug King's Crypt:** grey tombstone walls with candle niches.
+- Barrels, crates, mining tools, rubble, candles, chests and broken arms now line the dungeon walls.
+- Dungeon models by Kay Lousberg (KayKit Dungeon Pack, CC0).
+
+## v0.27.0
+
+### Improved
+- **Much better performance:** monsters, people, trees and rocks far away or off screen are no longer drawn, and distant characters animate less often.
+- Lighter shadows.
+
+### New
+- **Graphics setting** in the Esc menu: Low, Medium (default) or High. Low turns off shadows; High gives sharper shadows and draws characters further away.
+
+### Fixed
+- The Threat meter setting in the Esc menu now always shows its current state.
+
+## v0.26.1
+
+### Fixed
+- Rogues now see their combo points under the health bar.
+
+## v0.26.0
+
+### New
+- **New buildings** in every town and camp:
+  - **Human towns and Rimhaven:** timbered houses, taverns, smithies and chapels with blue and red roofs.
+  - **Elven towns:** houses, a chapel and a tavern with green roofs.
+  - **Dwarven towns:** stone halls, workshops, smithies and a mine.
+  - **Orc towns:** large hide tents and lookout towers.
+  - **Undead towns:** faded, crumbling houses and a ruined building.
+  - **Rimhaven:** a new stone city wall and gate towers.
+  - **Camps:** new tents; the Forester's Cabin and the Witch's Hut have new houses.
+- Barrels, crates, hay bales and other goods stand beside many houses.
+- Building models by Kay Lousberg (KayKit Medieval Hexagon Pack, CC0).
+
+## v0.25.0
+
+### New
+- **New trees, rocks and bushes** across the world: leafy trees in the meadows, pines in the forests and highlands, birches in the elven woods, violet trees in the Moonwood, snow-covered pines in the north and bare trees in the swamps and ash lands.
+- Bushes now grow in the meadows, forests and woods.
+- Nature models by Kay Lousberg (KayKit Forest Nature Pack, CC0).
+
 ## v0.24.0
 
 ### New

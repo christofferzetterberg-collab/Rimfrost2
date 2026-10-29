@@ -3,6 +3,8 @@
 import * as THREE from "three";
 import {clamp, lerp, smooth, rng, fbm} from "./util.js";
 import {dgLos} from "./dungeon.js";
+import {natureReady, natureInstances} from "./nature.js";
+import {buildingsReady, buildingModel, stretchedModel, LOOKS, PROPS} from "./buildings.js";
 import {TS, ZONES, HUBS, ROADS, LAIRS, EXPLORE, DG_DOORS, CITY_SIGNS} from "./worlddata.js";
 
 export const B = {x0: -308, x1: 308, z0: -250, z1: 250};        // the edges of the world (1 unit ≈ 1 metre)
@@ -190,7 +192,8 @@ function hut(x, z, rot, rad, wallC, roofC){                                     
   for(const s of [-1, 1]){ const t = mesh(new THREE.ConeGeometry(0.12, 1.1, 5), 0xf0e6cc, s * 0.6, 2, rad + 0.25); t.rotation.x = 0.9; g.add(t); }
   seeThrough(place(g, x, z, rot)); solid(x, z, rad + 0.3, true); return g;
 }
-function tent(x, z, rot, color, s = 1){ const t = mesh(new THREE.ConeGeometry(1.6 * s, 2.1 * s, 5), color, 0, 1.05 * s, 0); const g = new THREE.Group(); g.add(t); place(g, x, z, rot); solid(x, z, 1.3 * s, true); return g; }
+function tent(x, z, rot, color, s = 1){ if(buildingsReady()){ const g = buildingModel(pick("camp", (color >> 12) & 1), {width: 3.6 * s}); place(g, x, z, rot); solid(x, z, 1.3 * s, true); return g; }
+  const t = mesh(new THREE.ConeGeometry(1.6 * s, 2.1 * s, 5), color, 0, 1.05 * s, 0); const g = new THREE.Group(); g.add(t); place(g, x, z, rot); solid(x, z, 1.3 * s, true); return g; }
 function fire(x, z){ const g = new THREE.Group(); for(let i = 0; i < 5; i++){ const l = mesh(new THREE.BoxGeometry(0.9, 0.14, 0.14), 0x4a3220, 0, 0.1, 0); l.rotation.y = i * 1.25; g.add(l); }
   g.add(mesh(new THREE.ConeGeometry(0.35, 0.8, 6), glowMat(0xff9a3a), 0, 0.5, 0)); place(g, x, z); solid(x, z, 0.6); return g; }
 function brazier(x, z, color = 0xff8a3a){ const g = new THREE.Group();
@@ -203,6 +206,17 @@ function signpost(x, z, name){ const g = new THREE.Group(); g.add(mesh(new THREE
   place(g, x, z, Math.random() * 0.5); SIGNS.push({name, x, z}); }
 function stone(x, z, w, h, d, color, rot = 0, los = true){ const g = new THREE.Group(); g.add(mesh(new THREE.BoxGeometry(w, h, d), color, 0, h / 2 - 0.1, 0)); place(g, x, z, rot); solid(x, z, Math.max(w, d) * 0.55, los); return g; }
 function seeThrough(g){ houses.push(g); g.traverse(o => { if(o.material){ o.material = o.material.clone(); o.material.transparent = true; } }); }
+// a KayKit building: widest side w, collider r; returns null when the models are missing (then the shapes above are used)
+function building(x, z, rot, name, w, r, tint = null, faded = false){
+  if(!buildingsReady()) return null; const g = buildingModel(name, {width: w, tint, faded}); if(!g) return null;
+  seeThrough(place(g, x, z, rot)); solid(x, z, r, true); return g; }
+const pick = (look, i) => LOOKS[look][i % LOOKS[look].length];
+// a barrel, crate or hay bale beside a house (off the roads)
+function props(x, z, rot, w, i){
+  if(!buildingsReady()) return;
+  for(let k = 0; k < 2; k++){ const side = (i + k) % 2 ? 1 : -1, p = turn(x, z, rot, side * (w / 2 + 0.6), -k * 1.4);
+    if(roadDist(p.x, p.z) < 2.6) continue; const g = buildingModel(PROPS[(i * 3 + k * 5) % PROPS.length], {scale: 4.2}); if(!g) continue;
+    place(g, p.x, p.z, rot + i * 0.9 + k); solid(p.x, p.z, Math.max(g.userData.size.x, g.userData.size.z) * 0.5); } }
 
 // ---------------------------------------------------------------- towns, camps and Rimhaven
 const TOWN_LOOK = {
@@ -221,7 +235,9 @@ function ringSpots(c, rad, n, avoid = []){ const out = [];
 function buildTown(h){
   const L = TOWN_LOOK[h.race], spots = ringSpots(h, h.R + 2.6, 6);
   spots.forEach((s, i) => {
-    if(h.race === "dwarf") hall(s.x, s.z, s.rot, 5, 4.2, L.walls[i % 2], L.roofs[i % 2]);
+    const w = h.race === "dwarf" ? 5.2 : h.race === "orc" ? 4.6 : 4.6;
+    if(building(s.x, s.z, s.rot, pick(h.race, i), w, w * 0.56, h.race === "undead" ? [0xd8d4e0, 0xc4c0cc][i % 2] : null, h.race === "undead")){ if(h.race !== "orc" && h.race !== "undead") props(s.x, s.z, s.rot, w, i); }
+    else if(h.race === "dwarf") hall(s.x, s.z, s.rot, 5, 4.2, L.walls[i % 2], L.roofs[i % 2]);
     else if(h.race === "orc") hut(s.x, s.z, s.rot, 2.2, L.walls[i % 2], L.roofs[i % 2]);
     else house(s.x, s.z, s.rot, 4.6, 4, L.walls[i % L.walls.length], L.roofs[i % L.roofs.length]); });
   if(h.race === "orc"){ fire(h.x, h.z); for(const a of [0.8, 2.4, 4.0, 5.6]){ const x = h.x + Math.cos(a) * 3.2, z = h.z + Math.sin(a) * 3.2;
@@ -234,7 +250,7 @@ function buildTown(h){
 function buildCamp(h){
   fire(h.x, h.z);
   const spots = ringSpots(h, h.R + 1.6, 2);
-  spots.forEach((s, i) => { if(h.id === "holgerstuga" && i === 0) house(s.x, s.z, s.rot, 4.6, 4, 0x8a6a4a, 0x4a3a2a); else tent(s.x, s.z, s.rot, [0x8a6a4a, 0x6a5a4a][i % 2]); });
+  spots.forEach((s, i) => { if(h.id === "holgerstuga" && i === 0){ if(!building(s.x, s.z, s.rot, pick("human", 3), 4.4, 2.6)) house(s.x, s.z, s.rot, 4.6, 4, 0x8a6a4a, 0x4a3a2a); else props(s.x, s.z, s.rot, 4.4, 1); } else tent(s.x, s.z, s.rot, [0x8a6a4a, 0x6a5a4a][i % 2]); });
 }
 function buildCity(h){
   const R = h.R, ring = R + 1.2;
@@ -242,10 +258,12 @@ function buildCity(h){
   const angs = []; for(const L of ROAD_LINES) for(const [x, z] of L){ const d = Math.hypot(x - h.x, z - h.z); if(Math.abs(d - ring) < 1) angs.push(Math.atan2(z - h.z, x - h.x)); }
   const gates = []; for(const a of angs){ const g = gates.find(g => Math.abs(Math.atan2(Math.sin(a - g.a), Math.cos(a - g.a))) < 0.4); if(g){ g.s += a; g.n++; g.a = g.s / g.n; } else gates.push({a, s: a, n: 1}); }
   const atGate = a => gates.some(g => Math.abs(Math.atan2(Math.sin(a - g.a), Math.cos(a - g.a))) < 3.4 / ring);
-  const wallC = 0x9a968c, segs = Math.ceil(ring * Math.PI * 2 / 1.9);
+  const wallC = 0x9a968c, model = buildingsReady(), segs = Math.ceil(ring * Math.PI * 2 / (model ? 3.8 : 1.9)), segL = ring * Math.PI * 2 / segs;
   for(let k = 0; k < segs; k++){ const a = k / segs * Math.PI * 2; if(atGate(a)) continue; const x = h.x + Math.cos(a) * ring, z = h.z + Math.sin(a) * ring;
+    if(model){ place(stretchedModel("wall_straight", segL / 2 * 1.08, 3.1, 1.4), x, z, -a + Math.PI / 2); for(const s of [-1, 1]){ const p = {x: h.x + Math.cos(a + s * segL / 4 / ring) * ring, z: h.z + Math.sin(a + s * segL / 4 / ring) * ring}; solid(p.x, p.z, 1.15, true); } continue; }
     const g = new THREE.Group(); g.add(mesh(new THREE.BoxGeometry(2.1, 3.4, 1), wallC, 0, 1.7, 0), mesh(new THREE.BoxGeometry(0.6, 0.6, 1.1), 0x8a867c, (k % 2) * 0.7 - 0.35, 3.6, 0)); place(g, x, z, -a + Math.PI / 2); solid(x, z, 1.15, true); }
   for(const gt of gates) for(const s of [-1, 1]){ const a = gt.a + s * 3.9 / ring, x = h.x + Math.cos(a) * ring, z = h.z + Math.sin(a) * ring;
+    if(model){ place(buildingModel("building_tower_A_blue", {width: 3.2}), x, z, -a); solid(x, z, 1.35, true); continue; }
     const t = new THREE.Group(); t.add(mesh(new THREE.CylinderGeometry(1.2, 1.35, 5, 8), 0x8a867c, 0, 2.5, 0), mesh(new THREE.ConeGeometry(1.5, 1.8, 8), 0x5a3a3a, 0, 5.9, 0)); place(t, x, z); solid(x, z, 1.35, true); }
   fountain(h.x, h.z, 0x3f8fbf, 0xa8a49a);
   for(const [dx, dz] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) brazier(h.x + dx * TS, h.z + dz * TS);
@@ -256,7 +274,7 @@ function buildCity(h){
   for(const rr of [10.5, 15.5]) for(let k = 0, cnt = Math.round(rr * Math.PI * 2 / 6.2); k < cnt; k++){ const a = k / cnt * Math.PI * 2 + rr, x = h.x + Math.cos(a) * rr, z = h.z + Math.sin(a) * rr;
     if(streets.some(s => { const d = Math.atan2(Math.sin(a - s), Math.cos(a - s)); return Math.abs(Math.sin(d)) * rr < 3.6 && Math.cos(d) > 0; })) continue;
     if(keep.some(o => Math.hypot(o.x - x, o.z - z) < 4.2) || SIGNS.some(o => Math.hypot(o.x - x, o.z - z) < 3.5)) continue;
-    house(x, z, Math.atan2(h.x - x, h.z - z), 3.8, 3.4, walls[n % 4], roofs[n % 4]); n++; }
+    const rot = Math.atan2(h.x - x, h.z - z); if(building(x, z, rot, pick("city", n), 4, 2.36)){ if(n % 3 === 0) props(x, z, rot, 4, n); } else house(x, z, rot, 3.8, 3.4, walls[n % 4], roofs[n % 4]); n++; }
   { const sx = h.x + STABLE_AT[0] * TS, sz = h.z + STABLE_AT[1] * TS; stable(sx, sz, Math.atan2(h.x - sx, h.z - sz)); }
 }
 export const STABLE_AT = [7.6, 10.1];   // Rimhaven's stable (tiles from the centre); the stablemaster stands in front of it
@@ -321,7 +339,7 @@ function buildPlace(id, e){
     solid(x, z - 2.6, 3, true); solid(x - 1.3, z, 0.5, true); solid(x + 1.3, z, 0.5, true); }
   else if(id === "watchtower"){ add(mesh(new THREE.CylinderGeometry(1.8, 2.1, 6.5, 8), 0x8a857c, 0, 3.25, 0), mesh(new THREE.BoxGeometry(1.2, 1.4, 1.2), 0x8a857c, 1, 7.2, 0.6), mesh(new THREE.DodecahedronGeometry(0.7, 0), 0x8a857c, 2.4, 0.3, 1.8)); solid(x, z, 2.1, true); }
   else if(id === "minershrine"){ add(mesh(new THREE.BoxGeometry(1.8, 1.2, 1.2), 0x8a8d91, 0, 0.6, 0), mesh(new THREE.BoxGeometry(2.2, 0.3, 1.5), 0x6e7176, 0, 1.35, 0), mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.3, 6), 0xf0e6cc, 0.4, 1.65, 0), mesh(new THREE.ConeGeometry(0.06, 0.14, 5), glowMat(0xffd060), 0.4, 1.86, 0)); solid(x, z, 1.1); }
-  else if(id === "witchhut"){ house(x, z - 2.5, 0.25, 3.8, 3.4, 0x4a4a3a, 0x3a2a3a); const pot = new THREE.Group(); pot.add(mesh(new THREE.SphereGeometry(0.6, 8, 6), 0x2a2a2a, 0, 0.5, 0), mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 8), glowMat(0x7aff6a), 0, 0.9, 0)); place(pot, x + 1.5, z + 1); solid(x + 1.5, z + 1, 0.6); }
+  else if(id === "witchhut"){ if(!building(x, z - 2.5, 0.25, pick("witch", 0), 4, 2.36, 0x7a7a6a)) house(x, z - 2.5, 0.25, 3.8, 3.4, 0x4a4a3a, 0x3a2a3a); const pot = new THREE.Group(); pot.add(mesh(new THREE.SphereGeometry(0.6, 8, 6), 0x2a2a2a, 0, 0.5, 0), mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.06, 8), glowMat(0x7aff6a), 0, 0.9, 0)); place(pot, x + 1.5, z + 1); solid(x + 1.5, z + 1, 0.6); }
   else if(id === "sunkenbell"){ const b = mesh(new THREE.CylinderGeometry(0.9, 1.6, 2.2, 10), 0x9a7a3a, 0, 0.6, 0); b.rotation.z = 0.5; add(b); solid(x, z, 1.6); }
   else if(id === "obelisk"){ add(mesh(new THREE.BoxGeometry(1.3, 6.5, 1.3), 0x1a1618, 0, 3.25, 0), mesh(new THREE.ConeGeometry(0.95, 1.2, 4), glowMat(0xff4a1a), 0, 7.1, 0)); g.children[0].rotation.y = 0.785; solid(x, z, 1); }
   else if(id === "scorchbridge"){ for(let k = 0; k < 6; k++){ const p = mesh(new THREE.BoxGeometry(2.6, 0.15, 0.8), 0x2a2220, 0, 0.35 + (k % 2) * 0.1, -2.5 + k * 1); p.rotation.z = (k % 3 - 1) * 0.15; add(p); }
@@ -354,14 +372,16 @@ const DENS = {   // per 100 square units: trees, rocks, spikes (ice / obsidian)
   steppe: [0.18, 0.2], canyon: [0.15, 0.3], rock: [0.4, 0.5], swamp: [0.9, 0.05], ash: [0.2, 0.2, 0.3], snow: [0.2, 0.1, 0.35], blight: [0.7, 0.25], gloom: [1.5, 0.1]};
 const TREE = {meadow: "oak", forest: "pine", elfwood: "birch", moonwood: "violet", highland: "pine", snowhigh: "snowpine", steppe: "cactus", canyon: "cactus", rock: "pine",
   swamp: "dead", ash: "charred", snow: "snowpine", blight: "dead", gloom: "dead"};
+const BUSH = {meadow: 0.1, forest: 0.12, elfwood: 0.12, moonwood: 0.08, highland: 0.05, swamp: 0.06, rock: 0.03};    // bushes (chance per spot, only with the new models)
 const ROCK_COL = {steppe: 0x9a5a40, canyon: 0xa86a48, snowhigh: 0xdde6ea, snow: 0xdde6ea, ash: 0x3a3634, gloom: 0x4a4a52, blight: 0x6a6a5e};
 function buildProps(){
-  const r = rng(5), T = {trunk: [], crown: [], cone: [], dead: [], cactus: [], rock: [], spike: [], reed: []}, c = new THREE.Color();
+  const r = rng(5), T = {trunk: [], crown: [], cone: [], dead: [], cactus: [], rock: [], spike: [], reed: []}, c = new THREE.Color(), K = {};          // K: the new tree models, by kind
   const ok = (x, z, pad) => openAt(x, z) > 0.95 && roadDist(x, z) > pad && !hubAt(x, z) && !featureAt(x, z) && height(x, z) > 0.55;
   for(let z = B.z0 + 6; z < B.z1 - 6; z += 2.2) for(let x = B.x0 + 6; x < B.x1 - 6; x += 2.2){
     const px = x + (r() - 0.5) * 2, pz = z + (r() - 0.5) * 2, t = landAt(px, pz), D = DENS[t], s = r();
     const clump = 0.25 + 1.5 * smooth(0.38, 0.62, fbm(px * 0.05 + 7, pz * 0.05 - 3)), area = 2.2 * 2.2 / 100;
     if(r() < D[0] * area * clump && ok(px, pz, 3)){ const kind = TREE[t], y = height(px, pz), sc = 0.8 + s * 0.6;
+      if(kind !== "cactus") (K[kind] = K[kind] || []).push([px, y - 0.05, pz, sc, kind === "charred" ? 0x3a3430 : t === "gloom" ? 0x8a8090 : kind === "dead" ? 0xd8ccb8 : null]);
       if(kind === "cactus") T.cactus.push([px, y, pz, sc, 0x5a8a3a]);
       else if(kind === "dead" || kind === "charred") T.dead.push([px, y, pz, sc, kind === "charred" ? 0x2a2420 : t === "gloom" ? 0x3a3438 : 0x4a3e32]);
       else { T.trunk.push([px, y, pz, sc, kind === "birch" ? 0xe8e4d8 : kind === "violet" ? 0x3a2a3a : 0x6b4a2e]);
@@ -383,6 +403,15 @@ function buildProps(){
   const inst = (geo, list, fn, shadow = true) => { if(!list.length) return; const im = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({flatShading: true}), list.length), o = new THREE.Object3D();
     list.forEach((p, i) => { o.position.set(p[0], p[1], p[2]); o.rotation.set(0, p[0] * 7.3 + p[2], 0); o.scale.setScalar(p[3]); if(fn) fn(o, p); o.updateMatrix(); im.setMatrixAt(i, o.matrix); im.setColorAt(i, c.setHex(p[4]).offsetHSL(0, 0, ((i * 37) % 10 - 5) * 0.006)); });
     im.castShadow = shadow; im.receiveShadow = true; SCENE.add(im); };
+  if(natureReady()){                                                          // the KayKit trees, rocks and bushes
+    for(const [kind, list] of Object.entries(K)) natureInstances(SCENE, kind, list, {size: kind === "dead" || kind === "charred" ? 3.6 : kind === "pine" || kind === "snowpine" ? 4.6 : 4.4});
+    natureInstances(SCENE, "rock", T.rock.map(p => [p[0], p[1] - 0.25, p[2], p[3], new THREE.Color(p[4]).getHex() === 0x8a8d91 ? null : p[4]]), {size: 1.9, byWidth: true, bright: 1.25});
+    const rb = rng(9), bush = [];
+    for(let z = B.z0 + 6; z < B.z1 - 6; z += 3.1) for(let x = B.x0 + 6; x < B.x1 - 6; x += 3.1){ const px = x + (rb() - 0.5) * 3, pz = z + (rb() - 0.5) * 3, t = landAt(px, pz), dn = BUSH[t] || 0;
+      if(dn && rb() < dn && ok(px, pz, 2.2)) bush.push([px, height(px, pz) - 0.05, pz, 0.7 + rb() * 0.6, t === "elfwood" ? 0xd8f0a0 : t === "moonwood" ? 0xb8a0e0 : t === "swamp" ? 0xa0a070 : null]); }
+    natureInstances(SCENE, "bush", bush, {size: 1.3, byWidth: true, shadow: false});
+    inst(cactusGeo, T.cactus); inst(spikeGeo, T.spike, (o, p) => o.rotation.set((p[0] % 1) * 0.3, p[2], 0)); inst(reedGeo, T.reed, null, false);
+    return; }
   inst(trunkGeo, T.trunk); inst(pineGeo, T.cone); inst(crownGeo, T.crown, (o, p) => o.scale.set(p[3] * 1.1, p[3] * 0.95, p[3] * 1.1)); inst(deadGeo, T.dead); inst(cactusGeo, T.cactus);
   inst(rockGeo, T.rock, (o, p) => { o.scale.set(p[3], p[3] * 0.7, p[3] * 0.85); o.rotation.set(p[3] * 3, p[0], p[3] * 2); }); inst(spikeGeo, T.spike, (o, p) => o.rotation.set((p[0] % 1) * 0.3, p[2], 0)); inst(reedGeo, T.reed, null, false);
 }

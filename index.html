@@ -154,7 +154,7 @@
   #load[hidden]{display:none}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261104i", "./src/dungeon.js": "./src/dungeon.js?v=20261104i", "./src/dev.js": "./src/dev.js?v=20261104i", "./src/clock.js": "./src/clock.js?v=20261104i", "./src/coop.js": "./src/coop.js?v=20261104i", "./src/content.js": "./src/content.js?v=20261104i", "./src/engine.js": "./src/engine.js?v=20261104i", "./src/items.js": "./src/items.js?v=20261104i", "./src/keys.js": "./src/keys.js?v=20261104i", "./src/main.js": "./src/main.js?v=20261104i", "./src/models.js": "./src/models.js?v=20261104i", "./src/nav.js": "./src/nav.js?v=20261104i", "./src/quests.js": "./src/quests.js?v=20261104i", "./src/rimdata.js": "./src/rimdata.js?v=20261104i", "./src/state.js": "./src/state.js?v=20261104i", "./src/util.js": "./src/util.js?v=20261104i", "./src/world.js": "./src/world.js?v=20261104i", "./src/worlddata.js": "./src/worlddata.js?v=20261104i", "./src/mobs.js": "./src/mobs.js?v=20261104i", "./src/dgmech.js": "./src/dgmech.js?v=20261104i", "./src/avatar.js": "./src/avatar.js?v=20261104i", "./src/glb.js": "./src/glb.js?v=20261104i", "./src/beasts.js": "./src/beasts.js?v=20261104i" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261105d", "./src/dungeon.js": "./src/dungeon.js?v=20261105d", "./src/dev.js": "./src/dev.js?v=20261105d", "./src/clock.js": "./src/clock.js?v=20261105d", "./src/coop.js": "./src/coop.js?v=20261105d", "./src/content.js": "./src/content.js?v=20261105d", "./src/engine.js": "./src/engine.js?v=20261105d", "./src/items.js": "./src/items.js?v=20261105d", "./src/keys.js": "./src/keys.js?v=20261105d", "./src/main.js": "./src/main.js?v=20261105d", "./src/models.js": "./src/models.js?v=20261105d", "./src/nav.js": "./src/nav.js?v=20261105d", "./src/quests.js": "./src/quests.js?v=20261105d", "./src/rimdata.js": "./src/rimdata.js?v=20261105d", "./src/state.js": "./src/state.js?v=20261105d", "./src/util.js": "./src/util.js?v=20261105d", "./src/world.js": "./src/world.js?v=20261105d", "./src/worlddata.js": "./src/worlddata.js?v=20261105d", "./src/mobs.js": "./src/mobs.js?v=20261105d", "./src/dgmech.js": "./src/dgmech.js?v=20261105d", "./src/avatar.js": "./src/avatar.js?v=20261105d", "./src/glb.js": "./src/glb.js?v=20261105d", "./src/beasts.js": "./src/beasts.js?v=20261105d", "./src/nature.js": "./src/nature.js?v=20261105d", "./src/buildings.js": "./src/buildings.js?v=20261105d", "./src/dgkit.js": "./src/dgkit.js?v=20261105d" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -182,7 +182,7 @@
 <div id="bigmap" hidden><div class="mbox"><div class="mhead"><b id="mapTitle">World map</b><span class="muted">M or Esc to close · mouse wheel to zoom</span></div><canvas id="mapcv"></canvas></div></div>
 <div id="gmenu" hidden><div class="box"><h2>Menu</h2>
   <button data-g="map">World map</button><button data-g="quests">Quests</button><button data-g="char">Character</button><button data-g="bag">Bag</button><button data-g="spells">Spellbook</button>
-  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="threat">Threat meter <small id="gthr">On</small></button><button data-g="coop">Co-op</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
+  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="threat">Threat meter <small id="gthr">On</small></button><button data-g="gfx">Graphics <small id="ggfx">Medium</small></button><button data-g="coop">Co-op</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
 <div id="panel" hidden><div class="tabs"><button data-tab="quests">Quests</button><button data-tab="char">Character</button><button data-tab="bag">Bag</button><button data-tab="spells">Spellbook</button><button data-tab="tal">Talents</button><button data-tab="keys">Keys</button><button data-tab="coop">Co-op</button><button class="x" title="Close (Esc)">✕</button></div><div id="pbody"></div></div>
 <div id="chars" hidden><div class="box">
   <h1>Rimfrost 2</h1>
@@ -197,6 +197,6 @@
 </div></div>
 <div id="ghostbar" hidden></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261104i"></script>
+<script type="module" src="./src/main.js?v=20261105d"></script>
 </body>
 </html>

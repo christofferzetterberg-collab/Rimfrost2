@@ -4,6 +4,7 @@
 // the Frost Vault (4000, Frostcrown) and the Draug King's crypt (5000, Mistmarsh).
 import * as THREE from "three";
 import {DG_DOORS} from "./worlddata.js";
+import {kitReady, kitInstances, DG_LOOK} from "./dgkit.js";
 
 export const inDungeon = x => x > 500;
 export const regionOf = x => x > 500 ? Math.floor(x / 1000) : 0;          // 0 = the open world, 1–5 = a dungeon
@@ -412,6 +413,32 @@ export const dgBlocked = (x, z, r) => { const d = dungeonAt(x); return !d || d.b
 export const dgLos = (ax, az, bx, bz) => { const d = dungeonAt(ax); return !!d && d === dungeonAt(bx) && d.los(ax, az, bx, bz); };
 export const dgNavGrids = () => DUNGEONS.map(d => d.navGrid());
 
+// KayKit floors, walls, pillars and props for one dungeon (the walls stand on the edges between wall and floor tiles)
+const hash = (i, j, k = 0) => ((i * 73856093) ^ (j * 19349663) ^ (k * 83492791)) >>> 0;
+function kitDungeon(d, g, L, floors, walls, pillars, tint){
+  const T = d.T, Y = d.floorY, s = T / 4, groups = {}, add = (name, p) => (groups[name] = groups[name] || []).push(p), c = new THREE.Color();
+  for(const [i, j] of floors){ const k = d.kind(i, j), t = tint[k], ctr = d.tileCenter(i, j), h = hash(i, j);
+    const col = t ? c.setHSL(t[0], Math.min(0.5, t[1] + 0.1), Math.min(0.85, t[2] + 0.4)).getHex() : new THREE.Color(L.floorTint).multiplyScalar(0.94 + (h % 5) * 0.03).getHex();
+    add(L.floor[h % 16 === 0 ? 1 : 0], {x: ctr.x, y: Y - 0.04, z: ctr.z, ry: (h % 4) * Math.PI / 2, s, c: col}); }
+  const DIRS = [[0, 1, 0], [0, -1, Math.PI], [1, 0, Math.PI / 2], [-1, 0, -Math.PI / 2]], open = (i, j) => d.kind(i, j) !== "#";
+  const top = [];
+  for(let j = 0; j < d.H; j++) for(let i = 0; i < d.W; i++) if(d.kind(i, j) === "#"){ const ctr = d.tileCenter(i, j); top.push({x: ctr.x, y: Y + 2.45, z: ctr.z, s: [T, 0.1, T]}); }
+  for(const [i, j] of walls){ const ctr = d.tileCenter(i, j);
+    for(const [di, dj, ry] of DIRS){ if(!open(i + di, j + dj)) continue; const h = hash(i, j, di * 3 + dj + 5), off = T / 2 - s * 0.5;
+      const name = h % 7 === 0 ? L.wall[1 + (h >> 3) % (L.wall.length - 1)] : L.wall[0];
+      add(name, {x: ctr.x + di * off, y: Y - 0.05, z: ctr.z + dj * off, ry, s, c: new THREE.Color(L.wallTint).multiplyScalar(0.92 + (h % 4) * 0.04).getHex()}); } }
+  for(const [i, j] of pillars){ const ctr = d.tileCenter(i, j); add(L.pillar, {x: ctr.x, y: Y, z: ctr.z, ry: 0, s: 0.72, c: L.wallTint}); }
+  // props along the walls, away from doors, lights and where the monsters stand
+  const quiet = (i, j) => { for(let b = -1; b <= 1; b++) for(let a = -1; a <= 1; a++) if(!".r#".includes(d.kind(i + a, j + b))) return false; return true; };
+  for(const [i, j] of floors){ const k = d.kind(i, j); if((k !== "." && k !== "r") || hash(i, j, 7) % 9 || !quiet(i, j)) continue;
+    const ws = DIRS.filter(([di, dj]) => !open(i + di, j + dj)); if(ws.length !== 1) continue;
+    const [di, dj, ry] = ws[0], ctr = d.tileCenter(i, j), name = L.props[hash(i, j, 3) % L.props.length], big = name === "rubble_half" || name === "box_stacked";
+    add(name, {x: ctr.x + di * T * 0.18, y: Y, z: ctr.z + dj * T * 0.18, ry: ry + Math.PI + ((hash(i, j, 5) % 5) - 2) * 0.15, s: big ? 0.42 : 0.55}); }
+  for(const [name, list] of Object.entries(groups)) kitInstances(g, name, list, {shadow: !name.startsWith("floor")});
+  // dark caps on top of the wall tiles
+  const cap = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({color: new THREE.Color(L.wallTint).multiplyScalar(0.16)}), top.length), o = new THREE.Object3D();
+  top.forEach((p, k) => { o.position.set(p.x, p.y, p.z); o.scale.set(...p.s); o.updateMatrix(); cap.setMatrixAt(k, o.matrix); }); cap.computeBoundingSphere(); g.add(cap);
+}
 // build every dungeon's floor, walls, braziers and features (once)
 export function buildDungeons(scene){
   const out = [], lam = c => new THREE.MeshLambertMaterial({color: c, flatShading: true});
@@ -425,12 +452,15 @@ export function buildDungeons(scene){
     const o = new THREE.Object3D(), col = new THREE.Color();
     const inst = (geo, mat, list, place) => { const m = new THREE.InstancedMesh(geo, mat, Math.max(1, list.length)); m.count = list.length; list.forEach((t, k) => { place(t, k); o.updateMatrix(); m.setMatrixAt(k, o.matrix); }); g.add(m); return m; };
     const tint = {"~": [0.55, 0.35, 0.22], i: [0.55, 0.35, 0.82], w: [0.56, 0.3, 0.74], r: [0.09, 0.14, 0.24], v: [0.02, 0.1, 0.12], "=": [0.08, 0.16, 0.24], "|": [0.08, 0.16, 0.24]};
+    const L = kitReady() && DG_LOOK[d.id];
+    if(L) kitDungeon(d, g, L, floors, walls, pillars, tint);
+    else {
     const fm = inst(new THREE.BoxGeometry(T, 0.2, T), lam(0xffffff), floors, ([i, j], k) => { const c = d.tileCenter(i, j); o.position.set(c.x, Y - 0.1, c.z); o.scale.set(1, 1, 1); o.rotation.set(0, 0, 0); });
     const fm_col = []; floors.forEach(([i, j]) => { const t = tint[d.kind(i, j)] || d.floor; fm_col.push(new THREE.Color().setHSL(t[0], t[1], t[2] + ((i * 7 + j * 13) % 5) * 0.015)); });
     fm_col.forEach((c, k) => fm.setColorAt(k, c)); fm.receiveShadow = true;
     const wm = inst(new THREE.BoxGeometry(T, 2.2, T), lam(0xffffff), walls, ([i, j]) => { const c = d.tileCenter(i, j); o.position.set(c.x, Y + 1.1, c.z); o.scale.set(1, 1 + ((i * 5 + j * 3) % 4) * 0.06, 1); });
-    walls.forEach(([i, j], k) => { col.setHSL(d.wall[0], d.wall[1], d.wall[2] + ((i * 3 + j * 11) % 5) * 0.02); wm.setColorAt(k, col); }); wm.castShadow = true; wm.receiveShadow = true;
-    if(pillars.length){ const pm = inst(new THREE.CylinderGeometry(0.75, 0.9, 3, 8), lam(new THREE.Color().setHSL(d.wall[0], d.wall[1], d.wall[2] + 0.08).getHex()), pillars, ([i, j]) => { const c = d.tileCenter(i, j); o.scale.set(1, 1, 1); o.position.set(c.x, Y + 1.5, c.z); }); pm.castShadow = true; }
+    walls.forEach(([i, j], k) => { col.setHSL(d.wall[0], d.wall[1], d.wall[2] + ((i * 3 + j * 11) % 5) * 0.02); wm.setColorAt(k, col); }); wm.castShadow = true; wm.receiveShadow = true; }
+    if(pillars.length && !L){ const pm = inst(new THREE.CylinderGeometry(0.75, 0.9, 3, 8), lam(new THREE.Color().setHSL(d.wall[0], d.wall[1], d.wall[2] + 0.08).getHex()), pillars, ([i, j]) => { const c = d.tileCenter(i, j); o.scale.set(1, 1, 1); o.position.set(c.x, Y + 1.5, c.z); }); pm.castShadow = true; }
     let lavaMat = null; if(lava.length){ lavaMat = new THREE.MeshLambertMaterial({color: 0xff5a1a, emissive: 0xff3a0a, emissiveIntensity: 0.9, flatShading: true});
       inst(new THREE.BoxGeometry(T, 0.2, T), lavaMat, lava, ([i, j]) => { const c = d.tileCenter(i, j); o.scale.set(1, 1, 1); o.position.set(c.x, Y - 0.35, c.z); }); }
     let waterMat = null; if(water.length){ waterMat = new THREE.MeshLambertMaterial({color: 0x2f7fb0, emissive: 0x0a3050, emissiveIntensity: 0.3, transparent: true, opacity: 0.6, depthWrite: false});

@@ -61,7 +61,8 @@ export function build(asset){
       let m; if(n.skin != null){ m = new THREE.SkinnedMesh(g, material); const s = asset.skins[n.skin], bones = s.joints.map(j => objs[j]);
         const inv = s.ibm ? s.joints.map((_, k) => new THREE.Matrix4().fromArray(s.ibm, k * 16)) : undefined; m.bind(new THREE.Skeleton(bones, inv), objs[i].matrixWorld); }
       else m = new THREE.Mesh(g, material);
-      m.name = san(json.meshes[n.mesh].name); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; objs[i].add(m); meshes.push(m); } });
+      m.name = san(json.meshes[n.mesh].name); m.castShadow = true; m.receiveShadow = true; objs[i].add(m); meshes.push(m);
+      if(m.isSkinnedMesh){ if(!g.boundingSphere) g.computeBoundingSphere(); m.boundingSphere = g.boundingSphere.clone(); m.boundingSphere.radius *= 1.6; } } });   // a fixed, roomy sphere, so animated models are skipped when off screen
   root.userData.nodes = Object.fromEntries(objs.map(o => [o.name, o])); root.userData.meshes = meshes;
   return root;
 }

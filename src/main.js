@@ -7,6 +7,9 @@ import {KINDS, SPAWNS, ZONE_MOB_MULT, FIXED} from "./mobs.js";
 import {DUNGEONS, DG_VER, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
 import {initMech, updMech, envSpeed, onIce} from "./dgmech.js";
 import {preloadAvatars, makeAvatar} from "./avatar.js";
+import {preloadNature} from "./nature.js";
+import {preloadBuildings} from "./buildings.js";
+import {preloadKit} from "./dgkit.js";
 import {preloadBeasts} from "./beasts.js";
 import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
@@ -26,7 +29,7 @@ const {blocked, tryMove, distU, sees, withPx} = G;
 const renderer = new THREE.WebGLRenderer({antialias: true});
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
@@ -38,7 +41,16 @@ const sun = new THREE.DirectionalLight(0xfff1d6, 2.0);
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, {left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 140}); sun.shadow.bias = -0.0005;
 scene.add(sun, sun.target);
+// graphics quality (Esc menu): resolution, shadows and how far away people and monsters are drawn
+const GFX_LEVELS = {low: {name: "Low", pr: 1, shadow: 0, area: 0, view: 60}, medium: {name: "Medium", pr: 1.25, shadow: 1024, area: 32, view: 72}, high: {name: "High", pr: 2, shadow: 2048, area: 40, view: 85}};
+const GFX_KEY = "rimfrost2_gfx"; let GFX = GFX_LEVELS.medium, frameNo = 0;
+function applyGfx(id){ GFX = GFX_LEVELS[id] || GFX_LEVELS.medium; GFX.id = GFX_LEVELS[id] ? id : "medium"; try{ localStorage.setItem(GFX_KEY, GFX.id); }catch(e){}
+  renderer.setPixelRatio(Math.min(GFX.pr, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight); sun.castShadow = GFX.shadow > 0;
+  if(GFX.shadow && sun.shadow.mapSize.x !== GFX.shadow){ sun.shadow.mapSize.set(GFX.shadow, GFX.shadow); if(sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; } }
+  Object.assign(sun.shadow.camera, {left: -GFX.area, right: GFX.area, top: GFX.area, bottom: -GFX.area}); sun.shadow.camera.updateProjectionMatrix(); }
+{ let g = null; try{ g = localStorage.getItem(GFX_KEY); }catch(e){} applyGfx(g || "medium"); }
 addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+await Promise.all([preloadNature().catch(e => console.warn("New nature models not loaded:", e)), preloadBuildings().catch(e => console.warn("Building models not loaded:", e)), preloadKit().catch(e => console.warn("Dungeon models not loaded:", e))]);      /* KayKit trees and rocks (else the old shapes) */
 const {terrain, water} = buildWorld(scene);
 ["horse", "gray"].forEach((k, i) => { const s = STABLE_HORSES[i]; if(!s) return; const g = makeMount(MOUNTS[k]); g.position.set(s.x, height(s.x, s.z), s.z); g.rotation.y = s.rot; scene.add(g); });   /* horses in Rimhaven's stable */
 // ---------------------------------------------------------------- the people in the towns and camps
@@ -403,11 +415,12 @@ function unstuck(dt, ok){
       if(!reachable(x, z) || blocked(x, z, x, z, P.r)) continue; const d = Math.hypot(x - P.x, z - P.z); if(d < bd){ bd = d; best = {x, z}; } }
     if(best){ P.x = best.x; P.z = best.z; P.dest = null; marker.visible = false; return; } } }
 // the Esc menu
-function openGameMenu(){ closePanel(); $("gmenu").hidden = false; $("gthr").textContent = THREAT_ON ? "On" : "Off"; updHelp(); }
+function openGameMenu(){ closePanel(); $("gmenu").hidden = false; updHelp(); $("gthr").textContent = THREAT_ON ? "On" : "Off"; $("ggfx").textContent = GFX.name; }
 function closeGameMenu(){ $("gmenu").hidden = true; }
 document.querySelectorAll("#gmenu [data-g]").forEach(b => b.onclick = () => { const g = b.dataset.g; closeGameMenu();
   if(g === "map"){ toggleMap(); return; }
   if(g === "threat"){ THREAT_ON = !THREAT_ON; try{ localStorage.setItem(THREAT_KEY, THREAT_ON ? "1" : "0"); }catch(e){} log(`Threat meter ${THREAT_ON ? "enabled" : "disabled"}.`, "#9fd6e8"); return; }
+  if(g === "gfx"){ const ids = Object.keys(GFX_LEVELS), next = ids[(ids.indexOf(GFX.id) + 1) % ids.length]; applyGfx(next); log(`Graphics quality: ${GFX.name}.`, "#9fd6e8"); openGameMenu(); return; }
   if(g === "logout"){ CO.leave(true); showChars(); } else if(g !== "resume") togglePanel(g); });
 document.querySelectorAll("#panel .tabs button[data-tab]").forEach(b => b.onclick = () => togglePanel(b.dataset.tab));
 document.querySelector("#panel .tabs .x").onclick = closePanel;
@@ -848,7 +861,7 @@ addEventListener("blur", () => down.clear());
 addEventListener("wheel", e => { if(running && !e.target.closest("#panel") && $("bigmap").hidden) cam.distT = clamp(cam.distT + Math.sign(e.deltaY) * 3, 12, 48); }, {passive: true});
 const actionLabel = a => { for(const [, list] of K.ACTIONS) for(const [id, label] of list) if(id === a) return label; return a; };
 // the short help box in the corner always shows your current keys
-function updHelp(){ for(const b of document.querySelectorAll("#gmenu [data-g]")){ const a = b.dataset.g; if(!b.dataset.label) b.dataset.label = b.textContent;
+function updHelp(){ for(const b of document.querySelectorAll("#gmenu [data-g]")){ const a = b.dataset.g; if(!b.dataset.label) b.dataset.label = b.innerHTML;
   b.innerHTML = b.dataset.label + (K.binds[a] && K.binds[a][0] ? ` <small>${K.keyOf(a)}</small>` : ""); } }
 const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
 const marker = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55, 20), new THREE.MeshBasicMaterial({color: 0xffe08a, transparent: true, opacity: 0.9}));
@@ -1048,7 +1061,7 @@ function updHUD(dt){
   const c = S.cur;
   $("plvl").textContent = "Level " + c.level; $("phpi").style.width = (P.hp / P.maxHp * 100) + "%"; $("phpt").textContent = `${Math.ceil(P.hp)} / ${P.maxHp}`;
   const rt = G.resType(), rmax = G.maxRes(rt); $("presi").style.width = (P[rt] / rmax * 100) + "%"; $("presi").style.background = `var(--${rt})`; $("prest").textContent = `${Math.floor(P[rt])} / ${rmax}`;
-  { const html = P.form === "cat" ? Array.from({length: 5}, (_, i) => `<i class="${i < P.cp ? "on" : ""}"></i>`).join("") : ""; if($("pcp").innerHTML !== html) $("pcp").innerHTML = html; }
+  { const html = P.form === "cat" || S.cur.cls === "rogue" ? Array.from({length: 5}, (_, i) => `<i class="${i < P.cp ? "on" : ""}"></i>`).join("") : ""; if($("pcp").innerHTML !== html) $("pcp").innerHTML = html; }
   setAuras($("pbuffs"), playerAuras());
   // your pet: its health and rage (bear) or energy (wolf), under your frame
   { const pt = G.PET_CLASSES.has(c.cls) ? G.getPet() : null; $("ppet").hidden = !pt; $("ppet").classList.toggle("sel", G.petSelected()); if(pt) setAuras($("ppetb"), petAurasHUD());
@@ -1251,7 +1264,7 @@ function update(dt){
   // monsters: only the ones near you (or a friend) are drawn and move about
   { const rs = CO.visible(), reg0 = curDungeon();
     for(const m of mobs){ const d = Math.hypot(m.x - P.x, m.z - P.z), dr = rs.length ? Math.min(...rs.map(r => Math.hypot(m.x - r.x, m.z - r.z))) : 1e9;
-      m.far = Math.min(d, dr) > 110 && m.state === "idle"; const show = running && d < (P.ghost ? GHOST_SIGHT : 80) && dungeonAt(m.x) === reg0;
+      m.far = Math.min(d, dr) > 110 && m.state === "idle"; const show = running && d < (P.ghost ? GHOST_SIGHT : GFX.view) && dungeonAt(m.x) === reg0;
       if(show !== m.inScene){ m.inScene = show; if(show) scene.add(m.mesh); else scene.remove(m.mesh); } } }
   for(const m of mobs) updMob(m, dt); separate();
   if(running && !inCrypt() && (exploreT -= dt) <= 0){ exploreT = 0.4; Q.questExplore(P.x, P.z); }
@@ -1260,7 +1273,8 @@ function update(dt){
   if(running && P.pendingUse && !P.dead){ if(!P.dest) P.pendingUse = null; else if(distU(P, P.pendingUse) < USE_RANGE){ const n = P.pendingUse; P.dest = null; marker.visible = false; useThing(n); } }
   if(talkNpc && distU(P, talkNpc) > 7) closePanel();
   for(const n of npcs){ const d = distU(P, n), want = talkNpc === n && running && !P.dead ? Math.atan2(P.x - n.x, P.z - n.z) : n.rot0;   // people only turn to you while you talk to them
-    n.mesh.visible = !P.ghost || d < GHOST_SIGHT; let dr = want - n.mesh.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); n.mesh.rotation.y += dr * Math.min(1, dt * 4); n.mesh.userData.animate(0, false, 0, null); }
+    n.mesh.visible = d < GFX.view && (!P.ghost || d < GHOST_SIGHT); if(!n.mesh.visible) continue;          // people far away are not drawn or animated
+    let dr = want - n.mesh.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); n.mesh.rotation.y += dr * Math.min(1, dt * 4); if(d < 30 || (frameNo + n.mesh.id) % 2 === 0) n.mesh.userData.animate(0, false, 0, null); }
   needSet = running ? Q.neededItems() : new Set(); mobNeedSet = running ? Q.neededMobs() : new Set();
   for(const n of nodes){ if(!n.active){ n.respawn -= dt; if(n.respawn <= 0) n.active = true; }
     const need = needSet.has(n.item), gath = running && Q.gatherReq(n.item) && Q.canGather(n.item) === true;
@@ -1288,7 +1302,10 @@ function update(dt){
     if(ins){ torch.position.set(P.x, height(P.x, P.z) + 3.5, P.z); for(const db of dgBuilt) for(const b of db.braziers) b.fire.scale.setScalar(0.85 + Math.sin(now * 9 + b.x) * 0.15); } }
   { const pt = G.getPet(); if(pt){ pt.mesh.visible = !(pt.dead && pt.deadT > 3); pt.mesh.position.set(pt.x, height(pt.x, pt.z), pt.z); pt.mesh.rotation.set(0, pt.rot, pt.dead ? Math.min(1.4, pt.deadT * 4) : 0);
     pt.mesh.userData.animate(pt.walk, pt.moving, pt.attackAnim); } }
-  for(const m of mobs){ if(!m.inScene || (m.dead && m.deadT > 4)) continue; m.mesh.position.set(m.x, height(m.x, m.z), m.z); m.mesh.rotation.y = m.rot; m.mesh.userData.animate(m.walk, m.moving, m.attackAnim, null, {dead: m.dead, kind: m.mesh.userData.caster ? "cast" : "melee"});
+  frameNo++;
+  for(const m of mobs){ if(!m.inScene || (m.dead && m.deadT > 4)) continue; m.mesh.position.set(m.x, height(m.x, m.z), m.z); m.mesh.rotation.y = m.rot;
+    if(!m.dead && !m.moving && m.attackAnim <= 0 && Math.hypot(m.x - P.x, m.z - P.z) > 30 && (frameNo + m.mesh.id) % 2) continue;   // far, idle monsters animate every other frame
+    m.mesh.userData.animate(m.walk, m.moving, m.attackAnim, null, {dead: m.dead, kind: m.mesh.userData.caster ? "cast" : "melee"});
     m.mesh.traverse(o => { if(o.isMesh){ if(m.flash > 0 && !o.userData.fl){ o.userData.fl = o.material; o.material = o.material.clone(); if(o.material.emissive) o.material.emissive.setHex(0x883322); } else if(m.flash <= 0 && o.userData.fl){ o.material = o.userData.fl; o.userData.fl = null; } } }); }
   G.updFx(dt);
   // the ring under your target: pulsing red while you attack it, calm yellow when you don't, green for a friend
@@ -1315,7 +1332,8 @@ function update(dt){
 function loop(t){
   const dt = Math.min(0.05, (t - last) / 1000); last = t;
   if(DEV.sim){ requestAnimationFrame(loop); return; }                       // the balance test runs the game on its own
-  update(dt); updHUD(dt); if(running) drawMinimap(); if(!$("bigmap").hidden) drawBigMap(); renderer.render(scene, camera);
+  update(dt); updHUD(dt); if(running) drawMinimap(); if(!$("bigmap").hidden) drawBigMap(); { const far = Math.max(60, scene.fog.far + 12); if(Math.abs(camera.far - far) > 2){ camera.far = far; camera.updateProjectionMatrix(); } }   // nothing past the fog is drawn
+  renderer.render(scene, camera);
   frames++; fpsT += dt; if(fpsT > 1){ fpsEl.textContent = frames + " fps"; frames = 0; fpsT = 0; }
   requestAnimationFrame(loop);
 }
@@ -1331,5 +1349,5 @@ initDev({update, save, refresh, buildBar, buildHero, hubSpot, log, arena: ARENA,
   makeMob: (kind, p, lvl) => { const m = makeMob(kind, p, lvl, rng(7)); m.dev = true; return m; },
   removeMob: m => { const i = mobs.indexOf(m); if(i >= 0) mobs.splice(i, 1); scene.remove(m.mesh); const pl = plates.get(m); if(pl){ pl.remove(); plates.delete(m); } if(P.target === m) P.target = null; },
   restore: c => { G.clearFx(); play(c); }});
-window.R2 = {setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
+window.R2 = {renderer, setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
 requestAnimationFrame(loop);

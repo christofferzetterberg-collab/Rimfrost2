@@ -49,7 +49,10 @@ Open the game with `?dev` at the end of the address (for example http://localhos
 - **PeerJS** (`lib/peerjs.min.js`): MIT License, Copyright © 2015 Michelle Bu and Eric Zhang (see `lib/PEERJS-LICENSE.txt`).
 - Races, classes, abilities and ability icons come from Rimfrost 1 (`src/rimdata.js`); the world, monsters, people and quests too (`src/worlddata.js`, `src/mobs.js`, `src/content.js`).
 - Character, monster and weapon models: **KayKit** by Kay Lousberg (www.kaylousberg.com), CC0 (`assets/kaykit`).
+- Tree, rock and bush models: **KayKit Forest Nature Pack** by Kay Lousberg, CC0 (`assets/nature`).
+- Building and prop models: **KayKit Medieval Hexagon Pack** by Kay Lousberg, CC0 (`assets/buildings`).
+- Dungeon models: **KayKit Dungeon Pack** by Kay Lousberg, CC0 (`assets/dungeon`).
 - Animal and monster models: **Quaternius** (quaternius.com), CC0: wolf, fox, deer, stag, cat, spider, rat, dragon and goblin (`assets/animals`).
 - [Black bear](https://poly.pizza/m/56ym_pyVnel), [Boar](https://poly.pizza/m/57fSWum6F1P), [Beetle](https://poly.pizza/m/4yufxgZ1QQ2) and [Rabbit](https://poly.pizza/m/9OBTRVYUSmt) by [Poly by Google](https://poly.pizza/u/Poly%20by%20Google), [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/), via Poly Pizza. Rigged and animated for the game.
 - [Scorpion](https://poly.pizza/m/cJfrRPiSgA4) by [jeremy](https://poly.pizza/u/jeremy), [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/), via Poly Pizza. Rigged and animated for the game.
-- Houses, trees and the remaining shapes are made from simple shapes in code.
+- The stable, braziers, gates and the remaining scenery are made from simple shapes in code.

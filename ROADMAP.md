@@ -272,7 +272,10 @@ Numbered so we can refer to them. Tick them off as they get done.
     - [x] Golems, trolls and giants, ghouls, cultists and witches, guardians and the dungeon bosses (KayKit Mystery Monthly characters)
     - [x] Bears (and Bear Form), boars, spiders, beetles, scorpions, drakes and gargoyles, kobolds and goblins, hares and rats
     - [ ] Wisps and spirits stay as glowing effects
-  - [ ] Step 7: environment (trees, rocks, buildings, dungeon walls)
+  - [x] Step 7: environment (trees, rocks, buildings, dungeon walls)
+    - [x] Trees, rocks and bushes (KayKit Forest Nature Pack)
+    - [x] Buildings (KayKit Medieval Hexagon Pack)
+    - [x] Dungeon walls and props (KayKit Dungeon Pack)
 
 ## Ideas to investigate
 
