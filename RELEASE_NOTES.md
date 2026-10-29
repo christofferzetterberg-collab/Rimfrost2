@@ -1,5 +1,54 @@
 # Rimfrost 2 – Release notes
 
+## v0.24.0
+
+### New
+- **Bear Form** and the hunter's bear have a new animated bear model.
+- **New monster models:**
+  - **Bears:** Ice Bears, Plague Bears, the Cave Bear and the Vault Ice Bear.
+  - **Boars:** Wild Boars, Bristleboars and Crag Boars.
+  - **Spiders and insects:** Forest and Mine Spiders, Thorn Creepers, Stone Beetles and Scorpions.
+  - **Drakes:** the Marsh Drake, and winged drakes for the Ash and Magma Gargoyles.
+  - **Kobolds and goblins:** every kobold and goblin, including Foreman Krakk and Snorre the Kobold King.
+  - **Critters:** hares and Grave Rats.
+- Bear, boar, beetle and rabbit models by Poly by Google, and scorpion model by jeremy (CC-BY 3.0, via Poly Pizza). Spider, rat, dragon and goblin models by Quaternius (CC0).
+
+## v0.23.0
+
+### New
+- **More monsters with new models:**
+  - **Golems:** Stone, Sand and Ice Golems, the Stone Sentinel, Forgemaster Ignar, the Magma Lord and the Fire Tyrant, each in its own stone, sand, ice or fire.
+  - **Trolls and giants:** Warlord Garuk, Rime Trolls, Skrymer, Hrimgar the Ice Giant and the Bull from the Deep.
+  - **Ghouls:** Marsh Ghouls, Crypt Ghouls and Morvel the Nightwatcher.
+  - **Casters:** Marsh Cultists, Hagga the Marsh Witch, Skadi the Ice Queen and the Sunken Prophet.
+  - **Others:** the Drowned One, Forge Slaves, Temple Guardians, Vault Guardians and the Draug King.
+
+## v0.22.0
+
+### New
+- **Town folk** now use the new character models, with models matching their trade and varied colours.
+- **New monster models:**
+  - All wolves, including Old Gray, Shadow Wolves, Plague Wolves, Ash Hounds, Frost Wolves, Ember Hounds and Frost Wargs, coloured to match their kind.
+  - Forest Foxes, Steppe Jackals and Red Deer (does and stags).
+  - Barn Thieves, Bandits, Grave Robbers, Canyon Raiders, Lost Druids and Ironclan Warriors.
+  - Chieftain Grimm, now a towering barbarian.
+  - Shambling Skeletons, Bone Guardians, Vex the Necromancer, Draug Warriors and Crypt Priests.
+- Monsters with new models play a death animation when slain.
+
+## v0.21.0
+
+### New
+- **Druids** have their own model: an antlered hood and a druid staff.
+- **Imp:** new animated model with horns and a tail.
+- **Voidwalker:** new animated model, a hulking shadow golem.
+- **Wolves:** a new model for the hunter's wolf and Wolf Form, with running and bite animations.
+
+## v0.20.2
+
+### Fixed
+- Orc and undead characters now have dark hair on every model. Hair was sometimes coloured like the skin.
+- Bows are held the right way round, with the string facing the archer.
+
 ## v0.20.1
 
 ### New

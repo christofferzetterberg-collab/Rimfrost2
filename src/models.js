@@ -1,6 +1,6 @@
 // Low-poly characters and monsters built from simple shapes. Each model has an animate(walk, moving, attack) function.
 import * as THREE from "three";
-import {makeAvatar} from "./avatar.js";
+import {makeAvatar, makeCreature} from "./avatar.js";
 import {makeAnimal} from "./beasts.js";
 
 const mats = new Map();
@@ -171,7 +171,7 @@ export const makeDraug = (o = {}) => { const g = makeSkeleton(Object.assign({ski
   for(let k = 0; k < 5; k++){ const sp = part(new THREE.ConeGeometry(0.05, 0.18, 4), 0xd8b04a, Math.cos(k * 1.26) * 0.22, 2.27, Math.sin(k * 1.26) * 0.22); g.children[0].add(sp); }
   const s2 = o.scale || 2.0; g.scale.setScalar(s2); g.userData.height *= s2; return g; };
 // druid shapes
-export const makeBearForm = () => makeBeast({w: 0.95, h: 0.9, l: 1.5, legH: 0.5, head: 0.6, color: 0x6a4a30, snout: 0x9a7a58, leg: 0x4e3622, ears: true, tail: 0.15});
+export const makeBearForm = () => makeAnimal("bearForm") || makeBeast({w: 0.95, h: 0.9, l: 1.5, legH: 0.5, head: 0.6, color: 0x6a4a30, snout: 0x9a7a58, leg: 0x4e3622, ears: true, tail: 0.15});
 export const makeWolfForm = race => makeAnimal("wolfForm", race) || makeBeast({w: 0.55, h: 0.55, l: 1.3, legH: 0.55, head: 0.45, color: 0x4a5866, snout: 0x9fb0bc, leg: 0x3a4652, ears: true, tail: 0.7});
 export const makeLeopardForm = race => makeAnimal("leopard", race) || makeBeast({w: 0.5, h: 0.48, l: 1.4, legH: 0.55, head: 0.42, color: 0xd8b04a, snout: 0xf0dca0, leg: 0xb08a34, ears: true, tail: 0.9});
 const hex = s => parseInt(s.slice(1), 16);
@@ -322,11 +322,11 @@ export function makeGargoyle(o = {}){
 }
 
 // warlock demons and shaman totems
-export function makeImp(){ const g = new THREE.Group(), h = makeHumanoid({skin: 0xc8402a, shirt: 0x8a2a1a, pants: 0x6a1a10, boots: 0x3a1a10, hair: 0x3a1a10, cape: null, eyes: 0xffd040, weaponType: null, gaunt: true});
+export function makeImp(){ const kk = makeCreature("imp"); if(kk) return kk; const g = new THREE.Group(), h = makeHumanoid({skin: 0xc8402a, shirt: 0x8a2a1a, pants: 0x6a1a10, boots: 0x3a1a10, hair: 0x3a1a10, cape: null, eyes: 0xffd040, weaponType: null, gaunt: true});
   for(const s of [-1, 1]){ const horn = part(new THREE.ConeGeometry(0.07, 0.3, 5), 0x2a1a10, s * 0.15, 2.12, 0.02); horn.rotation.z = -s * 0.4; h.children[0].add(horn);
     const wing = part(new THREE.BoxGeometry(0.5, 0.36, 0.03), 0x6a1a10, s * 0.38, 1.4, -0.24); wing.rotation.y = s * 0.5; wing.rotation.z = s * 0.3; h.children[0].add(wing); }
   g.add(h); g.scale.setScalar(0.55); g.userData.animate = (...a) => h.userData.animate(...a); g.userData.height = 1.3; return g; }
-export function makeVoidwalker(){ const g = new THREE.Group(), h = makeHumanoid({skin: 0x4a3a8a, shirt: 0x3a2a6a, pants: 0x2a1a4a, boots: 0x2a1a4a, hair: 0x2a1a4a, cape: null, eyes: 0xd0b0ff, weaponType: null, stocky: true, shoulders: 0x6a5ab0});
+export function makeVoidwalker(){ const kk = makeCreature("voidwalker"); if(kk) return kk; const g = new THREE.Group(), h = makeHumanoid({skin: 0x4a3a8a, shirt: 0x3a2a6a, pants: 0x2a1a4a, boots: 0x2a1a4a, hair: 0x2a1a4a, cape: null, eyes: 0xd0b0ff, weaponType: null, stocky: true, shoulders: 0x6a5ab0});
   for(const s of [-1, 1]) h.children[0].add(part(new THREE.BoxGeometry(0.26, 0.2, 0.26), 0x8a7ad0, s * 0.42, 0.85, 0));                    // glowing cuffs
   g.add(h); g.scale.setScalar(1.25); let t = Math.random() * 6;
   g.userData.animate = (w, mv, atk, pose) => { t += 0.03; h.userData.animate(w, mv, atk, pose); h.position.y = 0.25 + Math.sin(t * 2) * 0.08; };            // it floats

@@ -1,2 +1,13 @@
-Wolf and cat models: Animal Pack Vol. 2 by Quaternius (quaternius.com), CC0 1.0 Universal (public domain).
-Converted from FBX to glTF for Rimfrost 2.
+Models in this folder
+
+Quaternius (quaternius.com), CC0 1.0 Universal:
+- wolf2, fox, deer, stag: Ultimate Animated Animals
+- cat (and the unused wolf): Animal Pack Vol. 2
+- spider, rat, dragon, goblin (converted from FBX to glTF)
+
+CC-BY 3.0 (https://creativecommons.org/licenses/by/3.0/), via Poly Pizza. Rigged and animated for Rimfrost 2:
+- bear: "Black bear" by Poly by Google, https://poly.pizza/m/56ym_pyVnel
+- boar: "Boar" by Poly by Google, https://poly.pizza/m/57fSWum6F1P
+- beetle: "Beetle" by Poly by Google, https://poly.pizza/m/4yufxgZ1QQ2
+- hare: "Rabbit" by Poly by Google, https://poly.pizza/m/9OBTRVYUSmt
+- scorpion: "Scorpion" by jeremy, https://poly.pizza/m/cJfrRPiSgA4

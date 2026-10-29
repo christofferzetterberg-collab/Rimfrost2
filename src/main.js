@@ -6,7 +6,7 @@ import {HUBS, ZONES, LAIRS, EXPLORE, RACE_HUB, DG_DOORS} from "./worlddata.js";
 import {KINDS, SPAWNS, ZONE_MOB_MULT, FIXED} from "./mobs.js";
 import {DUNGEONS, DG_VER, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
 import {initMech, updMech, envSpeed, onIce} from "./dgmech.js";
-import {preloadAvatars} from "./avatar.js";
+import {preloadAvatars, makeAvatar} from "./avatar.js";
 import {preloadBeasts} from "./beasts.js";
 import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
@@ -45,7 +45,16 @@ const {terrain, water} = buildWorld(scene);
 const hexc = s => parseInt(s.slice(1), 16);
 await preloadAvatars().catch(e => console.warn("New character models not loaded:", e));
 await preloadBeasts().catch(e => console.warn("New animal models not loaded:", e));     /* the KayKit models: if they can't be loaded the old ones are used */
+// town folk on the KayKit models: the model follows the job, the colours vary from person to person
+const ALT = (n, h) => [null, "A", "B", "C"].map(k => k && n + "_texture_alt_" + k)[h % 4];
+function npcLook(d){ const h = [...d.id].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7), t = d.title + " " + d.name;
+  if(d.shop === "smith" || /Weapons|Smith/.test(t)) return {char: "Barbarian", alt: ALT("barbarian", h), right: "axe_1handed"};
+  if(/Alchem|Apothec|Herb|Brew|Potion/.test(t)) return {char: "Mage", alt: ALT("mage", h)};
+  if(/Ruler|Captain|Guard/.test(t)) return {char: "Knight", alt: ALT("knight", h), right: "sword_1handed", shield: "shield_badge_color", left: "shield_badge_color"};
+  if(d.role === "quest") return [{char: "Knight", alt: ALT("knight", h >> 2), right: "sword_1handed"}, {char: "Ranger", alt: ALT("ranger", h >> 2)}, {char: "Druid", alt: ALT("druid", h >> 2), right: "druid_staff"}][h % 3];
+  return [{char: "Rogue", alt: ALT("rogue", h >> 2)}, {char: "Ranger", alt: ALT("ranger", h >> 2)}][h % 2]; }
 function npcModel(d){ if(d.trains) return makeHero(d.race, d.trains, RACES);                       // trainers look like their class
+  { const kk = makeAvatar(d.race, null, {}, npcLook(d)); if(kk) return kk; }
   const R = RACES[d.race] || {}, o = {shirt: hexc(d.color), cape: null, belt: 0x4a3220, weaponType: d.shop === "smith" ? "hammer" : d.role === "quest" ? "sword" : "none"};
   if(R.skin) o.skin = hexc(R.skin); if(R.hair) o.hair = hexc(R.hair);
   if(d.race === "elf") o.ears = true; if(d.race === "orc") o.tusks = true; if(d.race === "dwarf"){ o.beard = true; o.stocky = true; } if(d.race === "undead"){ o.gaunt = true; o.eyes = 0xffe86a; }
@@ -888,7 +897,7 @@ function moveMob(m, gx, gz, speed, dt){            // walks around houses, rocks
 }
 function updMob(m, dt){
   m.flash = Math.max(0, m.flash - dt); m.attackAnim = Math.max(0, m.attackAnim - dt * 3);
-  if(m.dead){ m.deadT += dt; m.mesh.rotation.z = Math.min(1.4, m.deadT * 4);   // tips over, then sinks and respawns
+  if(m.dead){ m.deadT += dt; if(!m.mesh.userData.ownDeath) m.mesh.rotation.z = Math.min(1.4, m.deadT * 4);   // tips over, then sinks and respawns
     if(m.deadT > 4) m.mesh.position.y -= dt * 0.6; if(m.deadT > 6) m.mesh.visible = false; if(!m.dg && !CO.guestMob(m) && !(m.night && (m.nightGone || !nightNow)) && m.deadT > (m.elite ? RESPAWN_ELITE : RESPAWN)) respawn(m); return; }
   if(CO.guestMob(m)){ CO.guestUpd(m, dt); return; }                                        // a friend hosts this monster: just follow what they send
   const dp = P.dead || !running ? 1e9 : distU(m, P);
@@ -1279,7 +1288,7 @@ function update(dt){
     if(ins){ torch.position.set(P.x, height(P.x, P.z) + 3.5, P.z); for(const db of dgBuilt) for(const b of db.braziers) b.fire.scale.setScalar(0.85 + Math.sin(now * 9 + b.x) * 0.15); } }
   { const pt = G.getPet(); if(pt){ pt.mesh.visible = !(pt.dead && pt.deadT > 3); pt.mesh.position.set(pt.x, height(pt.x, pt.z), pt.z); pt.mesh.rotation.set(0, pt.rot, pt.dead ? Math.min(1.4, pt.deadT * 4) : 0);
     pt.mesh.userData.animate(pt.walk, pt.moving, pt.attackAnim); } }
-  for(const m of mobs){ if(!m.inScene || (m.dead && m.deadT > 4)) continue; m.mesh.position.set(m.x, height(m.x, m.z), m.z); m.mesh.rotation.y = m.rot; m.mesh.userData.animate(m.walk, m.moving, m.attackAnim);
+  for(const m of mobs){ if(!m.inScene || (m.dead && m.deadT > 4)) continue; m.mesh.position.set(m.x, height(m.x, m.z), m.z); m.mesh.rotation.y = m.rot; m.mesh.userData.animate(m.walk, m.moving, m.attackAnim, null, {dead: m.dead, kind: m.mesh.userData.caster ? "cast" : "melee"});
     m.mesh.traverse(o => { if(o.isMesh){ if(m.flash > 0 && !o.userData.fl){ o.userData.fl = o.material; o.material = o.material.clone(); if(o.material.emissive) o.material.emissive.setHex(0x883322); } else if(m.flash <= 0 && o.userData.fl){ o.material = o.userData.fl; o.userData.fl = null; } } }); }
   G.updFx(dt);
   // the ring under your target: pulsing red while you attack it, calm yellow when you don't, green for a friend

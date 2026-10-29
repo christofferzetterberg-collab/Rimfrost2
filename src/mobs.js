@@ -1,5 +1,7 @@
 // Rimfrost 1's monsters: names, levels, sizes, speeds and special attacks, turned into 3D models and Rimfrost 2 stats.
 import * as THREE from "three";
+import {makeAvatar} from "./avatar.js";
+import {makeMobAnimal} from "./beasts.js";
 import {makeHumanoid, makeBeast, makeSpider, makeTroll, makeCultist, makeSkeleton, makeKobold, makeGolem, makeWisp, makeCritter, makeGhoul, makeDraug, makeDrowned, makeDrake, makeGargoyle} from "./models.js";
 
 // r = size, sp = speed (Rimfrost 1 pixels), elite = strength, special = a big attack you must step away from
@@ -129,8 +131,61 @@ const LOOKS = {
   isvaktare: c => makeHumanoid({skin: 0xbfe6ff, shirt: c, pants: 0x8ab0c8, boots: 0x6a8aa0, shoulders: 0xdff4ff, helm: {type: "plate", color: 0xdff4ff}, eyes: 0x9fd6ff, cape: null, weaponType: "sword", weapon: 0xdff4ff, offhand: "shield", offColor: 0xa8d8ec}),
   skadi: c => makeHumanoid({skin: 0xd8eef6, shirt: c, robe: true, cape: 0xdff4ff, hair: 0xf4f8fa, shoulders: 0xbfe6ff, weaponType: "staff", weapon: 0x9fd6ff, helm: {type: "cloth", color: 0xbfe6ff}})
 };
+// the new models (KayKit and Quaternius): animals in the monster's colour, people and skeletons on the KayKit rig
+// kobolds and goblins: the goblin model, tinted for the kobolds (h = height at size 10)
+const GOBLINS = {troll: {h: 1.7}, goblin: {h: 1.75}, goblinshaman: {h: 1.75, tint: 0xb0a0e0}, kobold: {h: 1.8, tint: 0xd8b860}, frostkobold: {h: 1.8, tint: 0x9ac0d8}, gruvkobold: {h: 1.8, tint: 0xc9a24a}, krakk: {h: 1.9, tint: 0xe0b040}, snorre: {h: 1.95, tint: 0xe8c050}};
+const WOLVES = new Set(["wolf", "oldgray", "shadewolf", "plaguewolf", "hound", "frostwolf", "eldhund", "frostulv"]);
+const PEOPLE = {
+  thief: {char: "Rogue", alt: "rogue_texture_alt_B", right: "dagger", left: "dagger", melee: "DW"},
+  bandit: {char: "Rogue_Hooded", alt: "rogue_texture_alt_B", right: "sword_1handed", left: "dagger", melee: "DW"},
+  robber: {char: "Rogue_Hooded", right: "dagger", left: "dagger", melee: "DW"},
+  leader: {char: "Barbarian_Large", right: "axe_2handed", size: 15},
+  raider: {race: "orc", char: "Barbarian", alt: "barbarian_texture_alt_A", right: "axe_1handed"},
+  lostdruid: {race: "elf", char: "Druid", alt: "druid_texture_alt_A", right: "druid_staff", caster: true},
+  orcwar: {race: "orc", char: "Knight", alt: "knight_texture_alt_B", right: "axe_1handed", left: "shield_spikes", helm: true},
+  shambler: {char: "Skeleton_Minion"},
+  boneguard: {char: "Skeleton_Warrior", right: "Skeleton_Blade", left: "Skeleton_Shield_Small_A", helm: true},
+  vex: {char: "Necromancer", right: "Skeleton_Staff", helm: true, caster: true},
+  cryptguard: {char: "Skeleton_Warrior", alt: "skeleton_texture_B", right: "Skeleton_Axe", left: "Skeleton_Shield_Small_A", helm: true},
+  cryptpriest: {char: "Skeleton_Mage", alt: "skeleton_texture_B", right: "Skeleton_Staff", helm: true, caster: true},
+  // golems (the Frost Golem in the stone, sand or fire of their kind)
+  golem: {char: "FrostGolem", tint: [40, 0.08, 0.75], size: 15}, stenvakt: {char: "FrostGolem", tint: [30, 0.1, 0.7], size: 15}, sandgolem: {char: "FrostGolem", tint: [38, 0.35, 0.9], size: 15},
+  icegolem: {char: "FrostGolem", size: 15}, ignar: {char: "FrostGolem", tint: [18, 0.7, 0.55], glow: 0x3a0e00, size: 15},
+  magma: {char: "FrostGolem", tint: [12, 0.8, 0.5], glow: 0x5a1000, size: 15}, eldtyrann: {char: "FrostGolem", tint: [8, 0.85, 0.55], glow: 0x6a1600, size: 15},
+  // trolls and giants
+  garuk: {char: "OrcBrute", right: "Orc_Axe_Large", size: 14}, rimtroll: {char: "OrcBrute", tint: [200, 0.3, 0.85], size: 14}, skrymer: {char: "OrcBrute", tint: [200, 0.3, 0.85], right: "Orc_Axe_Large", size: 14},
+  giant: {char: "OrcBrute", tint: [195, 0.35, 0.95], alt: "orcbrute_texture_B", size: 14}, djuptjur: {char: "OrcBrute", tint: [8, 0.55, 0.55], size: 14},
+  // ghouls
+  ghoul: {char: "Monstrosity", size: 14}, cryptghoul: {char: "Monstrosity", alt: "monstrosity_texture_B", size: 14}, morvel: {char: "Monstrosity", tint: [265, 0.3, 0.6], right: "Monstrosity_Pitchfork_Large", size: 14},
+  // casters, guardians and the dungeon bosses
+  kultist: {char: "Witch", tint: [120, 0.25, 0.5], helm: true, caster: true}, hagga: {char: "Witch", right: "Broom", helm: true, caster: true},
+  skadi: {char: "Witch", tint: [200, 0.4, 0.9], helm: true, caster: true}, profeten: {char: "Lorekeeper", tint: [165, 0.4, 0.62], right: "Lorekeeper_Staff", caster: true},
+  drunknad: {char: "Skeleton_Rogue", tint: [140, 0.3, 0.7], helm: true}, smedjeorc: {char: "OrcRaider", alt: "orc_texture_A", right: "Orc_Axe"},
+  templevakt: {char: "BlackKnight", tint: [150, 0.3, 0.6], right: "BlackKnight_Sword_Large", left: "BlackKnight_Shield_Large", size: 15},
+  isvaktare: {char: "Knight", tint: [200, 0.3, 1.0], right: "sword_1handed", left: "shield_square", helm: true},
+  boss: {char: "BlackKnight", alt: "blackknight_texture_alt", right: "BlackKnight_Sword_Large", left: "BlackKnight_Shield_Large", size: 15},
+};
+function newModel(kind, d, c){
+  if(WOLVES.has(kind)) return makeMobAnimal("wolf2", 2.2 * d.r / 11, c);
+  if(kind === "lynx") return makeMobAnimal("fox", 1.6 * d.r / 11, null);
+  if(kind === "jackal") return makeMobAnimal("fox", 1.7 * d.r / 11, c);
+  if(kind === "deer") return makeMobAnimal(Math.random() < 0.4 ? "stag" : "deer", 2.5, null);
+  if(d.shape === "boar") return /Bear/.test(d.name) ? makeMobAnimal("bear", 2.6 * d.r / 14, /Ice|Vault/.test(d.name) ? 0xe4ecf0 : kind === "plaguebear" ? 0x6a8a40 : null, {flat: /Ice|Vault|Plague/.test(d.name)})
+    : makeMobAnimal("boar", 2.1 * d.r / 12, kind === "rocksvin" ? 0x9aa0a8 : null);
+  if(kind === "beetle") return makeMobAnimal("beetle", 2.0, 0xd8b890);
+  if(kind === "scorpion") return makeMobAnimal("scorpion", 2.0, c);
+  if(d.shape === "spider") return makeMobAnimal("spider", 2.1 * d.r / 11, kind === "thorn" ? 0x5f8a3a : null);
+  if(kind === "hare") return makeMobAnimal("hare", 0.85, null);
+  if(kind === "rat") return makeMobAnimal("rat", 1.1, null);
+  if(d.shape === "drake") return makeMobAnimal("dragon", 3.4 * d.r / 18, c);
+  if(kind === "gargoyle" || kind === "magmagargoyl") return makeMobAnimal("dragon", 2.4 * d.r / 12, c);
+  if(GOBLINS[kind]) return makeMobAnimal("goblin", 0, GOBLINS[kind].tint ?? null, {height: GOBLINS[kind].h * d.r / 10});
+  const P = PEOPLE[kind]; if(!P) return null;
+  const g = makeAvatar(P.race || "human", null, {}, {...P, scale: d.r / (P.size || 11)}); if(g && P.caster) g.userData.caster = true; return g;
+}
 function makeModel(kind, d){
   const c = hx(d.color), s = d.r / 11;
+  { const kk = newModel(kind, d, c); if(kk) return kk; }
   switch(d.shape){
     case "wolf": return scaled(makeBeast({w: 0.5, h: 0.5, l: 1.2, legH: 0.5, head: 0.42, color: c, snout: shade(c, 0.8), leg: shade(c, 0.8), ears: true, tail: 0.6}), s);
     case "boar": return /Bear/.test(d.name) ? scaled(makeBeast({w: 0.9, h: 0.85, l: 1.45, legH: 0.48, head: 0.58, color: c, snout: shade(c, 0.75), leg: shade(c, 0.8), ears: true, tail: 0.15}), s * 0.9)

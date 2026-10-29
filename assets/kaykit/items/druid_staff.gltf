@@ -15,13 +15,12 @@
     "nodes" : [
         {
             "mesh" : 0,
-            "name" : "quiver"
+            "name" : "druid_staff"
         }
     ],
     "materials" : [
         {
-            "doubleSided" : true,
-            "name" : "rogue",
+            "name" : "druid",
             "pbrMetallicRoughness" : {
                 "baseColorTexture" : {
                     "index" : 0
@@ -33,7 +32,7 @@
     ],
     "meshes" : [
         {
-            "name" : "quiver",
+            "name" : "druid_staff",
             "primitives" : [
                 {
                     "attributes" : {
@@ -56,69 +55,69 @@
     "images" : [
         {
             "mimeType" : "image/png",
-            "name" : "rogue_texture",
-            "uri" : "rogue_texture.png"
+            "name" : "druid_texture",
+            "uri" : "druid_texture.png"
         }
     ],
     "accessors" : [
         {
             "bufferView" : 0,
             "componentType" : 5126,
-            "count" : 386,
+            "count" : 1094,
             "max" : [
-                0.15271618962287903,
-                0.4207805097103119,
-                0.12147191166877747
+                0.3053012490272522,
+                1.3638982772827148,
+                0.33105483651161194
             ],
             "min" : [
-                -0.15271618962287903,
-                -0.5085819363594055,
-                -0.07299748808145523
+                -0.568760097026825,
+                -0.892172634601593,
+                -0.33104071021080017
             ],
             "type" : "VEC3"
         },
         {
             "bufferView" : 1,
             "componentType" : 5126,
-            "count" : 386,
+            "count" : 1094,
             "type" : "VEC2"
         },
         {
             "bufferView" : 2,
             "componentType" : 5126,
-            "count" : 386,
+            "count" : 1094,
             "type" : "VEC3"
         },
         {
             "bufferView" : 3,
             "componentType" : 5123,
-            "count" : 765,
+            "count" : 3186,
             "type" : "SCALAR"
         }
     ],
     "bufferViews" : [
         {
             "buffer" : 0,
-            "byteLength" : 4632,
+            "byteLength" : 13128,
             "byteOffset" : 0,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 3088,
-            "byteOffset" : 4632,
+            "byteLength" : 8752,
+            "byteOffset" : 13128,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 4632,
-            "byteOffset" : 7720,
+            "byteLength" : 13128,
+            "byteOffset" : 21880,
             "target" : 34962
         },
         {
             "buffer" : 0,
-            "byteLength" : 1530,
-            "byteOffset" : 12352,
+            "byteLength" : 6372,
+            "byteOffset" : 35008,
             "target" : 34963
         }
     ],
@@ -130,8 +129,8 @@
     ],
     "buffers" : [
         {
-            "byteLength" : 13884,
-            "uri" : "quiver.bin"
+            "byteLength" : 41380,
+            "uri" : "druid_staff.bin"
         }
     ]
 }

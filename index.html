@@ -154,7 +154,7 @@
   #load[hidden]{display:none}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261104d", "./src/dungeon.js": "./src/dungeon.js?v=20261104d", "./src/dev.js": "./src/dev.js?v=20261104d", "./src/clock.js": "./src/clock.js?v=20261104d", "./src/coop.js": "./src/coop.js?v=20261104d", "./src/content.js": "./src/content.js?v=20261104d", "./src/engine.js": "./src/engine.js?v=20261104d", "./src/items.js": "./src/items.js?v=20261104d", "./src/keys.js": "./src/keys.js?v=20261104d", "./src/main.js": "./src/main.js?v=20261104d", "./src/models.js": "./src/models.js?v=20261104d", "./src/nav.js": "./src/nav.js?v=20261104d", "./src/quests.js": "./src/quests.js?v=20261104d", "./src/rimdata.js": "./src/rimdata.js?v=20261104d", "./src/state.js": "./src/state.js?v=20261104d", "./src/util.js": "./src/util.js?v=20261104d", "./src/world.js": "./src/world.js?v=20261104d", "./src/worlddata.js": "./src/worlddata.js?v=20261104d", "./src/mobs.js": "./src/mobs.js?v=20261104d", "./src/dgmech.js": "./src/dgmech.js?v=20261104d", "./src/avatar.js": "./src/avatar.js?v=20261104d", "./src/glb.js": "./src/glb.js?v=20261104d", "./src/beasts.js": "./src/beasts.js?v=20261104d" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261104i", "./src/dungeon.js": "./src/dungeon.js?v=20261104i", "./src/dev.js": "./src/dev.js?v=20261104i", "./src/clock.js": "./src/clock.js?v=20261104i", "./src/coop.js": "./src/coop.js?v=20261104i", "./src/content.js": "./src/content.js?v=20261104i", "./src/engine.js": "./src/engine.js?v=20261104i", "./src/items.js": "./src/items.js?v=20261104i", "./src/keys.js": "./src/keys.js?v=20261104i", "./src/main.js": "./src/main.js?v=20261104i", "./src/models.js": "./src/models.js?v=20261104i", "./src/nav.js": "./src/nav.js?v=20261104i", "./src/quests.js": "./src/quests.js?v=20261104i", "./src/rimdata.js": "./src/rimdata.js?v=20261104i", "./src/state.js": "./src/state.js?v=20261104i", "./src/util.js": "./src/util.js?v=20261104i", "./src/world.js": "./src/world.js?v=20261104i", "./src/worlddata.js": "./src/worlddata.js?v=20261104i", "./src/mobs.js": "./src/mobs.js?v=20261104i", "./src/dgmech.js": "./src/dgmech.js?v=20261104i", "./src/avatar.js": "./src/avatar.js?v=20261104i", "./src/glb.js": "./src/glb.js?v=20261104i", "./src/beasts.js": "./src/beasts.js?v=20261104i" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -197,6 +197,6 @@
 </div></div>
 <div id="ghostbar" hidden></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261104d"></script>
+<script type="module" src="./src/main.js?v=20261104i"></script>
 </body>
 </html>

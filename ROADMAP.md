@@ -263,10 +263,15 @@ Numbered so we can refer to them. Tick them off as they get done.
   - [x] Step 2: one character in the game: human warriors (Knight) with idle, run, attack, cast, sit and death animations
   - [x] Step 3: the races (skin, size, ears, tusks, beards) – on warriors
   - [x] Step 4: every class with its own model, colours and weapons; equipped gear changes the look
-  - [ ] Step 5: pets and druid forms
+  - [x] Step 5: pets and druid forms
     - [x] Hunter wolf, Wolf Form and Leopard Form (Quaternius Animal Pack Vol. 2, CC0), druid forms coloured by race
-    - [ ] Bear (hunter pet and Bear Form), Imp and Voidwalker: no fitting model yet
-  - [ ] Step 6: NPCs and monsters, zone by zone
+    - [x] Druid model, Imp (KayKit Tiefling), Voidwalker (KayKit Frost Golem, recoloured), new wolf (Quaternius Ultimate Animals)
+    - [x] Bear (hunter pet and Bear Form)
+  - [x] Step 6: NPCs and monsters, zone by zone
+    - [x] Town NPCs; wolves, foxes, jackals and deer; bandits, thieves, robbers, raiders, Lost Druids, Ironclan Warriors, Chieftain Grimm; skeletons and crypt undead
+    - [x] Golems, trolls and giants, ghouls, cultists and witches, guardians and the dungeon bosses (KayKit Mystery Monthly characters)
+    - [x] Bears (and Bear Form), boars, spiders, beetles, scorpions, drakes and gargoyles, kobolds and goblins, hares and rats
+    - [ ] Wisps and spirits stay as glowing effects
   - [ ] Step 7: environment (trees, rocks, buildings, dungeon walls)
 
 ## Ideas to investigate

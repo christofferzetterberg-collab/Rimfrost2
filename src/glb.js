@@ -14,7 +14,7 @@ async function fetchAsset(url){
   if(dv.getUint32(0, true) === 0x46546C67){                                   // "glTF": binary
     let off = 12; while(off < buf.byteLength){ const len = dv.getUint32(off, true), type = dv.getUint32(off + 4, true), data = buf.slice(off + 8, off + 8 + len);
       if(type === 0x4E4F534A) json = JSON.parse(new TextDecoder().decode(data)); else if(type === 0x004E4942) bins.push(data); off += 8 + len; } }
-  else { json = JSON.parse(new TextDecoder().decode(buf)); bins = await Promise.all((json.buffers || []).map(b => fetch(base + b.uri).then(r => r.arrayBuffer()))); }
+  else { json = JSON.parse(new TextDecoder().decode(buf)); bins = await Promise.all((json.buffers || []).map(b => fetch(/^data:/.test(b.uri) ? b.uri : base + b.uri).then(r => r.arrayBuffer()))); }
   const acc = i => { const a = json.accessors[i], bv = json.bufferViews[a.bufferView], T = COMP[a.componentType], n = SIZE[a.type], stride = bv.byteStride || 0, bin = bins[bv.buffer || 0];
     const off = (bv.byteOffset || 0) + (a.byteOffset || 0), esz = T.BYTES_PER_ELEMENT;
     let arr; if(!stride || stride === n * esz) arr = new T(bin, off, a.count * n);
@@ -24,11 +24,11 @@ async function fetchAsset(url){
   // textures
   const images = await Promise.all((json.images || []).map(async im => { let blob;
     if(im.bufferView != null){ const bv = json.bufferViews[im.bufferView]; blob = new Blob([new Uint8Array(bins[bv.buffer || 0], bv.byteOffset || 0, bv.byteLength)], {type: im.mimeType}); }
-    else blob = await (await fetch(base + im.uri)).blob();
+    else blob = await (await fetch(/^data:/.test(im.uri) ? im.uri : base + im.uri)).blob();
     return createImageBitmap(blob, {imageOrientation: "none"}); }));
   const textures = (json.textures || []).map(t => { const tex = new THREE.Texture(images[t.source]); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true; return tex; });
   const materials = (json.materials || []).map(m => { const pb = m.pbrMetallicRoughness || {}, map = pb.baseColorTexture ? textures[pb.baseColorTexture.index] : null;
-    const mat = new THREE.MeshLambertMaterial({map, color: pb.baseColorFactor ? new THREE.Color(...pb.baseColorFactor.slice(0, 3)) : 0xffffff, side: m.doubleSided ? THREE.DoubleSide : THREE.FrontSide}); mat.name = m.name || ""; return mat; });
+    const mat = new THREE.MeshLambertMaterial({map, color: pb.baseColorFactor ? new THREE.Color(...pb.baseColorFactor.slice(0, 3)) : 0xffffff, side: m.doubleSided ? THREE.DoubleSide : THREE.FrontSide}); mat.name = m.name || ""; if(pb.baseColorFactor && pb.baseColorFactor[3] < 1){ mat.transparent = true; mat.opacity = pb.baseColorFactor[3]; mat.depthWrite = false; } return mat; });
   const geoms = (json.meshes || []).map(me => me.primitives.map(pr => { const g = new THREE.BufferGeometry(), at = pr.attributes;
     const set = (name, key) => { if(at[key] == null) return; const a = acc(at[key]); g.setAttribute(name, new THREE.BufferAttribute(a.arr, a.n, a.norm)); };
     set("position", "POSITION"); set("normal", "NORMAL"); set("uv", "TEXCOORD_0"); set("skinIndex", "JOINTS_0"); set("skinWeight", "WEIGHTS_0");
