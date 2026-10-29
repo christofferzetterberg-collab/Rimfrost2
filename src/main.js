@@ -50,13 +50,14 @@ function applyGfx(id){ GFX = GFX_LEVELS[id] || GFX_LEVELS.medium; GFX.id = GFX_L
   Object.assign(sun.shadow.camera, {left: -GFX.area, right: GFX.area, top: GFX.area, bottom: -GFX.area}); sun.shadow.camera.updateProjectionMatrix(); }
 { let g = null; try{ g = localStorage.getItem(GFX_KEY); }catch(e){} applyGfx(g || "medium"); }
 addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+const avatarsP = preloadAvatars().catch(e => console.warn("New character models not loaded:", e)), beastsP = preloadBeasts().catch(e => console.warn("New animal models not loaded:", e));   // (all models load at the same time)
 await Promise.all([preloadNature().catch(e => console.warn("New nature models not loaded:", e)), preloadBuildings().catch(e => console.warn("Building models not loaded:", e)), preloadKit().catch(e => console.warn("Dungeon models not loaded:", e))]);      /* KayKit trees and rocks (else the old shapes) */
 const {terrain, water} = buildWorld(scene);
 ["horse", "gray"].forEach((k, i) => { const s = STABLE_HORSES[i]; if(!s) return; const g = makeMount(MOUNTS[k]); g.position.set(s.x, height(s.x, s.z), s.z); g.rotation.y = s.rot; scene.add(g); });   /* horses in Rimhaven's stable */
 // ---------------------------------------------------------------- the people in the towns and camps
 const hexc = s => parseInt(s.slice(1), 16);
-await preloadAvatars().catch(e => console.warn("New character models not loaded:", e));
-await preloadBeasts().catch(e => console.warn("New animal models not loaded:", e));     /* the KayKit models: if they can't be loaded the old ones are used */
+await avatarsP;
+await beastsP;     /* the KayKit models: if they can't be loaded the old ones are used */
 // town folk on the KayKit models: the model follows the job, the colours vary from person to person
 const ALT = (n, h) => [null, "A", "B", "C"].map(k => k && n + "_texture_alt_" + k)[h % 4];
 function npcLook(d){ const h = [...d.id].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7), t = d.title + " " + d.name;

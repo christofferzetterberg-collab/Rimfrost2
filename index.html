@@ -153,17 +153,19 @@
   #threat .tr i{position:absolute;inset:0 auto 0 0;background:#5a6670} #threat .tr.top i{background:#b8423a} #threat .tr.mine i{background:#8a6a3a} #threat .tr.me i{background:#c89a3a} #threat .tr.me.top i{background:#d84a42}
   #threat .tr span,#threat .tr b{position:relative;text-shadow:0 1px 2px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} #threat .tr.me span{color:#ffe7a0}
   #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b1013;font-family:'Uncial Antiqua',serif;font-size:32px;color:var(--frost);z-index:5}
-  #load[hidden]{display:none}
+  #load[hidden]{display:none} #load .lbox{text-align:center}
+  #loadbar{width:320px;max-width:80vw;height:10px;margin:18px auto 8px;background:#1a242b;border:1px solid var(--line);border-radius:6px;overflow:hidden} #loadbar i{display:block;height:100%;width:0;background:var(--frost);transition:width .2s}
+  #loadtxt{font:15px 'Alegreya Sans',sans-serif;color:var(--mute)}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261106b", "./src/dungeon.js": "./src/dungeon.js?v=20261106b", "./src/dev.js": "./src/dev.js?v=20261106b", "./src/clock.js": "./src/clock.js?v=20261106b", "./src/coop.js": "./src/coop.js?v=20261106b", "./src/content.js": "./src/content.js?v=20261106b", "./src/engine.js": "./src/engine.js?v=20261106b", "./src/items.js": "./src/items.js?v=20261106b", "./src/keys.js": "./src/keys.js?v=20261106b", "./src/main.js": "./src/main.js?v=20261106b", "./src/models.js": "./src/models.js?v=20261106b", "./src/nav.js": "./src/nav.js?v=20261106b", "./src/quests.js": "./src/quests.js?v=20261106b", "./src/rimdata.js": "./src/rimdata.js?v=20261106b", "./src/state.js": "./src/state.js?v=20261106b", "./src/util.js": "./src/util.js?v=20261106b", "./src/world.js": "./src/world.js?v=20261106b", "./src/worlddata.js": "./src/worlddata.js?v=20261106b", "./src/mobs.js": "./src/mobs.js?v=20261106b", "./src/dgmech.js": "./src/dgmech.js?v=20261106b", "./src/avatar.js": "./src/avatar.js?v=20261106b", "./src/glb.js": "./src/glb.js?v=20261106b", "./src/beasts.js": "./src/beasts.js?v=20261106b", "./src/nature.js": "./src/nature.js?v=20261106b", "./src/buildings.js": "./src/buildings.js?v=20261106b", "./src/dgkit.js": "./src/dgkit.js?v=20261106b" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261106c", "./src/dungeon.js": "./src/dungeon.js?v=20261106c", "./src/dev.js": "./src/dev.js?v=20261106c", "./src/clock.js": "./src/clock.js?v=20261106c", "./src/coop.js": "./src/coop.js?v=20261106c", "./src/content.js": "./src/content.js?v=20261106c", "./src/engine.js": "./src/engine.js?v=20261106c", "./src/items.js": "./src/items.js?v=20261106c", "./src/keys.js": "./src/keys.js?v=20261106c", "./src/main.js": "./src/main.js?v=20261106c", "./src/models.js": "./src/models.js?v=20261106c", "./src/nav.js": "./src/nav.js?v=20261106c", "./src/quests.js": "./src/quests.js?v=20261106c", "./src/rimdata.js": "./src/rimdata.js?v=20261106c", "./src/state.js": "./src/state.js?v=20261106c", "./src/util.js": "./src/util.js?v=20261106c", "./src/world.js": "./src/world.js?v=20261106c", "./src/worlddata.js": "./src/worlddata.js?v=20261106c", "./src/mobs.js": "./src/mobs.js?v=20261106c", "./src/dgmech.js": "./src/dgmech.js?v=20261106c", "./src/avatar.js": "./src/avatar.js?v=20261106c", "./src/glb.js": "./src/glb.js?v=20261106c", "./src/beasts.js": "./src/beasts.js?v=20261106c", "./src/nature.js": "./src/nature.js?v=20261106c", "./src/buildings.js": "./src/buildings.js?v=20261106c", "./src/dgkit.js": "./src/dgkit.js?v=20261106c" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
 </script>
 </head>
 <body>
-<div id="load">Rimfrost 2</div>
+<div id="load"><div class="lbox">Rimfrost 2<div id="loadbar"><i></i></div><div id="loadtxt">Loading…</div></div></div>
 <div id="hud">
   <div class="frame" id="pframe"><div class="n"><span id="pname">Adventurer</span><span id="plvl">Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt"></b></div><div class="bar res"><i id="presi"></i><b id="prest"></b></div><div id="pcp"></div><div class="auras" id="pbuffs"></div><div id="ppet" hidden><div class="n"><span id="ppetn"></span><span id="ppetm"></span></div><div class="bar"><i id="ppethi"></i><b id="ppetht"></b></div><div class="bar res"><i id="ppetri"></i><b id="ppetrt"></b></div><div class="auras" id="ppetb"></div></div></div>
   <div id="party"></div>
@@ -199,6 +201,6 @@
 <div id="ghostbar" hidden></div>
 <div id="rezask" hidden><span></span><button id="rezyes">Accept</button><button id="rezno" class="no">Decline</button></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261106b"></script>
+<script type="module" src="./src/main.js?v=20261106c"></script>
 </body>
 </html>

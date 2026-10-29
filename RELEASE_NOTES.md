@@ -1,5 +1,13 @@
 # Rimfrost 2 – Release notes
 
+## v0.29.2
+
+### New
+- A loading bar on the start screen shows how far the game has loaded.
+
+### Improved
+- The game loads faster: all models now load at the same time.
+
 ## v0.29.1
 
 ### Changed

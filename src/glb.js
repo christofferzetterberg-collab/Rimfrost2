@@ -43,7 +43,11 @@ async function fetchAsset(url){
     return new THREE.AnimationClip(an.name, -1, tracks); });
   return {json, geoms, materials, skins, clips};
 }
-export function load(url){ if(!cache.has(url)) cache.set(url, fetchAsset(url)); return cache.get(url); }
+// the loading bar on the start screen: models asked for and models done
+let asked = 0, done = 0, shown = 0;
+function progress(){ const bar = document.getElementById("loadbar"), txt = document.getElementById("loadtxt"); if(!bar) return;
+  shown = Math.max(shown, asked ? done / asked : 0); bar.firstChild.style.width = Math.round(shown * 100) + "%"; txt.textContent = shown >= 1 ? "Building the world…" : `Loading models… ${Math.round(shown * 100)}%`; }
+export function load(url){ if(!cache.has(url)){ asked++; progress(); cache.set(url, fetchAsset(url).finally(() => { done++; progress(); })); } return cache.get(url); }
 
 // a fresh copy of the model: a Group holding the node tree, with skinned meshes bound to their own bones
 export function build(asset){
