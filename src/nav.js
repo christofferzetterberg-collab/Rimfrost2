@@ -1,6 +1,6 @@
 // Path finding: a walk grid (1 cell = 1 unit) and A* search, so monsters and click-to-move go around houses, rocks, trees and water.
 import {B, WATER, height, colliders} from "./world.js";
-import {dgNavGrids} from "./dungeon.js";
+import {dgNavGrids, DUNGEONS} from "./dungeon.js";
 
 const PAD = 0.7, NAV_SLOPE = 1.0;                                     // PAD: body radius used when marking blocked cells
 let GRIDS = null;                                    // the open world, and the crypt: {x0, z0, w, h, grid (1 = blocked), hgt}
@@ -17,6 +17,8 @@ export function buildNav(){
   GRIDS = [{x0: B.x0, z0: B.z0, w, h, grid, hgt}, ...dgNavGrids()];
 }
 // which places can be walked to from the given start (flood fill over the world grid); used so nothing appears inside a ring of cliffs
+// a dungeon's walk grid changed (a crypt gate opened or shut)
+export function refreshDgNav(d){ if(!GRIDS) return; const k = DUNGEONS.indexOf(d); if(k >= 0) GRIDS[k + 1] = d.navGrid(); }
 let REACH = null;
 export function reachable(x, z){ if(!GRIDS) buildNav(); if(x > 500) return true; const g = GRIDS[0];
   if(!REACH){ REACH = new Uint8Array(g.w * g.h); const st = []; for(const [sx, sz] of REACH_FROM){ const k = Math.floor(sz - g.z0) * g.w + Math.floor(sx - g.x0); if(!g.grid[k] && !REACH[k]){ REACH[k] = 1; st.push(k); } }

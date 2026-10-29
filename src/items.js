@@ -61,24 +61,25 @@ export const SLOTS = {
 export const SLOT_ORDER = ["head","neck","shoulder","chest","hands","legs","feet","ring","weapon","offhand"];
 // armor types and which classes may use them
 export const ARMOR = {
-  cloth:{name:"Cloth", cls:["mage","priest"], def:0.10},
-  leather:{name:"Leather", cls:["hunter","druid"], def:0.20},
+  cloth:{name:"Cloth", cls:["mage","priest","warlock"], def:0.10},
+  leather:{name:"Leather", cls:["hunter","druid","rogue","shaman"], def:0.20},
   plate:{name:"Plate", cls:["warrior","paladin"], def:0.30}
 };
-export const CLASS_ARMOR = {mage:"cloth", priest:"cloth", hunter:"leather", druid:"leather", warrior:"plate", paladin:"plate"};
+export const CLASS_ARMOR = {mage:"cloth", priest:"cloth", warlock:"cloth", hunter:"leather", druid:"leather", rogue:"leather", shaman:"leather", warrior:"plate", paladin:"plate"};
 // weapon / offhand types
 export const WTYPES = {
-  sword:{name:"Sword", cls:["warrior","paladin"], icon:"sword", base:["Longsword","Broadsword","Blade"]},
-  axe:{name:"Axe", cls:["warrior"], icon:"axeDouble", base:["Battleaxe","Cleaver","Hatchet"]},
-  mace:{name:"Mace", cls:["paladin"], icon:"hammer", base:["Warhammer","Cudgel","Maul"]},
+  sword:{name:"Sword", cls:["warrior","paladin","rogue"], icon:"sword", base:["Longsword","Broadsword","Blade"]},
+  axe:{name:"Axe", cls:["warrior","shaman"], icon:"axeDouble", base:["Battleaxe","Cleaver","Hatchet"]},
+  mace:{name:"Mace", cls:["paladin","shaman"], icon:"hammer", base:["Warhammer","Cudgel","Maul"]},
   bow:{name:"Bow", cls:["hunter"], icon:"bow", base:["Longbow","Hunting Bow","War Bow"]},
-  staff:{name:"Staff", cls:["mage","priest","druid"], icon:"upg_wand", base:["Staff","Walking Staff","Runestaff"]},
-  wand:{name:"Wand", cls:["mage","priest"], icon:"wand", base:["Wand","Scepter"]},
-  shield:{name:"Shield", cls:["warrior","paladin"], icon:"shield", base:["Shield","Buckler","Tower Shield"], off:true},
-  tome:{name:"Tome", cls:["mage","priest","druid"], icon:"tome", base:["Tome","Spellbook","Grimoire"], off:true}
+  staff:{name:"Staff", cls:["mage","priest","druid","warlock","shaman"], icon:"upg_wand", base:["Staff","Walking Staff","Runestaff"]},
+  wand:{name:"Wand", cls:["mage","priest","warlock"], icon:"wand", base:["Wand","Scepter"]},
+  dagger:{name:"Dagger", cls:["rogue"], icon:"sword", base:["Dagger","Dirk","Kris"]},
+  shield:{name:"Shield", cls:["warrior","paladin","shaman"], icon:"shield", base:["Shield","Buckler","Tower Shield"], off:true},
+  tome:{name:"Tome", cls:["mage","priest","druid","warlock"], icon:"tome", base:["Tome","Spellbook","Grimoire"], off:true}
 };
-export const CLASS_WEAP = {warrior:["sword","axe"], paladin:["sword","mace"], hunter:["bow"], mage:["staff","wand"], priest:["staff","wand"], druid:["staff"]};
-export const CLASS_OFF = {warrior:["shield"], paladin:["shield"], mage:["tome"], priest:["tome"], druid:["tome"], hunter:[]};
+export const CLASS_WEAP = {warrior:["sword","axe"], paladin:["sword","mace"], hunter:["bow"], mage:["staff","wand"], priest:["staff","wand"], druid:["staff"], warlock:["staff","wand"], rogue:["dagger","sword"], shaman:["mace","axe","staff"]};
+export const CLASS_OFF = {warrior:["shield"], paladin:["shield"], mage:["tome"], priest:["tome"], druid:["tome"], hunter:[], warlock:["tome"], rogue:["dagger","sword"], shaman:["shield"]};
 const ARMOR_BASE = {
   cloth:{head:"Hood", shoulder:"Mantle", chest:"Robe", hands:"Gloves", legs:"Trousers", feet:"Slippers"},
   leather:{head:"Leather Cap", shoulder:"Leather Spaulders", chest:"Leather Vest", hands:"Leather Gloves", legs:"Leather Pants", feet:"Leather Boots"},
@@ -88,7 +89,7 @@ const JEWEL_BASE = {neck:["Necklace","Amulet","Pendant"], ring:["Ring","Signet",
 const SLOT_ICON = {head:"helmet", shoulder:"upg_helmet", chest:"armor", hands:"upg_armor", legs:"armor", feet:"upg_armor", neck:"gemBlue", ring:"gemRed"};
 export const STAT_NAME = {str:"Strength", agi:"Agility", int:"Intellect", sta:"Stamina", pow:"Attack Power", sp:"Spell Power", sd:"Spell Damage", sh:"Spell Healing", hp:"Health", mana:"Mana", crit:"Critical Strike", def:"Armor"};
 // the stats each class gets the most out of (gear for a class rolls these first)
-export const CLASS_MAIN = {warrior:["str","sta"], paladin:["str","int","sta"], hunter:["agi","sta"], mage:["int","sta"], priest:["int","sta"], druid:["int","agi","str","sta"]};
+export const CLASS_MAIN = {warrior:["str","sta"], paladin:["str","int","sta"], hunter:["agi","sta"], mage:["int","sta"], priest:["int","sta"], druid:["int","agi","str","sta"], warlock:["int","sta"], rogue:["agi","sta"], shaman:["int","str","sta"]};
 const STAT_SUFFIX = {str:"Strength", agi:"Agility", int:"Intellect", sta:"Stamina", pow:"Power", sp:"Sorcery", sd:"Destruction", sh:"Healing", hp:"Endurance", mana:"Wisdom", crit:"Precision", def:"Protection"};
 const PREFIX = [["Beggar's","Thrall's","Apprentice's"], [""], [""], ["Warden's","Master's","Knight's","Huntmaster's"], ["Stormcaller's","Nightfall","Runesmith's","Wolfking's"], ["Rimfrost","Ice Giant's","Draugr King's","Elder"]];
 export const GEAR_MAX = 30;
@@ -103,7 +104,7 @@ export function canWear(it, cls){ return gearClasses(it).includes(cls); }
 export function gearTypeName(it){ return it.arm ? ARMOR[it.arm].name : it.wt ? WTYPES[it.wt].name : "Jewelry"; }
 
 // other stats a class can roll on its gear (besides its main stats)
-const EXTRA = {warrior:["agi","crit"], paladin:["sh","crit"], hunter:["crit","str"], mage:["sd","crit"], priest:["sh","sd"], druid:["sh","sd","crit"]};
+const EXTRA = {warrior:["agi","crit"], paladin:["sh","crit"], hunter:["crit","str"], mage:["sd","crit"], priest:["sh","sd"], druid:["sh","sd","crit"], warlock:["sd","crit"], rogue:["crit","str"], shaman:["sh","crit","agi"]};
 // make one item. opts: {slot, cls, q, il, r}
 export function makeGear(opts){
   const r = opts.r || Math.random, q = opts.q, il = Math.max(1, Math.min(30, Math.round(opts.il)));
@@ -116,12 +117,12 @@ export function makeGear(opts){
   else if(slot!=="neck" && slot!=="ring") it.arm = CLASS_ARMOR[cls];
   // stat budget
   let pts = (4 + il*1.15) * QUAL[q].mult * SLOTS[slot].w * 2;
-  const role = ["warrior","hunter"].includes(cls) ? "phys" : ["mage","priest"].includes(cls) ? "caster" : "hybrid";
+  const role = ["warrior","hunter","rogue"].includes(cls) ? "phys" : ["mage","priest","warlock"].includes(cls) ? "caster" : "hybrid";
   const add = (k, p) => { if(p <= 0) return; it.st[k] = (it.st[k]||0) + p; };
   let defShare = it.arm ? ARMOR[it.arm].def : it.wt==="shield" ? 0.4 : 0;
   add("def", pts*defShare); pts *= 1-defShare;
   // weapons: a big helping of the class's damage stat (Strength / Agility for fighters, Spell Power or Spell Damage for casters)
-  if(slot==="weapon"){ const fs = cls==="hunter" ? "agi" : "str"; if(role==="phys") add(fs, pts*0.6 * 0.17/0.4*2); else if(role==="caster") add(cls==="priest" ? "sp" : r() < 0.5 ? "sp" : "sd", pts*0.6); else { add(cls==="druid" ? "agi" : "str", pts*0.3 * 0.17/0.4*2); add(cls==="paladin" ? "sh" : "sp", pts*0.3); } pts *= 0.4; }
+  if(slot==="weapon" || (slot==="offhand" && (it.wt==="dagger" || it.wt==="sword"))){ const fs = cls==="hunter" || cls==="rogue" ? "agi" : "str"; if(role==="phys") add(fs, pts*0.6 * 0.17/0.4*2); else if(role==="caster") add(cls==="priest" ? "sp" : r() < 0.5 ? "sp" : "sd", pts*0.6); else { add(cls==="druid" ? "agi" : "str", pts*0.3 * 0.17/0.4*2); add(cls==="paladin" ? "sh" : "sp", pts*0.3); } pts *= 0.4; }
   else if(it.wt==="tome"){ add(cls==="mage" ? "sd" : cls==="priest" ? "sh" : "sp", pts*0.4); pts *= 0.6; }
   // spread the rest over 1-3 stats (better items get more): always one of the class's main stats first, then others it can use
   const main = CLASS_MAIN[cls], extra = EXTRA[cls], pool = [...main, ...extra];

@@ -277,7 +277,7 @@ function stable(x, z, rot){                                                     
   for(const [lx, lz] of [[-w / 2, 0], [0, -d / 2], [w / 2, 0], [-w / 4, -d / 4], [w / 4, -d / 4]]){ const p = turn(x, z, rot, lx, lz); solid(p.x, p.z, 1.0, true); }
   for(const px of [-w / 3, w / 3]){ const p = turn(x, z, rot, px, 0.1); STABLE_HORSES.push({x: p.x, z: p.z, rot}); }
 }
-export const CITY_KEEP = [[-2, -2], [2, -2], [-2, 2], [2, 2], [-3, -10], [3, -10], [10, -3], [10, 3], [-3, 10], [3, 10], [-10, -4], [-11, -1], [-11, 2], [-9, 5], [6.4, 8.4], [7.6, 10.1], [8.4, 11.5], [6.2, 11.6]];   // where Rimhaven's people stand (tiles from the centre)
+export const CITY_KEEP = [[-2, -2], [2, -2], [-2, 2], [2, 2], [-3, -10], [3, -10], [10, -3], [10, 3], [-3, 10], [3, 10], [-10, -4], [-11, -1], [-11, 2], [-9, 5], [-6, -11], [-7, 9], [12, 0], [6.4, 8.4], [7.6, 10.1], [8.4, 11.5], [6.2, 11.6]];   // where Rimhaven's people stand (tiles from the centre)
 
 // ---------------------------------------------------------------- lairs, places to explore, dungeon doors
 function buildLair(id, l){

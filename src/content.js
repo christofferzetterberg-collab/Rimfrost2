@@ -5,29 +5,29 @@ import {CLASSES, RACE_CLASSES} from "./rimdata.js";
 // ---------------------------------------------------------------- people
 // role: "quest" | "vendor" (shop: "goods" = potions and elixirs, "basic" = potions, "smith" = equipment) | "trainer" (trains: the one class they teach)
 const HUB_IL = {frostvik: 5, holgerstuga: 10, lovhem: 5, manglanta: 10, bergsdal: 5, snostugan: 10, brannmark: 5, kanjonlagret: 10, traskvakten: 20, askvakten: 25, isporten: 30, bleksted: 5, benvakten: 10};
-const CLS = ["mage", "warrior", "hunter", "priest", "druid", "paladin"];
+const CLS = ["mage", "warrior", "hunter", "priest", "druid", "paladin", "warlock", "rogue", "shaman"];
 const list = [];
 const add = (hub, arr) => arr.forEach(n => list.push({...n, hub}));
 // a race town only has trainers for the classes that race can be (Rimhaven has them all)
 const trainers = (hub, race, names) => add(hub, CLS.map((c, i) => ({id: hub + "_t_" + c, name: names[i], title: CLASSES[c].name + " Trainer", color: CLASSES[c].color, trains: c, race})).filter(t => RACE_CLASSES[race].includes(t.trains)));
 add("frostvik", [{id: "edda", name: "Captain Edda", title: "Quest Giver", color: "#7b8fa8", race: "human"}, {id: "linnea", name: "Herbwife Linnea", title: "Alchemist", color: "#6aa06a", shop: "goods", race: "human"},
   {id: "bror", name: "Bror the Smith", title: "Blacksmith", color: "#a0683a", shop: "smith", race: "human"}, {id: "olle", name: "Olle the Merchant", title: "Merchant", color: "#c09a40", shop: "goods", race: "human"}]);
-trainers("frostvik", "human", ["Archmage Vidar", "Weaponmaster Gunhild", "Huntmaster Arne", "Priestess Sigrid", "Ask the Druid", "Holmfrid the Knight"]);
+trainers("frostvik", "human", ["Archmage Vidar", "Weaponmaster Gunhild", "Huntmaster Arne", "Priestess Sigrid", "Ask the Druid", "Holmfrid the Knight", "Solvi the Shadowcaller", "Kettil the Quick", "Stormsinger Embla"]);
 add("holgerstuga", [{id: "holger", name: "Holger the Forester", title: "Quest Giver", color: "#4f7a3a", race: "human"}]);
 add("lovhem", [{id: "ilsa", name: "Warden Ilsa", title: "Quest Giver", color: "#7aa0b8", race: "elf"}, {id: "faelin", name: "Herbmaster Faelin", title: "Alchemist", color: "#6ab08a", shop: "goods", race: "elf"},
   {id: "elvar", name: "Elvar the Smith", title: "Blacksmith", color: "#9a8a6a", shop: "smith", race: "elf"}, {id: "mirel", name: "Mirel the Merchant", title: "Merchant", color: "#b89ad0", shop: "goods", race: "elf"}]);
-trainers("lovhem", "elf", ["Magister Aelin", "Sylva the Bladedancer", "Bowmaster Eiron", "Moon Priestess Ylva", "Thal the Grovewarden", "Aerin the Lightknight"]);
+trainers("lovhem", "elf", ["Magister Aelin", "Sylva the Bladedancer", "Bowmaster Eiron", "Moon Priestess Ylva", "Thal the Grovewarden", "Aerin the Lightknight", "Nyx the Felcaster", "Siv the Silent Blade", "Ael the Tidecaller"]);
 add("manglanta", [{id: "lyra", name: "Lyra the Scout", title: "Quest Giver", color: "#5a6aa0", race: "elf"}]);
 add("bergsdal", [{id: "hjalmar", name: "Foreman Hjalmar", title: "Quest Giver", color: "#8a6a4a", race: "dwarf"}, {id: "ingrid", name: "Ingrid the Brewer", title: "Alchemist", color: "#b08a4a", shop: "goods", race: "dwarf"},
   {id: "torvald", name: "Torvald the Smith", title: "Blacksmith", color: "#6a5a50", shop: "smith", race: "dwarf"}, {id: "bodil", name: "Bodil the Merchant", title: "Merchant", color: "#c09a40", shop: "goods", race: "dwarf"}]);
-trainers("bergsdal", "dwarf", ["Runemaster Kalle", "Shieldbrother Ragnvald", "Ebba the Hunter", "Gunnar the Priest", "Hulda the Stonewise", "Shieldfather Brage"]);
+trainers("bergsdal", "dwarf", ["Runemaster Kalle", "Shieldbrother Ragnvald", "Ebba the Hunter", "Gunnar the Priest", "Hulda the Stonewise", "Shieldfather Brage", "Brokk the Hexer", "Finn Quickfingers", "Stormfather Odd"]);
 add("snostugan", [{id: "sune", name: "Sune the Hunter", title: "Quest Giver", color: "#7a8ea0", race: "dwarf"}]);
 add("brannmark", [{id: "ragna", name: "Chieftain Ragna", title: "Quest Giver", color: "#8a3a2a", race: "orc"}, {id: "urk", name: "Urk the Shaman", title: "Alchemist", color: "#6a8a4a", shop: "goods", race: "orc"},
   {id: "grosh", name: "Grosh the Smith", title: "Blacksmith", color: "#5a4a40", shop: "smith", race: "orc"}, {id: "zaga", name: "Zaga the Merchant", title: "Merchant", color: "#c09a40", shop: "goods", race: "orc"}]);
-trainers("brannmark", "orc", ["Morg the Flamespeaker", "Thra the Bloodfighter", "Vash the Tracker", "Neka the Spiritspeaker", "Earthmother Grunda", "Grak the Sunwarrior"]);
+trainers("brannmark", "orc", ["Morg the Flamespeaker", "Thra the Bloodfighter", "Vash the Tracker", "Neka the Spiritspeaker", "Earthmother Grunda", "Grak the Sunwarrior", "Ghul the Demonbinder", "Rakka Shadowstep", "Durg the Farseer"]);
 add("bleksted", [{id: "morten", name: "Morten the Gravedigger", title: "Quest Giver", color: "#5a5a6a", race: "undead"}, {id: "hilde", name: "Hilde the Apothecary", title: "Alchemist", color: "#6a7a5a", shop: "goods", race: "undead"},
   {id: "knota", name: "Knota the Smith", title: "Blacksmith", color: "#4a4a4a", shop: "smith", race: "undead"}, {id: "sorgsen", name: "Mournful the Merchant", title: "Merchant", color: "#8a7a6a", shop: "goods", race: "undead"}]);
-trainers("bleksted", "undead", ["Selma the Gravemage", "Rolf the Bonewarrior", "Vira the Shadowhunter", "Marten the Shadowpriest", "Mossa the Druid", "Ture the Fallen Knight"]);
+trainers("bleksted", "undead", ["Selma the Gravemage", "Rolf the Bonewarrior", "Vira the Shadowhunter", "Marten the Shadowpriest", "Mossa the Druid", "Ture the Fallen Knight", "Sorrow the Cursed", "Silent Agna", "Ash the Spiritcaller"]);
 add("benvakten", [{id: "ulvar", name: "Ulvar the Keeper", title: "Quest Giver", color: "#6a6a7a", race: "undead"}]);
 add("kanjonlagret", [{id: "kruk", name: "Kruk the Tracker", title: "Quest Giver", color: "#7a5a3a", race: "orc"}]);
 add("jarnfastet", [   // Rimhaven: everyone has their own spot (tiles from the centre)
@@ -41,6 +41,9 @@ add("jarnfastet", [   // Rimhaven: everyone has their own spot (tiles from the c
   {id: "t_paladin", name: "Lord Commander Eir", title: "Paladin Trainer", color: CLASSES.paladin.color, trains: "paladin", race: "dwarf", at: [10, 3]},
   {id: "t_hunter", name: "Ranger-Captain Ulf", title: "Hunter Trainer", color: CLASSES.hunter.color, trains: "hunter", race: "undead", at: [-3, 10]},
   {id: "t_druid", name: "Archdruid Mira", title: "Druid Trainer", color: CLASSES.druid.color, trains: "druid", race: "elf", at: [3, 10]},
+  {id: "t_warlock", name: "Demonologist Vera", title: "Warlock Trainer", color: CLASSES.warlock.color, trains: "warlock", race: "undead", at: [-6, -11]},
+  {id: "t_rogue", name: "Shadowmaster Sten", title: "Rogue Trainer", color: CLASSES.rogue.color, trains: "rogue", race: "human", at: [-7, 9]},
+  {id: "t_shaman", name: "Farseer Ulla", title: "Shaman Trainer", color: CLASSES.shaman.color, trains: "shaman", race: "orc", at: [12, 0]},
   {id: "armorer", name: "Gerd the Armorer", title: "Weapons & Armor", color: "#9aa4ad", shop: "smith", city: true, race: "dwarf", at: [-10, -4]},
   {id: "oreman", name: "Hakon the Smith", title: "Blacksmith", color: "#7a5a40", shop: "smith", city: true, race: "human", at: [-11, -1]},
   {id: "apoth", name: "Yrsa the Apothecary", title: "Alchemy & Potions", color: "#6ab08a", shop: "goods", race: "elf", at: [-11, 2]},
@@ -394,7 +397,7 @@ export const QUESTS = [
   {id: "c1", npc: "brenna", lvl: 11, name: "The Ironclan Raiders", text: "Ironclan warriors raid every caravan bound for Rimhaven. Kill 10 of them in Iron Ridge.", obj: [["kill", "orcwar", 10]]},
   {id: "c2", npc: "ivo", lvl: 12, req: ["c1"], name: "Plans of War", text: "The Ironclan must have a plan. Find their war plans on one of their warriors.", obj: [["loot", "warplans", 1, "orcwar", 0.3]]},
   {id: "c3", npc: "brenna", lvl: 13, name: "Spiders in the Mine", text: "Huge spiders have nested in the Iron Mine east of the city. Kill 10 mine spiders.", obj: [["kill", "gruvspindel", 10]]},
-  {id: "c4", npc: "ivo", lvl: 14, name: "Hearts of the Sentinels", text: "The stone sentinels of the Iron Mine carry glowing hearts. Bring me 4 for my studies.", obj: [["loot", "golemheart", 4, "stenvakt", 0.5]]},
+  {id: "c4", npc: "ivo", lvl: 14, name: "Hearts of the Sentinels", text: "The stone sentinels of the Iron Mine carry glowing hearts. Bring me 4 for my studies.", obj: [["loot", "golemheart", 4, "stenvakt", 0.6]]},
   {id: "c5", npc: "brenna", lvl: 18, name: "The Drowned", text: "The drowned walk the halls of the Drowned Temple in Mistmarsh. Lay 10 of them to rest.", obj: [["kill", "drunknad", 10]]},
   {id: "c6", npc: "aldric", lvl: 19, name: "The Marsh Drake", text: "A great drake terrorizes the roads of Mistmarsh. Slay it and Rimhaven will remember your name.", obj: [["kill", "dragon", 1]], mult: 1.5},
   {id: "c7", npc: "ivo", lvl: 21, name: "Heartstones", text: "The ash gargoyles carry heartstones that keep them alive. Bring me 5 from Ashfields.", obj: [["loot", "stoneheart", 5, "gargoyle", 0.5]]},

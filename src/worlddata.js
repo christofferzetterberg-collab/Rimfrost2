@@ -66,7 +66,7 @@ export const EXPLORE = {
 export const DG_DOORS = {
   d_mine: {tx: 232, ty: 150, hub: "jarnfastet", name: "The Iron Mine", lv: "12–16"}, d_temple: {tx: 294, ty: 250, hub: "traskvakten", name: "The Drowned Temple", lv: "17–21"},
   d_forge: {tx: 314, ty: 76, hub: "askvakten", name: "The Ember Forge", lv: "22–26"}, d_vault: {tx: 394, ty: 168, hub: "isporten", name: "The Frost Vault", lv: "27–31"},
-  d_crypt: {tx: 280, ty: 276, hub: "traskvakten", name: "The Draug King's Crypt", lv: "20"}
+  d_crypt: {tx: 280, ty: 276, hub: "traskvakten", name: "The Draug King's Crypt", lv: "19–20"}
 };
 // world positions (units) and sizes for everything above
 for(const o of [...Object.values(HUBS), ...Object.values(LAIRS), ...Object.values(EXPLORE), ...Object.values(DG_DOORS)]){ Object.assign(o, W(o.tx, o.ty)); if(o.r) o.R = o.r * TS; }

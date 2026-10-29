@@ -56,6 +56,7 @@
   #ghostbar[hidden]{display:none} #ghostbar button{font:800 14px 'Alegreya Sans';padding:5px 14px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer} #ghostbar button:disabled{opacity:.4;cursor:default}
   #dead .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 26px;text-align:center}
   #dead h2{font-family:'Uncial Antiqua',serif;font-weight:400;color:#ff6b5e;margin:0 0 12px}
+  #dead button:disabled{opacity:.45;cursor:default} #wotd{background:#7ad06a!important}
   #dead button{font:800 15px 'Alegreya Sans';padding:8px 18px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer}
   #pframe .bar.res i{background:var(--mana)}
   #pcp{display:flex;gap:3px;margin-top:4px} #pcp i{width:12px;height:6px;border-radius:2px;background:#3a2a20} #pcp i.on{background:#ffcf4a} #pcp:empty{display:none}
@@ -65,7 +66,7 @@
   .slot.atk{font-size:12px}
   #petbar .slot{width:40px;height:40px} #petbar .slot.off canvas{filter:grayscale(1) brightness(.45)} #petbar .slot.off::after{content:"OFF";position:absolute;bottom:1px;right:3px;z-index:2;font-size:10px;color:#ff8a7a;text-shadow:0 1px 2px #000}
   #petbar .slot.auto{box-shadow:0 0 0 2px #e6bd5c inset} #petbar .slot.on{box-shadow:0 0 0 2px #7be08a inset}
-  #ppet{margin-top:6px;padding-top:5px;border-top:1px solid var(--line)} #ppet .n{font-size:12.5px} #ppet .n span:last-child{color:var(--mute);font-weight:700;font-size:11.5px} #ppet .bar{height:11px;margin-top:3px} #ppet .bar b{font-size:9.5px;line-height:11px}
+  #ppet{margin-top:6px;padding-top:5px;border-top:1px solid var(--line);cursor:pointer;border-radius:4px} #ppet.sel{outline:1px solid #5adc6a;outline-offset:2px} #ppet .n{font-size:12.5px} #ppet .n span:last-child{color:var(--mute);font-weight:700;font-size:11.5px} #ppet .bar{height:11px;margin-top:3px} #ppet .bar b{font-size:9.5px;line-height:11px}
   .pmem .bar.rs{height:7px;margin-top:2px} .pmem .bar.rs b{font-size:0}
   .pmem .pp{display:flex;align-items:center;gap:5px;margin-top:3px;font-size:10.5px;color:var(--mute)} .pmem .pp .bar{flex:1;height:7px;margin:0} .pmem .pp .bar.r{flex:.6}
   #cast{position:absolute;bottom:92px;left:50%;transform:translateX(-50%);width:260px;height:16px} #cast[hidden]{display:none} #cast i{background:#e0b84a} #cast b{font-size:11.5px;line-height:16px}
@@ -153,7 +154,7 @@
   #load[hidden]{display:none}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261101i", "./src/dungeon.js": "./src/dungeon.js?v=20261101i", "./src/dev.js": "./src/dev.js?v=20261101i", "./src/clock.js": "./src/clock.js?v=20261101i", "./src/coop.js": "./src/coop.js?v=20261101i", "./src/content.js": "./src/content.js?v=20261101i", "./src/engine.js": "./src/engine.js?v=20261101i", "./src/items.js": "./src/items.js?v=20261101i", "./src/keys.js": "./src/keys.js?v=20261101i", "./src/main.js": "./src/main.js?v=20261101i", "./src/models.js": "./src/models.js?v=20261101i", "./src/nav.js": "./src/nav.js?v=20261101i", "./src/quests.js": "./src/quests.js?v=20261101i", "./src/rimdata.js": "./src/rimdata.js?v=20261101i", "./src/state.js": "./src/state.js?v=20261101i", "./src/util.js": "./src/util.js?v=20261101i", "./src/world.js": "./src/world.js?v=20261101i", "./src/worlddata.js": "./src/worlddata.js?v=20261101i", "./src/mobs.js": "./src/mobs.js?v=20261101i" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261104d", "./src/dungeon.js": "./src/dungeon.js?v=20261104d", "./src/dev.js": "./src/dev.js?v=20261104d", "./src/clock.js": "./src/clock.js?v=20261104d", "./src/coop.js": "./src/coop.js?v=20261104d", "./src/content.js": "./src/content.js?v=20261104d", "./src/engine.js": "./src/engine.js?v=20261104d", "./src/items.js": "./src/items.js?v=20261104d", "./src/keys.js": "./src/keys.js?v=20261104d", "./src/main.js": "./src/main.js?v=20261104d", "./src/models.js": "./src/models.js?v=20261104d", "./src/nav.js": "./src/nav.js?v=20261104d", "./src/quests.js": "./src/quests.js?v=20261104d", "./src/rimdata.js": "./src/rimdata.js?v=20261104d", "./src/state.js": "./src/state.js?v=20261104d", "./src/util.js": "./src/util.js?v=20261104d", "./src/world.js": "./src/world.js?v=20261104d", "./src/worlddata.js": "./src/worlddata.js?v=20261104d", "./src/mobs.js": "./src/mobs.js?v=20261104d", "./src/dgmech.js": "./src/dgmech.js?v=20261104d", "./src/avatar.js": "./src/avatar.js?v=20261104d", "./src/glb.js": "./src/glb.js?v=20261104d", "./src/beasts.js": "./src/beasts.js?v=20261104d" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -162,7 +163,7 @@
 <body>
 <div id="load">Rimfrost 2</div>
 <div id="hud">
-  <div class="frame" id="pframe"><div class="n"><span id="pname">Adventurer</span><span id="plvl">Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt"></b></div><div class="bar res"><i id="presi"></i><b id="prest"></b></div><div id="pcp"></div><div class="auras" id="pbuffs"></div><div id="ppet" hidden><div class="n"><span id="ppetn"></span><span id="ppetm"></span></div><div class="bar"><i id="ppethi"></i><b id="ppetht"></b></div><div class="bar res"><i id="ppetri"></i><b id="ppetrt"></b></div></div></div>
+  <div class="frame" id="pframe"><div class="n"><span id="pname">Adventurer</span><span id="plvl">Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt"></b></div><div class="bar res"><i id="presi"></i><b id="prest"></b></div><div id="pcp"></div><div class="auras" id="pbuffs"></div><div id="ppet" hidden><div class="n"><span id="ppetn"></span><span id="ppetm"></span></div><div class="bar"><i id="ppethi"></i><b id="ppetht"></b></div><div class="bar res"><i id="ppetri"></i><b id="ppetrt"></b></div><div class="auras" id="ppetb"></div></div></div>
   <div id="party"></div>
   <div class="frame" id="tframe" hidden><div class="n"><span id="tname"></span><span id="tlvl"></span></div><div class="bar"><i id="thpi"></i><b id="thpt"></b></div><div class="s" id="tstate"></div><div class="auras" id="tauras"></div></div>
   <div id="title">Rimfrost 2</div>
@@ -195,7 +196,7 @@
   </div>
 </div></div>
 <div id="ghostbar" hidden></div>
-<div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button></div></div>
-<script type="module" src="./src/main.js?v=20261101i"></script>
+<div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
+<script type="module" src="./src/main.js?v=20261104d"></script>
 </body>
 </html>

@@ -1,5 +1,91 @@
 # Rimfrost 2 – Release notes
 
+## v0.20.1
+
+### New
+- New animated models for the hunter's wolf and the druid's Wolf Form and Leopard Form.
+- Druid forms are coloured by race: humans have a dark grey wolf and a golden leopard, elves a silver wolf and a snow leopard.
+- Animal models by Quaternius (Animal Pack Vol. 2, CC0).
+
+## v0.20.0
+
+### New
+- Every class now uses the new character models:
+  - **Warrior and Paladin:** knight armor; paladins in blue with a crested shield.
+  - **Shaman:** barbarian build with axe and round wooden shield.
+  - **Mage, Priest, Warlock and Druid:** robed casters, each in its own colours.
+  - **Hunter:** ranger with a bow and bow animations.
+  - **Rogue:** hooded, with a dagger in each hand.
+- Weapons and shields shown match your equipped gear. Off-hand tomes appear as spellbooks.
+- Staves are held upright.
+
+## v0.19.1
+
+### New
+- Warriors of every race now use the new character models:
+  - **Orcs:** green skin, dark hair, tusks and a broader build.
+  - **Elves:** pointed ears and a slimmer, taller build.
+  - **Dwarves:** short and stocky, with a full beard.
+  - **Undead:** pale grey-green skin and glowing eyes.
+- Helmets are only shown while you wear head armor.
+
+## v0.19.0
+
+### New
+- **New character models (first test):** human warriors now use a new animated model with idle, running, sword attacks, spellcasting, sitting and death animations. The other races and classes follow in later updates.
+- Character models by Kay Lousberg (KayKit Adventurers and KayKit Character Animations, CC0).
+
+## v0.18.0
+
+### New
+- **New class: Warlock** (Human, Orc, Undead). Curses, damage over time, and Shadow and Fire magic. Summons an Imp that hurls Firebolts, and from level 10 a Voidwalker that holds the attention of enemies. Abilities include Shadow Bolt, Immolate, Corruption, Curse of Agony, Curse of Weakness, Life Tap, Drain Life, Health Funnel, Rain of Fire, Soul Fire and Death Coil.
+- **New class: Rogue** (Human, Orc, Elf, Dwarf, Undead). Fights with a weapon in each hand, attacks quickly and uses energy and combo points. Abilities include Sinister Strike, Eviscerate, Stealth, Ambush, Backstab, Gouge, Slice and Dice, Rupture, Evasion, Fan of Knives, Kidney Shot and Vanish.
+- **New class: Shaman** (Orc, Dwarf). Nature magic, shocks and totems. Abilities include Lightning Bolt, Chain Lightning, Earth Shock, Flame Shock, Frost Shock, Healing Wave, Lightning Shield and Heroism, plus Searing, Magma, Stoneskin, Strength of Earth and Healing Stream Totems. One totem of each element (Fire, Earth, Water) can be active at a time.
+- Each new class has three talent specializations, with Demonic Frenzy, Adrenaline Rush and Stormstrike as their talent abilities.
+- New trainers in Rimhaven and in the race starting towns. Daggers can now drop for rogues.
+- **Pets can be selected:** click your pet or its frame. Its health and active effects are shown, and your healing spells go to it.
+
+### Changed
+- Combo points (Wolf Form and rogues) now belong to the target they were built on and are lost when combat ends.
+
+### Fixed
+- Effects on your pet, such as Bestial Wrath, are now shown on its frame.
+
+## v0.17.1
+
+### Fixed
+- Dungeon packs now fight together: attacking one monster pulls the whole pack.
+- Monsters now notice pets that come close, as they do players.
+
+## v0.17.0
+
+### New
+- **All five dungeons have new, larger layouts, each with its own mechanic:**
+  - **The Iron Mine:** mine carts roll along the tracks, and rocks fall from unstable ceilings. Watch for the dust circles.
+  - **The Drowned Temple:** water slows movement. When the water starts to glow, the tide is about to surge and damages everyone standing in it.
+  - **The Ember Forge:** rivers of lava divide the halls. Fire vents glow before they erupt.
+  - **The Frost Vault:** ice floors are slippery. Freezing gusts blow through the wind tunnels, pushing you along and reducing movement speed by 40%.
+  - **The Draug King's Crypt:** three gated chambers guarded by Draug Warriors, Crypt Priests and Crypt Ghouls. Each gate opens when every monster before it is defeated.
+- Every dungeon now has enough monsters to complete all of its quests in one run.
+
+### Changed
+- Stone Sentinels drop Sentinel Hearts more often (60%, was 50%).
+- The Draug King's Crypt is now a level 19–20 dungeon.
+- Dungeon progress saved before this update has been reset.
+
+## v0.16.4
+
+### Changed
+- **Hunter:** Spirit Bond now heals you and your pet every 5 sec instead of every second.
+- **Hunter:** Improved bow animation. The bow is held upright, and the string is drawn back while shooting.
+- **Druid:** Entangling Roots now has a 20 sec cooldown.
+- **Mage:** The Ice Barrier talent now teaches Ice Barrier: absorbs damage for 1 min. Self only. 1 min cooldown. It no longer increases maximum health.
+- **Mage:** Shatter now only applies to frozen targets, not rooted or slowed ones.
+- **Mage:** Frost Ring now freezes enemies for 8 sec (was 4 sec). Cooldown increased to 25 sec (was 20 sec). Frozen enemies show a Frozen effect.
+
+### Fixed
+- Racial abilities (Sprint, Bloodrage, Shadowmeld, Stoneform and Will of the Dead) were missing after v0.16.0 and have been restored.
+
 ## v0.16.3
 
 ### Changed
@@ -25,6 +111,29 @@
 
 ### Changed
 - Monsters now always attack whoever has the most threat. Warriors and Bear Form still generate extra threat.
+
+## v0.15.3
+
+### New
+- **Racial abilities.** Every race has a racial ability from level 1. It appears in the spellbook under "Racial" and is placed on your action bar automatically. Racial abilities cost nothing and do not trigger the global cooldown.
+  - **Human – Sprint:** Increases movement speed by 40%. Lasts 8 sec. 2 min cooldown.
+  - **Orc – Bloodrage:** Increases damage dealt by 20%. Lasts 8 sec. 2 min cooldown.
+  - **Elf – Shadowmeld:** Enemies lose track of you and you leave combat. Lasts up to 60 sec. Moving or acting cancels the effect. 2 min cooldown. In co-op, an enemy only resets if no other player has fought it.
+  - **Dwarf – Stoneform:** Reduces damage taken by 20%. Lasts 8 sec. 2 min cooldown.
+  - **Undead – Will of the Dead:** Returns you to life at your corpse with 30% of your health, without Resurrection Sickness. Usable only while dead. 30 min cooldown. Also available from the death window.
+- Each racial ability has its own visual effect: a coloured ring around your character, plus a speed trail (Sprint), a red glow (Bloodrage), a stone skin (Stoneform), a shadowy fade (Shadowmeld) or a column of green light (Will of the Dead).
+- Ability tooltips now show long cooldowns in minutes.
+
+### Changed
+- **Racial bonuses lowered:**
+  - Human: experience +5% (was 10%).
+  - Orc: damage +3% (was 10%).
+  - Elf: dodge +3% (was +5% critical strike, +10% mana and +1% dodge).
+  - Dwarf: maximum health +8% (was 15%); no longer starts with Mining 25.
+  - Undead: unchanged (health and mana regeneration out of combat +50%).
+
+### Fixed
+- Loading a character could skip setting up its quest log and quest items (a code comment had swallowed that line).
 
 ## v0.15.2
 

@@ -4,11 +4,14 @@ import {clamp, lerp, rng} from "./util.js";
 import {B, WATER, height, ground, houses, colliders, buildWorld, zoneAt, landAt, hubAt, placeName, openAt, featureAt, roadDist, GROUND, waterColor, SIGNS, DOORS, STABLE_HORSES} from "./world.js";
 import {HUBS, ZONES, LAIRS, EXPLORE, RACE_HUB, DG_DOORS} from "./worlddata.js";
 import {KINDS, SPAWNS, ZONE_MOB_MULT, FIXED} from "./mobs.js";
-import {DUNGEONS, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
+import {DUNGEONS, DG_VER, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
+import {initMech, updMech, envSpeed, onIce} from "./dgmech.js";
+import {preloadAvatars} from "./avatar.js";
+import {preloadBeasts} from "./beasts.js";
 import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
 import {P, S, mobs, PXU} from "./state.js";
-import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RES_NAME, TALENTS, TIER_NEED, abIcon, drawIcon} from "./rimdata.js";
+import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, abIcon, drawIcon} from "./rimdata.js";
 import {ITEMS, QUAL, SLOTS, SLOT_ORDER, STAT_NAME, GEAR_MAX, CLASS_MAIN, canWear, gearTypeName, upgradeGear} from "./items.js";
 import * as G from "./engine.js";
 import * as Q from "./quests.js";
@@ -40,6 +43,8 @@ const {terrain, water} = buildWorld(scene);
 ["horse", "gray"].forEach((k, i) => { const s = STABLE_HORSES[i]; if(!s) return; const g = makeMount(MOUNTS[k]); g.position.set(s.x, height(s.x, s.z), s.z); g.rotation.y = s.rot; scene.add(g); });   /* horses in Rimhaven's stable */
 // ---------------------------------------------------------------- the people in the towns and camps
 const hexc = s => parseInt(s.slice(1), 16);
+await preloadAvatars().catch(e => console.warn("New character models not loaded:", e));
+await preloadBeasts().catch(e => console.warn("New animal models not loaded:", e));     /* the KayKit models: if they can't be loaded the old ones are used */
 function npcModel(d){ if(d.trains) return makeHero(d.race, d.trains, RACES);                       // trainers look like their class
   const R = RACES[d.race] || {}, o = {shirt: hexc(d.color), cape: null, belt: 0x4a3220, weaponType: d.shop === "smith" ? "hammer" : d.role === "quest" ? "sword" : "none"};
   if(R.skin) o.skin = hexc(R.skin); if(R.hair) o.hair = hexc(R.hair);
@@ -52,6 +57,7 @@ const npcs = NPCS.map(d => { const mesh = npcModel(d); mesh.position.set(d.x, he
 const nodes = [];
 // ---------------------------------------------------------------- dungeons (each its own small map) and the doors in and out
 const dgBuilt = buildDungeons(scene);
+initMech(dgBuilt, {floatText: (...a) => floatText(...a), log: (...a) => log(...a)});
 const portals = [];
 { const mk = (x, z, name, to, d) => { const m = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3, 1.2), new THREE.MeshBasicMaterial({visible: false})); m.position.set(x, height(x, z) + 1.5, z); scene.add(m);
     const p = {portal: to, d, name, x, z, mesh: m}; m.userData.node = p; portals.push(p); return p; };
@@ -128,9 +134,9 @@ let hero = null;
 function buildHero(){
   if(hero) scene.remove(hero);
   const c = S.cur;
-  hero = P.form === "bear" ? makeBearForm() : P.form === "cat" ? makeWolfForm() : P.form === "leopard" ? makeLeopardForm() : makeHero(c.race, c.cls, RACES, c.eq || {});
+  hero = P.form === "bear" ? makeBearForm() : P.form === "cat" ? makeWolfForm(c.race) : P.form === "leopard" ? makeLeopardForm(c.race) : makeHero(c.race, c.cls, RACES, c.eq || {});
   if(P.ghost) hero.traverse(o => { if(o.isMesh){ o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.45; o.material.depthWrite = false; if(o.material.color) o.material.color.lerp(new THREE.Color(0xbfe6ff), 0.6); o.castShadow = false; } });
-  scene.add(hero); buildMount();
+  tintHero(); scene.add(hero); buildMount();
 }
 // ---------------------------------------------------------------- riding (from level 20): summon your mount, 60% faster
 let mountMesh = null;
@@ -212,20 +218,23 @@ const WKEY = "rimfrost2-world";
 function saveWorld(){ if(CO.COOP.role === "guest" || DEV.sim) return; const now = Date.now(), w = {mobs: {}, nodes: {}};
   for(const m of mobs) if(m.dead && !m.dg && !m.night && !m.dev && m.nid != null){ const left = (m.elite ? RESPAWN_ELITE : RESPAWN) - m.deadT; if(left > 1) w.mobs[m.nid] = Math.round(now + left * 1000); }
   nodes.forEach((n, i) => { if(!n.active && n.respawn > 1) w.nodes[i] = Math.round(now + n.respawn * 1000); });
-  w.dg = mobs.filter(m => m.dg && m.dead && m.nid != null).map(m => m.nid);                                   // dungeon monsters stay dead until the dungeon is reset
+  w.dg = mobs.filter(m => m.dg && m.dead && m.nid != null).map(m => m.nid); w.dgv = DG_VER;                                   // dungeon monsters stay dead until the dungeon is reset
   try{ localStorage.setItem(WKEY, JSON.stringify(w)); }catch(e){} }
 function loadWorld(){ let w = null; try{ w = JSON.parse(localStorage.getItem(WKEY)); }catch(e){} if(!w) return; const now = Date.now();
   for(const [nid, at] of Object.entries(w.mobs || {})){ const m = mobs[+nid]; if(!m || m.nid !== +nid || at <= now) continue;
     Object.assign(m, {dead: true, state: "dead", hp: 0, deadT: (m.elite ? RESPAWN_ELITE : RESPAWN) - (at - now) / 1000}); m.mesh.visible = false; }
-  for(const nid of w.dg || []){ const m = mobs[nid]; if(m && m.dg && m.nid === nid){ Object.assign(m, {dead: true, state: "dead", hp: 0, deadT: 99}); m.mesh.visible = false; } }
+  for(const nid of w.dgv === DG_VER ? w.dg || [] : []){ const m = mobs[nid]; if(m && m.dg && m.nid === nid){ Object.assign(m, {dead: true, state: "dead", hp: 0, deadT: 99}); m.mesh.visible = false; } }
   for(const [i, at] of Object.entries(w.nodes || {})){ const n = nodes[+i]; if(n && at > now){ n.active = false; n.respawn = (at - now) / 1000; } } }
 addEventListener("beforeunload", () => save());
 let running = false;
 function play(c){
-  S.cur = c; K.useChar(c);                                                        /* every character has its own key bindings */ if(!c.learned) c.learned = []; for(const id of Q.starterAbilities(c.cls)) if(!c.learned.includes(id)) c.learned.push(id);   // the abilities every new character starts with if(!c.quests) c.quests = {}; if(!c.qbag) c.qbag = {};
+  S.cur = c; K.useChar(c);                                                        /* every character has its own key bindings */ if(!c.learned) c.learned = []; for(const id of Q.starterAbilities(c.cls)) if(!c.learned.includes(id)) c.learned.push(id);   // the abilities every new character starts with
+  if(RACIAL[c.race] && !c.learned.includes(RACIAL[c.race])) c.learned.push(RACIAL[c.race]);                        // and the racial ability
+  if(!c.quests) c.quests = {}; if(!c.qbag) c.qbag = {};
   let moved = false; if(c.world !== 2){ const sp = spawnFor(c.race); c.x = sp.x; c.z = sp.z; c.quests = {}; c.qbag = {}; delete c.pick; c.world = 2; moved = true; }   // a character from the old map: home town, fresh quest log
   for(const m of mobs) respawn(m);
   for(const it of [...Object.values(c.eq || {}), ...(c.gear || [])]) upgradeGear(it, c.cls);   // old gear gets the new stats
+  for(const t of TALENTS[c.cls] || []) if(t.grants && c.talents && c.talents[t.id] && c.learned && !c.learned.includes(t.grants)) c.learned.push(t.grants);   // talents that now teach an ability (Ice Barrier)
   const talReset = G.migrateTalents();
   G.clearFx(); G.resetPlayer(c.x ?? SPAWN.x, c.z ?? SPAWN.z); setGhost(false); $("ghostbar").hidden = true; closeChat();
   if(blocked(P.x, P.z, P.x, P.z, P.r)){ const sp = spawnFor(c.race); P.x = sp.x; P.z = sp.z; }
@@ -273,6 +282,9 @@ $("ccreate").onclick = () => { const name = $("cname").value.trim();
   const sp = spawnFor(pickRace), c = {id: Date.now().toString(36), name, race: pickRace, cls: pickCls, level: 1, xp: 0, learned: [], x: sp.x, z: sp.z, t: Date.now(), gold: 0, bag: {potHp: 3}, gear: [], eq: {}, talents: {}, world: 2};
   play(c); save(); };
 $("pframe").style.pointerEvents = "auto"; $("pframe").style.cursor = "pointer";        // (set here too, so an old cached page still works)
+// your pet can be selected (its frame shows its health and effects, and your heals go to it)
+function selectPet(){ P.target = null; P.auto = false; CO.select(null); P.selfT = false; P.petSel = true; }
+$("ppet").addEventListener("click", e => { e.stopPropagation(); if(running && G.getPet()) selectPet(); });
 $("pframe").addEventListener("click", () => { if(!running) return; P.target = null; P.auto = false; CO.select(null); P.selfT = true; });   // click your own portrait: target yourself
 $("party").addEventListener("click", e => { const b = e.target.closest("[data-pid]"); if(b) CO.select(b.dataset.pid, true); });
 $("cname").addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter") $("ccreate").click(); });
@@ -288,7 +300,7 @@ const SPECIALS = {
   mount:   {name: "Mount", icon: "paw", color: "#b08a5a", desc: "Summons your mount, increasing movement speed by 60%. Out of combat only. Cannot be used in dungeons."}
 };
 const formKey = () => S.cur.cls === "druid" && P.form ? P.form : "normal";
-const idsFor = form => BARS[form === "normal" ? S.cur.cls : "druid_" + form].filter(id => S.cur.learned.includes(id));
+const idsFor = form => [...BARS[form === "normal" ? S.cur.cls : "druid_" + form], RACIAL[S.cur.race]].filter(id => id && S.cur.learned.includes(id));
 function defaultBar(form){ const bar = Array(20).fill(null), ids = idsFor(form);
   ids.forEach((id, i) => { if(i < 16) bar[i] = id; }); if(form === "normal") ["attack", "pothp", "potmana", "rest"].forEach((x, i) => bar[16 + i] = x); return bar; }
 function curBar(){ const c = S.cur, f = formKey(); if(!c.bars) c.bars = {}; if(!c.barSeen) c.barSeen = {};
@@ -324,7 +336,7 @@ function buildBar(){
 // the class bar above the action bars: a hunter's pet orders and pet skills (while a pet is out), or a druid's shapeshifts
 const FORMS = [["bear", "formBear"], ["cat", "formCat"], ["leopard", "formTravel"]];
 let petSlots = [], petBarKind = null;
-function classBarKey(){ const c = S.cur; if(!c) return null; if(c.cls === "hunter"){ const pt = G.getPet(); return pt ? "pet:" + pt.kind : null; }
+function classBarKey(){ const c = S.cur; if(!c) return null; if(G.PET_CLASSES.has(c.cls)){ const pt = G.getPet(); return pt ? "pet:" + pt.kind : null; }
   if(c.cls === "druid"){ const f = FORMS.filter(([id]) => c.learned.includes(id)).map(f => f[0]).join(","); return f ? "forms:" + f : null; } return null; }
 function buildPetBar(){ const el = $("petbar"), key = classBarKey(); petBarKind = key; el.hidden = !key; el.innerHTML = ""; petSlots = []; if(!key) return;
   let list;
@@ -348,7 +360,7 @@ function updPetBar(){ const key = classBarKey(); if(key !== petBarKind) buildPet
     else { const on = G.petSkillOn(x); p.el.classList.toggle("off", !on); p.el.classList.toggle("auto", on); const cd = x === "growl" ? pt.growl : x === "maul" ? pt.maulT || 0 : 0; p.cd.textContent = on && cd > 0 && !pt.dead ? Math.ceil(cd) : ""; } } }
 const petBusy = pt => !pt.dead && G.petFight();
 function tipFor(id){ const a = AB[id], type = a.res || G.resType(), cost = G.costOf(id), bits = [];
-  if(cost) bits.push(`${cost} ${RES_NAME[type].toLowerCase()}`); bits.push(a.cast ? `${a.cast} sec cast` : "Instant"); if(a.cd) bits.push(`${a.cd} sec cooldown`);
+  if(cost) bits.push(`${cost} ${RES_NAME[type].toLowerCase()}`); bits.push(a.cast ? `${a.cast} sec cast` : "Instant"); if(a.cd) bits.push(a.cd >= 60 && a.cd % 60 === 0 ? `${a.cd / 60} min cooldown` : `${a.cd} sec cooldown`);
   if(a.range) bits.push(a.minRange ? `${Math.round(a.minRange / PXU)}–${Math.round(a.range / PXU)} m range` : `${Math.round(a.range / PXU)} m range`);
   return `<h4>${a.name}</h4><div class="m">${bits.join(" · ")}</div>${a.desc()}`; }
 function showTip(e, html){ const t = $("tip"); t.innerHTML = html; t.hidden = false; const r = e.currentTarget.getBoundingClientRect();
@@ -391,7 +403,7 @@ document.querySelectorAll("#gmenu [data-g]").forEach(b => b.onclick = () => { co
 document.querySelectorAll("#panel .tabs button[data-tab]").forEach(b => b.onclick = () => togglePanel(b.dataset.tab));
 document.querySelector("#panel .tabs .x").onclick = closePanel;
 // item pictures, drawn once per kind and quality
-const GEAR_GLYPH = {sword: "sword", axe: "axe", mace: "hammer", bow: "arrow", staff: "star", wand: "spark", shield: "shield", tome: "mind",
+const GEAR_GLYPH = {dagger: "dagger", sword: "sword", axe: "axe", mace: "hammer", bow: "arrow", staff: "star", wand: "spark", shield: "shield", tome: "mind",
   head: "halo", shoulder: "shield", chest: "shield", hands: "fist", legs: "boot", feet: "boot", neck: "bubble", ring: "nova"};
 const icoCache = new Map();
 function iconURL(icon, color){ const k = icon + color; if(!icoCache.has(k)){ const cv = document.createElement("canvas"); cv.width = cv.height = 64; drawIcon(cv, icon, color); icoCache.set(k, cv.toDataURL()); } return icoCache.get(k); }
@@ -433,6 +445,7 @@ function renderPanel(){
       h += `<h3>${title}${c.cls === "druid" && title !== "Abilities" ? " – change to this form to place these on its bar" : ""}</h3><div class="book">`;
       for(const id of ids) h += `<div class="bk" draggable="true" data-drag="${id}" data-tipab="${id}"><canvas width="36" height="36" data-icon="${id}"></canvas><span>${AB[id].name}</span></div>`;
       h += `</div>`; }
+    { const rid = RACIAL[c.race]; if(rid) h += `<h3>Racial</h3><div class="book"><div class="bk" draggable="true" data-drag="${rid}" data-tipab="${rid}"><canvas width="36" height="36" data-icon="${rid}"></canvas><span>${AB[rid].name}</span></div></div>`; }
     h += `<h3>Other</h3><div class="book">`; for(const x in SPECIALS) if(x !== "mount" || c.riding) h += `<div class="bk" draggable="true" data-drag="${x}" data-tipab="${x}"><canvas width="36" height="36" data-icon="${x}"></canvas><span>${SPECIALS[x].name}</span></div>`; h += `</div>`;
     const later = Q.trainable(); if(later.length) h += `<h3>Not learned yet</h3><div class="muted">${later.map(id => `${AB[id].name} (level ${AB[id].lvl})`).join(", ")} – learn them from your class trainer.</div>`;
   } else if(panelTab === "keys"){
@@ -453,7 +466,7 @@ function renderPanel(){
     h += `<h3>Attributes</h3><div class="muted" style="font-size:12px;margin-bottom:4px">Main stats for a ${CLASSES[c.cls].name}: ${MAIN.map(k => an[k]).join(", ")}</div><div class="stats">
       ${["str", "agi", "int", "sta"].map(k => `<span${MAIN.includes(k) ? ` style="color:#ffd36b"` : ""}>${an[k]}</span><b>${Math.round(G.attr(k))}</b>`).join("")}
       <span>Spell Damage</span><b>${Math.round(G.gearStat("sd"))}</b><span>Spell Healing</span><b>${Math.round(G.gearStat("sh"))}</b></div>
-      <div class="muted" style="font-size:11.5px;margin-top:4px">Strength: attack power${G.STR_FULL.has(c.cls) ? "" : " (less for your class)"} · Agility: ${c.cls === "hunter" || c.cls === "druid" ? "attack power" + (c.cls === "druid" ? " in Bear and Wolf Form" : "") + ", " : ""}attack crit and dodge · Intellect: ${CLASSES[c.cls].res === "mana" ? "mana, spell power and " : ""}spell crit · Stamina: 10 health each</div>`;
+      <div class="muted" style="font-size:11.5px;margin-top:4px">Strength: attack power${G.STR_FULL.has(c.cls) ? "" : " (less for your class)"} · Agility: ${c.cls === "hunter" || c.cls === "rogue" || c.cls === "druid" ? "attack power" + (c.cls === "druid" ? " in Bear and Wolf Form" : "") + ", " : ""}attack crit and dodge · Intellect: ${CLASSES[c.cls].res === "mana" ? "mana, spell power and " : ""}spell crit · Stamina: 10 health each</div>`;
     const mu = CLASSES[c.cls].res === "mana";
     h += `<h3>Stats</h3><div class="stats">
       <span>Health</span><b>${P.maxHp}</b>${mu ? `<span>Mana</span><b>${P.maxMana}</b>` : ""}
@@ -623,7 +636,7 @@ function npcHTML(n){
 let shopStock = [];
 
 // ---------------------------------------------------------------- death
-function onDeath(){ $("dead").hidden = false; $("ghostbar").hidden = true; log("You have died.", "#ff6b5e"); }
+function onDeath(){ $("dead").hidden = false; updWotdBtn(); $("ghostbar").hidden = true; log("You have died.", "#ff6b5e"); }
 // ---------------------------------------------------------------- graveyards: one in every zone, seen only by spirits
 // Release Spirit takes you there as a spirit. Walk back to your body to come back with half your health and mana,
 // or let the Spirit Guide bring you back at once with Resurrection Sickness (everything at 25% for a while).
@@ -714,6 +727,41 @@ function exitDungeon(d){
   for(const m of mobs) if(m.dg && m.state === "chase" && dungeonAt(m.hx) === d) evade(m);
   banner(zoneName(), ""); log(`You leave ${d.name}.`, "#93a4ad"); save(); }
 $("revive").addEventListener("click", releaseSpirit);
+// Undead: Will of the Dead – back to life where you fell, 30% health, no Resurrection Sickness, once every 30 min (the wait is kept across reloads)
+const WOTD = 1800;
+const wotdLeft = () => Math.max(0, ((S.cur && S.cur.wotd) || 0) - Date.now()) / 1000;
+function willOfTheDead(){ if(!P.dead || S.cur.race !== "undead") return; if(wotdLeft() > 0) return err("Not ready yet");
+  if(P.ghost && P.corpse){ P.x = P.corpse.x; P.z = P.corpse.z; }
+  S.cur.wotd = Date.now() + WOTD * 1000; $("dead").hidden = true; comeBack(0.3);
+  G.ring(P.px, P.py, 70, "#5ab04a"); G.burst(P.px, P.py, "#7aff6a", 30); G.burst(P.px, P.py, "#1a1a1a", 18); raiseFx = 1.6;
+  floatText(P, "Will of the Dead", "#7aff6a", true); log("Will of the Dead: you have returned to life.", "#7aff6a"); save(); }
+$("wotd").addEventListener("click", () => G.tryUse("willdead"));
+function updWotdBtn(){ const b = $("wotd"); if(!S.cur || S.cur.race !== "undead"){ b.hidden = true; return; } b.hidden = false; const l = wotdLeft();
+  b.disabled = l > 0; const txt = l > 0 ? `Will of the Dead (${Math.ceil(l / 60)} min)` : "Will of the Dead"; if(b.textContent !== txt) b.textContent = txt; }
+// ---------------------------------------------------------------- racial ability effects on your character
+// a glowing ring at your feet while Sprint, Bloodrage, Stoneform or Shadowmeld is active; your body turns to stone, glows red or fades into the shadows
+const RACE_FX = {sprint: 0x7fe8ff, bloodrage: 0xff3a2a, stoneform: 0xb8b0a0, meld: 0x8a6ab8};
+const fxRing = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 32), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide}));
+fxRing.rotation.x = -Math.PI / 2; fxRing.visible = false; fxRing.raycast = () => {}; scene.add(fxRing);
+const raiseCol = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.3, 9, 16, 1, true), new THREE.MeshBasicMaterial({color: 0x7aff6a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending}));
+raiseCol.visible = false; raiseCol.raycast = () => {}; scene.add(raiseCol);
+let raiseFx = 0, heroLook = "", puffT = 0;
+const lookOf = () => P.ghost ? "" : P.buffs.meld ? "meld" : P.buffs.stoneform ? "stone" : P.buffs.bloodrage ? "rage" : "";
+function tintHero(){ if(!hero || !heroLook) return; const L = heroLook;
+  hero.traverse(o => { if(!o.isMesh) return; o.material = o.material.clone();
+    if(L === "meld"){ o.material.transparent = true; o.material.opacity = 0.32; o.material.depthWrite = false; if(o.material.color) o.material.color.lerp(new THREE.Color(0x2a1a4a), 0.55); o.castShadow = false; }
+    if(L === "stone" && o.material.color) o.material.color.lerp(new THREE.Color(0x9a948a), 0.75);
+    if(L === "rage" && o.material.emissive){ o.material.emissive.setHex(0x8a1a0a); o.userData.rage = true; } }); }
+function updRaceFx(dt){
+  const L = running ? lookOf() : ""; if(L !== heroLook){ heroLook = L; buildHero(); }
+  const k = running && !P.ghost && Object.keys(RACE_FX).find(b => P.buffs[b]);
+  fxRing.visible = !!k; if(k){ fxRing.material.color.setHex(RACE_FX[k]); fxRing.position.set(P.x, height(P.x, P.z) + 0.07, P.z); fxRing.rotation.z += dt * 1.5;
+    const pulse = 1 + Math.sin(now * 6) * 0.08; fxRing.scale.setScalar(pulse); fxRing.material.opacity = Math.min(0.7, P.buffs[k] * 0.6); }
+  if(heroLook === "rage" && hero){ const e = 0.35 + Math.sin(now * 9) * 0.25; hero.traverse(o => { if(o.isMesh && o.userData.rage) o.material.emissiveIntensity = e; }); }
+  if(running && P.buffs.sprint && P.moving && (puffT -= dt) <= 0){ puffT = 0.09; G.burst(P.px - Math.sin(P.rot) * 12, P.py - Math.cos(P.rot) * 12, "#dff6ff", 3); }
+  if(raiseFx > 0){ raiseFx -= dt; raiseCol.visible = raiseFx > 0; raiseCol.position.set(P.x, height(P.x, P.z) + 4.5, P.z); raiseCol.material.opacity = Math.min(0.45, raiseFx * 0.4); raiseCol.scale.set(1 + (1.6 - raiseFx) * 0.4, 1, 1 + (1.6 - raiseFx) * 0.4); }
+  if(S.cur && S.cur.race === "undead"){ const l = wotdLeft(); if(l > 0) P.cds.willdead = l; else delete P.cds.willdead; if(P.dead && !$("dead").hidden) updWotdBtn(); }
+}
 
 function refresh(){ if(!$("panel").hidden) renderPanel(); updTracker(); }
 // ---------------------------------------------------------------- dungeon loot rolls: Need / Greed / Pass (30 sec)
@@ -733,7 +781,7 @@ $("chatin").addEventListener("keydown", e => { e.stopPropagation();
 $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("chatbox").hidden = true; });
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
-G.initEngine(scene, {floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount});
+G.initEngine(scene, {floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
 CO.initCoop({scene, hud, log, err, save, floatText, chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? makeMount(MOUNTS[k]) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t),
@@ -759,11 +807,11 @@ function doAction(a, e){
     const n = nearestUsable(USE_RANGE); if(n) useThing(n); else err("Nothing to interact with"); }
   else if(a === "potHp") G.usePotion("hp"); else if(a === "potMana") G.usePotion("mana");
   else if(a === "map") toggleMap();
-  else if(a === "petAttack"){ if(S.cur.cls === "hunter") G.petAttackCmd(); } else if(a === "petFollow"){ if(S.cur.cls === "hunter") G.petFollowCmd(); }
+  else if(a === "petAttack"){ if(G.PET_CLASSES.has(S.cur.cls)) G.petAttackCmd(); } else if(a === "petFollow"){ if(G.PET_CLASSES.has(S.cur.cls)) G.petFollowCmd(); }
   else if(a === "formBear" || a === "formCat" || a === "formTravel"){ const f = FORMS.find(x => x[1] === a); if(S.cur.cls === "druid" && f && S.cur.learned.includes(f[0])) G.tryUse(f[0]); }
   else if(a === "mount") toggleMount();
   else if(a === "chat") openChat();
-  else if(/^petSkill[123]$/.test(a) && S.cur.cls === "hunter"){ const pt = G.getPet(), sk = pt && G.PET_SKILLS[pt.kind][+a.slice(-1) - 1]; if(sk){ G.togglePetSkill(sk.id); buildPetBar(); } }
+  else if(/^petSkill[123]$/.test(a) && G.PET_CLASSES.has(S.cur.cls)){ const pt = G.getPet(), sk = pt && G.PET_SKILLS[pt.kind][+a.slice(-1) - 1]; if(sk){ G.togglePetSkill(sk.id); buildPetBar(); } }
   else if(["quests", "char", "bag", "spells", "tal", "keys", "coop"].includes(a)) togglePanel(a);
   else if(/^[bs]\d+$/.test(a)){ const idx = (a[0] === "s" ? 10 : 0) + (+a.slice(1)) - 1; useSlot(curBar()[idx]); }
 }
@@ -776,7 +824,7 @@ addEventListener("keydown", e => {
   if(!running) return;
   down.add(e.code);
   // Esc: close a window, then cancel a cast, then clear the target, then open the menu
-  if(e.code === "Escape"){ if(!$("bigmap").hidden) toggleMap(); else if(!$("gmenu").hidden) closeGameMenu(); else if(!$("panel").hidden) closePanel(); else if(P.casting) G.cancelCast(); else if(P.target || P.ftarget || P.selfT){ P.target = null; P.auto = false; P.selfT = false; CO.select(null); } else openGameMenu(); return; }
+  if(e.code === "Escape"){ if(!$("bigmap").hidden) toggleMap(); else if(!$("gmenu").hidden) closeGameMenu(); else if(!$("panel").hidden) closePanel(); else if(P.casting) G.cancelCast(); else if(P.target || P.ftarget || P.selfT || P.petSel){ P.target = null; P.auto = false; P.selfT = false; P.petSel = false; CO.select(null); } else openGameMenu(); return; }
   if(!$("gmenu").hidden) return;
   const combo = K.comboOf(e); if(!combo) return;
   const a = K.actionFor(combo) || (e.shiftKey || e.ctrlKey || e.altKey ? null : null);
@@ -803,8 +851,9 @@ function pick(e){ mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerH
   for(const n of nodes) if(n.active && n.mesh.visible) n.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
   for(const p of portals) meshes.push(p.mesh);
   for(const r of Object.values(CO.COOP.remotes)) if(r.mesh && r.mesh.visible) r.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
+  { const pt = G.getPet(); if(pt && !pt.dead) pt.mesh.traverse(o => { if(o.isMesh){ o.userData.myPet = pt; meshes.push(o); } }); }
   const hm = ray.intersectObjects(meshes, false)[0];
-  if(hm){ const u = hm.object.userData; if(u.mob) return {mob: u.mob}; if(u.remote) return {friend: u.remote}; if(u.npc) return {use: u.npc}; if(u.node) return {use: u.node}; }
+  if(hm){ const u = hm.object.userData; if(u.mob) return {mob: u.mob}; if(u.myPet) return {pet: u.myPet}; if(u.remote) return {friend: u.remote}; if(u.npc) return {use: u.npc}; if(u.node) return {use: u.node}; }
   const ht = ray.intersectObject(terrain)[0]; return ht ? {point: ht.point} : null; }
 renderer.domElement.addEventListener("contextmenu", e => e.preventDefault());
 // mouse: left click targets, right click attacks / talks / picks up, hold the right button and move the mouse to turn the camera
@@ -814,6 +863,7 @@ renderer.domElement.addEventListener("pointerdown", e => {
   if(e.button === 2){ rmb.down = true; rmb.moved = 0; rmb.x = e.clientX; rmb.y = e.clientY; renderer.domElement.setPointerCapture(e.pointerId); return; }
   if(e.button !== 0 || P.dead) return; const h = pick(e);
   if(h && h.mob){ P.target = h.mob; CO.select(null); }                                                 // left = select only
+  else if(h && h.pet) selectPet();
   else if(h && h.friend) CO.select(h.friend.id);                                                         // a friend: your heals go to them
   else if(!h || h.point){ P.target = null; P.auto = false; CO.select(null); P.selfT = false; }                           // clicking nothing clears your target
 });
@@ -832,6 +882,7 @@ renderer.domElement.addEventListener("pointerup", e => {
 function turnTo(e, dx, dz, dt, rate = 14){ const want = Math.atan2(dx, dz); let dr = want - e.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); e.rot += dr * Math.min(1, dt * rate); }
 function moveMob(m, gx, gz, speed, dt){            // walks around houses, rocks and trees (see nav.js)
   const dir = steer(m, gx, gz, dt, blocked); if(!dir) return false;
+  speed *= envSpeed(m.x, m.z);                         // (water in the Drowned Temple slows monsters too)
   if(tryMove(m, dir.dx * speed * dt, dir.dz * speed * dt)){ m.moving = true; turnTo(m, dir.dx, dir.dz, dt, 10); return true; }
   return false;
 }
@@ -846,7 +897,7 @@ function updMob(m, dt){
   if(m.state === "idle"){
     m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.1 * dt);
     if(m.far) return;                                                                        // nobody near: it just stands there
-    if(!m.K.passive) for(const c of CO.cands(m)){ if(c.pet) continue; const range = clamp(9 + (m.lvl - c.lvl) * 1.2, 5, 13) * (nightNow ? 0.85 : 1);   // harder to see you at night
+    if(!m.K.passive) for(const c of CO.cands(m)){ const range = clamp(9 + (m.lvl - (c.pet ? S.cur.level : c.lvl)) * 1.2, 5, 13) * (c.pet ? 0.7 : 1) * (nightNow ? 0.85 : 1);   // harder to see you at night
       if(distU(m, c.e) < range && sees(m, c.e)){ G.aggro(m); G.social(m); if(CO.coopMob(m)){ m.threat = m.threat || {}; m.threat[c.id] = (m.threat[c.id] || 0) + 1; } if(c.me) log(`${m.name} attacks you!`, "#ff9a7a"); return; } }
     m.wanderT -= dt; if(m.wanderT <= 0){ m.wanderT = 3 + Math.random() * 5; const a = Math.random() * 6.28, d = Math.random() * 5; m.wx = m.hx + Math.cos(a) * d; m.wz = m.hz + Math.sin(a) * d; }
     if(m.wx != null){ const dx = m.wx - m.x, dz = m.wz - m.z, d = Math.hypot(dx, dz); if(d < 0.3) m.wx = null; else { if(tryMove(m, dx / d * 1.6 * dt, dz / d * 1.6 * dt)) m.moving = true; else m.wx = null; turnTo(m, dx, dz, dt, 6); } }
@@ -865,10 +916,11 @@ function updMob(m, dt){
     if(dt2 <= reach + 0.5) turnTo(m, tg.x - m.x, tg.z - m.z, dt, 10);
     m.atkT -= dt;
     if(dt2 <= reach + 0.3 && seen && m.atkT <= 0){ m.atkT = ATK_SPEED; m.attackAnim = 1;
-      if(rg && dt2 > m.K.reach + tg.r + 0.5) mobBolt(m, c, m.dmg, rg.color);                     // a spell from range
-      else CO.mobAttack(m, c, m.dmg, "melee"); }
+      const dm = m.dmg * (m.weakT > 0 ? 0.8 : 1);                                                // (Curse of Weakness)
+      if(rg && dt2 > m.K.reach + tg.r + 0.5) mobBolt(m, c, dm, rg.color);                     // a spell from range
+      else CO.mobAttack(m, c, dm, "melee"); }
   } else if(m.state === "return"){
-    m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.5 * dt); m.slowT = m.rootT = m.stunT = 0;
+    m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.5 * dt); m.slowT = m.rootT = m.freezeT = m.stunT = 0;
     const d = Math.hypot(m.hx - m.x, m.hz - m.z);
     if(d < 0.6){ m.state = "idle"; m.hp = m.maxHp; m.path = null; }
     else if(!moveMob(m, m.hx, m.hz, m.K.speed * 1.3, dt)){ m.x += (m.hx - m.x) / d * m.K.speed * dt; m.z += (m.hz - m.z) / d * m.K.speed * dt; m.moving = true; }   // stuck: slip through
@@ -896,7 +948,7 @@ function novaVis(m, nv){ const t = nv ? nv[0] : 0; if(t > 0){ if(!m.nova){ const
 function respawnVis(m){ m.dead = false; m.deadT = 0; m.mesh.visible = true; m.mesh.rotation.z = 0; }
 function clearNova(m){ if(m.nova){ scene.remove(m.nova.mesh); m.nova.mesh.geometry.dispose(); m.nova = null; } }
 function novaBlast(m){ const N = m.K.nova, at = {x: m.nova.x, z: m.nova.z}; G.ring(at.x * PXU, at.z * PXU, N.r * PXU, N.atTarget ? "#a8a08a" : "#ff5a2a"); G.burst(at.x * PXU, at.z * PXU, N.atTarget ? "#8a8070" : "#ff7a3a", 30);
-  for(const c of CO.cands(m)) if(distU(c.e, at) < N.r) CO.mobAttack(m, c, m.dmg * N.dmg, "spell");       // everyone standing in it
+  for(const c of CO.cands(m)) if(distU(c.e, at) < N.r) CO.mobAttack(m, c, m.dmg * N.dmg * (m.weakT > 0 ? 0.8 : 1), "spell");       // everyone standing in it
   clearNova(m); }
 function separate(){ const act = mobs.filter(m => m.state === "chase");
   for(let i = 0; i < act.length; i++) for(let j = i + 1; j < act.length; j++){ const a = act[i], b = act[j], d = distU(a, b), min = a.r + b.r; if(d < min && d > 0.01){ const p = (min - d) / 2, ux = (a.x - b.x) / d, uz = (a.z - b.z) / d; tryMove(a, ux * p, uz * p); tryMove(b, -ux * p, -uz * p); } } }
@@ -923,8 +975,15 @@ function updMovement(dt){
   if(ix || iz){ const l = Math.hypot(ix, iz), s = Math.sin(cam.yaw), c = Math.cos(cam.yaw); dir = {dx: (ix * c + iz * s) / l, dz: (-ix * s + iz * c) / l}; voluntary = true; }
   else if(P.dest){ dir = Math.hypot(P.dest.x - P.x, P.dest.z - P.z) < 0.3 ? null : steer(P, P.dest.x, P.dest.z, dt, blocked); if(!dir){ P.dest = null; marker.visible = false; } else voluntary = true; }
    // walk up to what you attack
-  if(dir){ const sp = G.playerSpeed(), ok = tryMove(P, dir.dx * sp * dt, dir.dz * sp * dt); if(ok) P.moving = true; else if(P.dest){ P.dest = null; marker.visible = false; }
-    turnTo(P, dir.dx, dir.dz, dt); P.lastMv = {px: dir.dx, py: dir.dz}; unstuck(dt, ok); }
+  if(onIce(P.x, P.z) && !P.ghost){                                                           // ice (Frost Vault): you keep sliding and turn slowly
+    const sp = G.playerSpeed(), S2 = P.slide || (P.slide = {x: 0, z: 0}), k = 1 - Math.exp(-dt * (dir ? 1.6 : 0.5));
+    S2.x += ((dir ? dir.dx * sp : 0) - S2.x) * k; S2.z += ((dir ? dir.dz * sp : 0) - S2.z) * k;
+    if(Math.hypot(S2.x, S2.z) > 0.25){ if(tryMove(P, S2.x * dt, S2.z * dt)) P.moving = true; else { S2.x *= 0.3; S2.z *= 0.3; if(P.dest){ P.dest = null; marker.visible = false; } } }
+    if(dir){ turnTo(P, dir.dx, dir.dz, dt); P.lastMv = {px: dir.dx, py: dir.dz}; } }
+  else if(dir){ const sp = G.playerSpeed(), ok = tryMove(P, dir.dx * sp * dt, dir.dz * sp * dt); if(ok) P.moving = true; else if(P.dest){ P.dest = null; marker.visible = false; }
+    turnTo(P, dir.dx, dir.dz, dt); P.lastMv = {px: dir.dx, py: dir.dz}; P.slide = {x: dir.dx * sp, z: dir.dz * sp}; unstuck(dt, ok); }
+  else P.slide = null;
+  if(!dir && P.slide && !onIce(P.x, P.z)) P.slide = null;
   else if(P.auto && P.target && G.inMeleeOrRange(P.target)) turnTo(P, P.target.x - P.x, P.target.z - P.z, dt);
   else if(P.casting && P.casting.t) turnTo(P, P.casting.t.x - P.x, P.casting.t.z - P.z, dt);
   return voluntary && P.moving;
@@ -941,7 +1000,9 @@ function npcPlate(n){ let p = npcPlates.get(n); if(!p){ p = document.createEleme
 // buffs and debuffs: small icons with the seconds left, under your frame and the target frame
 const AURA = {   // buff key → ability whose icon it uses
   shout: "shout", bark: "bark", avenging: "avenging", bubble: "bubble", dash: "dash", hotstreak: "pyroblast",
-  ignite: "fireball", deep: "rend", burn: "firearrow", pyro: "pyroblast"};
+  ignite: "fireball", deep: "rend", burn: "firearrow", pyro: "pyroblast", sprint: "sprint", bloodrage: "bloodrage", meld: "meld", stoneform: "stoneform",
+  stskin: "stoneskin", earthstr: "strengthtotem", heroism: "heroism", lshield: "lshield", slice: "slicedice", evasion: "evasion", adren: "adrenaline", stealth: "stealth",
+  immolate: "immolate", corruption: "corruption", agony: "agony", rupture: "rupture", flameshock: "flameshock"};
 const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir of Ironskin", "#a8b0bc"], keen: ["Elixir of Keenness", "#ff9a4a"], sage: ["Elixir of Wisdom", "#9fd6e8"]};
 function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good}; }
 function playerAuras(){ const L = [];
@@ -951,14 +1012,20 @@ function playerAuras(){ const L = [];
   if(P.shield > 0) L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(P.shield)} left)`, left: P.shieldT, good: true});
   if(P.sitting) L.push({url: iconURL("halo", "#7fa8b8"), name: "Resting", left: null, good: true});
   if(P.potCd > 0) L.push({url: iconURL("flask", "#8a8a8a"), name: "Potion cooldown", left: P.potCd, good: false});
+  if(P.buffs.chill) L.push({url: iconURL("snowflake", "#bfe9ff"), name: "Chilled: movement speed reduced by 40%", left: P.buffs.chill, good: false});
+  if(P.envSpeed < 1) L.push({url: iconURL("drop", "#5fa8e0"), name: "Wading: movement speed reduced by 45%", left: null, good: false});
   return L; }
 function targetAuras(m){ const L = [];
   for(const d of m.dots){ const id = AURA[d.key] || (AB[d.key] ? d.key : null); L.push(id ? abAura(id, d.left, false) : {url: iconURL("drop", "#d0453a"), name: d.key, left: d.left, good: false}); }
   if(m.stunT > 0) L.push({url: iconURL("fist", "#e0b050"), name: "Stunned", left: m.stunT, good: false});
-  if(m.rootT > 0) L.push({url: iconURL("roots", "#a0b860"), name: "Rooted", left: m.rootT, good: false});
+  if(m.freezeT > 0) L.push({url: iconURL("snowflake", "#bfe9ff"), name: "Frozen", left: m.freezeT, good: false});
+  else if(m.rootT > 0) L.push({url: iconURL("roots", "#a0b860"), name: "Rooted", left: m.rootT, good: false});
   if(m.slowT > 0) L.push({url: iconURL("snowflake", "#8fd8ff"), name: `Slowed ${Math.round(m.slowPct * 100)}%`, left: m.slowT, good: false});
   if(m.tauntT > 0) L.push({url: iconURL("roar", "#e6bd5c"), name: "Taunted by your pet", left: m.tauntT, good: false});
+  if(m.weakT > 0) L.push(abAura("weakness", m.weakT, false));
   return L; }
+function petAurasHUD(){ return G.petAuras().map(a => a.shield ? {url: iconURL("shield", "#fff2b0"), name: a.name, left: a.left, good: true} : a.taunt ? {url: iconURL("roar", "#e6bd5c"), name: "Taunting", left: a.left, good: true}
+  : AB[a.id] ? abAura(a.id, a.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", left: a.left, good: true}); }
 const fmtLeft = s => s == null ? "" : s >= 60 ? Math.ceil(s / 60) + "m" : Math.ceil(s) + "";
 function setAuras(el, list){ const html = list.map(a => `<span class="aura ${a.good ? "" : "bad"}" title="${a.name}"><img src="${a.url}"><b>${fmtLeft(a.left)}</b></span>`).join("");
   if(el.innerHTML !== html) el.innerHTML = html; }
@@ -975,19 +1042,24 @@ function updHUD(dt){
   { const html = P.form === "cat" ? Array.from({length: 5}, (_, i) => `<i class="${i < P.cp ? "on" : ""}"></i>`).join("") : ""; if($("pcp").innerHTML !== html) $("pcp").innerHTML = html; }
   setAuras($("pbuffs"), playerAuras());
   // your pet: its health and rage (bear) or energy (wolf), under your frame
-  { const pt = c.cls === "hunter" ? G.getPet() : null; $("ppet").hidden = !pt;
+  { const pt = G.PET_CLASSES.has(c.cls) ? G.getPet() : null; $("ppet").hidden = !pt; $("ppet").classList.toggle("sel", G.petSelected()); if(pt) setAuras($("ppetb"), petAurasHUD());
     if(pt){ $("ppetn").textContent = pt.name; $("ppetm").textContent = pt.dead ? "Dead" : pt.mode === "follow" ? "Following" : pt.mode === "attack" ? "Attacking" : "Assisting";
       $("ppethi").style.width = (pt.hp / pt.maxHp * 100) + "%"; $("ppethi").style.background = pt.dead ? "#555" : ""; $("ppetht").textContent = `${Math.ceil(pt.hp)} / ${pt.maxHp}`;
-      const rk = pt.kind === "bear" ? "rage" : "energy"; $("ppetri").style.width = Math.min(100, pt.res) + "%"; $("ppetri").style.background = `var(--${rk})`; $("ppetrt").textContent = `${Math.floor(pt.res)} / 100`; } }
+      const rk = (G.PETS[pt.kind] || {}).res || "energy"; $("ppetri").style.width = Math.min(100, pt.res) + "%"; $("ppetri").style.background = `var(--${rk})`; $("ppetrt").textContent = `${Math.floor(pt.res)} / 100`; } }
   updPetBar(); if(P.ghost) updGhostBar();
   { const pf = $("pframe"), top = pf.offsetTop + pf.offsetHeight + 8 + "px"; if($("party").style.top !== top) $("party").style.top = top; }
   CO.partyHUD();
   updThreat();
   const need = G.xpNeed(c.level); $("xpi").style.width = (c.xp / need * 100) + "%"; $("xpt").textContent = `${c.xp} / ${need} XP`;
   if(P.target || P.ftarget) P.selfT = false;
+  if(P.target || P.ftarget || P.selfT || !G.getPet() || G.getPet().dead) P.petSel = false;
   { const pf = $("pframe"), left = pf.offsetLeft + pf.offsetWidth + 12 + "px"; if($("tframe").style.left !== left) $("tframe").style.left = left; }   // the target frame sits right of yours
-  const t = P.target, tf = $("tframe"), fr = !t && P.ftarget ? CO.remoteById(P.ftarget) : null, me = !t && !fr && P.selfT; setAuras($("tauras"), t && !t.dead ? targetAuras(t) : []);
-  tf.classList.toggle("friend", !!fr); tf.classList.toggle("self", !!me);
+  const t = P.target, tf = $("tframe"), fr = !t && P.ftarget ? CO.remoteById(P.ftarget) : null, me = !t && !fr && P.selfT, pe = !t && !fr && !me && G.petSelected() ? G.getPet() : null;
+  setAuras($("tauras"), t && !t.dead ? targetAuras(t) : pe ? petAurasHUD() : []);
+  tf.classList.toggle("friend", !!fr); tf.classList.toggle("self", !!(me || pe));
+  if(pe){ tf.hidden = false; $("tname").textContent = pe.name; $("tlvl").textContent = "Level " + c.level; $("tlvl").style.color = "#7be08a";
+    $("thpi").style.width = (pe.hp / pe.maxHp * 100) + "%"; $("thpt").textContent = `${Math.ceil(pe.hp)} / ${pe.maxHp}`; $("tstate").textContent = "Your pet"; }
+  else
   if(me){ tf.hidden = false; $("tname").textContent = c.name; $("tlvl").textContent = "Level " + c.level; $("tlvl").style.color = "#7be08a";
     $("thpi").style.width = (P.hp / P.maxHp * 100) + "%"; $("thpt").textContent = `${Math.ceil(P.hp)} / ${P.maxHp}`; $("tstate").textContent = ""; }
   else
@@ -1044,7 +1116,8 @@ const mapImg = (() => { const cv = document.createElement("canvas"), w = (B.x1 -
 // each dungeon's map: floor tiles
 const dgImgs = new Map(DUNGEONS.map(d => [d, (() => { const cv = document.createElement("canvas"), t = d.T * MM_PX; cv.width = d.W * t; cv.height = d.H * t; const g = cv.getContext("2d");
   g.fillStyle = "#1a1612"; g.fillRect(0, 0, cv.width, cv.height); g.fillStyle = "#6a6258";
-  for(let j = 0; j < d.H; j++) for(let i = 0; i < d.W; i++) if(!d.wallTile(i, j)) g.fillRect(i * t, j * t, t + 0.5, t + 0.5); return cv; })()]));
+  const MC = {"~": "#3a6a8a", L: "#b8401a", i: "#a8c0cc", w: "#8aa8b8", v: "#7a3a1a", o: "#3a342e", G: "#5a5a6a"};
+  for(let j = 0; j < d.H; j++) for(let i = 0; i < d.W; i++){ const k = d.kind(i, j); if(k === "#") continue; g.fillStyle = MC[k] || "#6a6258"; g.fillRect(i * t, j * t, t + 0.5, t + 0.5); } return cv; })()]));
 function drawMinimap(){
   const W = MM.width, c = W / 2, s = c / MM_R, cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw);
   const to = (x, z) => { const dx = x - P.x, dz = z - P.z; return [c + s * (dx * cy - dz * sy), c + s * (dx * sy + dz * cy)]; };
@@ -1146,7 +1219,7 @@ function zoneName(){ const dg = curDungeon(); return dg ? dg.name : placeName(P.
 function update(dt){
   now += dt;
   if(running){
-    const moved = updMovement(dt);
+    const moved = updMovement(dt); updMech(dt);
     G.updPlayer(dt, moved);
     saveT += dt; if(saveT > 10){ saveT = 0; save(); }
     trackT += dt; if(trackT > 2){ trackT = 0; updTracker(); }
@@ -1160,8 +1233,10 @@ function update(dt){
   // the hero
   if(hero){ P.walk = P.moving ? P.walk + dt * 9 : P.walk * 0.85;
     const pose = P.sitting ? "sit" : P.pose || (P.attackAnim > 0 && P.attackKind === "cast" ? "cast" : null);
-    hero.userData.animate(P.walk, P.moving, P.attackKind === "cast" ? 0 : P.attackAnim, pose);
-    hero.position.set(P.x, height(P.x, P.z) + (P.moving ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(P.dead && !P.ghost ? -1.4 : 0, P.rot, 0); if(P.dead && !P.ghost) hero.position.y += 0.3;
+    const sk = hero.userData.skinned, lying = P.dead && !P.ghost;
+    hero.userData.animate(P.walk, P.moving, sk || P.attackKind !== "cast" ? P.attackAnim : 0, pose, {kind: P.attackKind, dead: lying, mount: !!P.mount, speed: G.playerSpeed()});
+    hero.position.set(P.x, height(P.x, P.z) + (P.moving && !sk ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(lying && !sk ? -1.4 : 0, P.rot, 0); if(lying && !sk) hero.position.y += 0.3;
+  updRaceFx(dt);
     if(P.ghost) hero.position.y += 0.25 + Math.sin(now * 2) * 0.08;                            // a spirit floats
     if(mountMesh){ const gy = height(P.x, P.z); mountMesh.position.set(P.x, gy, P.z); mountMesh.rotation.y = P.rot; mountMesh.userData.animate(P.walk * 0.75, P.moving, 0); hero.position.y = gy + mountMesh.userData.saddle - 0.38 + (P.moving ? Math.abs(Math.sin(P.walk * 0.75)) * 0.08 : 0); } }
   // monsters: only the ones near you (or a friend) are drawn and move about
@@ -1208,9 +1283,9 @@ function update(dt){
     m.mesh.traverse(o => { if(o.isMesh){ if(m.flash > 0 && !o.userData.fl){ o.userData.fl = o.material; o.material = o.material.clone(); if(o.material.emissive) o.material.emissive.setHex(0x883322); } else if(m.flash <= 0 && o.userData.fl){ o.material = o.userData.fl; o.userData.fl = null; } } }); }
   G.updFx(dt);
   // the ring under your target: pulsing red while you attack it, calm yellow when you don't, green for a friend
-  { const fr = !P.target && P.ftarget ? CO.remoteById(P.ftarget) : null, tg = P.target && !P.target.dead ? P.target : fr && !fr.gh && CO.sameRegion(fr, P) ? fr : P.selfT && !P.dead ? P : null;
+  { const fr = !P.target && P.ftarget ? CO.remoteById(P.ftarget) : null, tg = P.target && !P.target.dead ? P.target : fr && !fr.gh && CO.sameRegion(fr, P) ? fr : P.selfT && !P.dead ? P : G.petSelected() ? G.getPet() : null;
     if(tg){ selRing.visible = true; selRing.position.set(tg.x, height(tg.x, tg.z) + 0.08, tg.z); const base = (tg.r || 0.4) / 0.6 + 0.3, atk = tg === P.target && P.auto;
-      selRing.scale.setScalar(base * (atk ? 1 + Math.sin(now * 7) * 0.12 : 1)); selRing.material.color.setHex(fr || tg === P ? 0x5adc6a : atk ? 0xff3a2a : 0xffc84a); selRing.material.opacity = atk ? 0.65 + Math.sin(now * 7) * 0.3 : 0.8; }
+      selRing.scale.setScalar(base * (atk ? 1 + Math.sin(now * 7) * 0.12 : 1)); selRing.material.color.setHex(fr || tg === P || tg === G.getPet() ? 0x5adc6a : atk ? 0xff3a2a : 0xffc84a); selRing.material.opacity = atk ? 0.65 + Math.sin(now * 7) * 0.3 : 0.8; }
     else selRing.visible = false; }
   // camera: angled from above, follows you, smooth zoom and turning
   cam.dist = lerp(cam.dist, cam.distT, Math.min(1, dt * 8)); cam.yaw = lerp(cam.yaw, cam.yawT, Math.min(1, dt * 8));

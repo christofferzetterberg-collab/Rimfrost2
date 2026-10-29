@@ -64,6 +64,9 @@ const MOBS = {
   giant: {name: "Hrimgar the Ice Giant", lv: [30, 30], color: "#a8d8ec", r: 22, sp: 85, shape: "troll", elite: 7, boss: true, special: {name: "Glacier Crush", every: 7, r: 135, windup: 1.5, mult: 2.6}},
   // the Draug King's crypt
   boss: {name: "The Draug King", lv: [20, 20], color: "#7cb3c4", r: 20, sp: 85, shape: "draug", elite: 6, boss: true, dg: 1, special: {name: "Grave Strike", every: 8, r: 125, windup: 1.6, mult: 2.6}},
+  cryptguard: {name: "Draug Warrior", lv: [19, 20], color: "#8aa4ac", r: 12, sp: 88, shape: "humanoid", dg: 1, hpm: 1.25, dmm: 1.1},
+  cryptpriest: {name: "Crypt Priest", lv: [19, 20], color: "#4a5a6a", r: 11, sp: 85, shape: "humanoid", ranged: 210, dg: 1, hpm: 1.25, dmm: 1.1},
+  cryptghoul: {name: "Crypt Ghoul", lv: [19, 20], color: "#6a7a6a", r: 12, sp: 100, shape: "ghoul", dg: 1, hpm: 1.25, dmm: 1.1},
   // the Iron Mine
   gruvkobold: {name: "Mine Kobold", lv: [12, 14], color: "#c9a24a", r: 9, sp: 95, shape: "humanoid", dg: 1, hpm: 1.25, dmm: 1.1},
   gruvspindel: {name: "Mine Spider", lv: [12, 14], color: "#4a4038", r: 11, sp: 100, shape: "spider", dg: 1, hpm: 1.25, dmm: 1.1},
@@ -117,6 +120,8 @@ const LOOKS = {
   magmagargoyl: c => makeGargoyle({color: 0x4a3a34, dark: 0x2a2220, wing: c, eyes: 0xffd060}),
   kultist: c => makeCultist({shirt: c, cape: 0x1a2a1a, weapon: 0x7aff9a, mask: 0x1a2a1a}),
   drunknad: c => makeDrowned({shirt: c}),
+  cryptguard: c => makeHumanoid({skin: 0x9ab0b8, shirt: 0x3a4a52, pants: 0x2a3238, boots: 0x1a2228, shoulders: 0x6a7a82, helm: {type: "plate", color: 0x5a6a72}, eyes: 0x9aff8a, cape: 0x1a2a2a, weaponType: "sword", weapon: 0x8a9aa0, offhand: "shield", offColor: 0x3a4a4a}),
+  cryptpriest: c => makeCultist({shirt: c, cape: 0x1a2a2a, mask: null, skin: 0x9ab0a8, hair: 0x2a2a2a, weapon: 0x9aff8a}),
   hagga: c => makeCultist({shirt: 0x3a2a3a, cape: 0x2a1a2a, hair: 0x8a8a8a, mask: null, skin: 0x8a9a6a, weapon: c}),
   templevakt: c => makeHumanoid({skin: c, shirt: c, pants: shade(c, 0.8), boots: shade(c, 0.6), shoulders: shade(c, 1.2), helm: {type: "plate", color: c}, cape: null, stocky: true, weaponType: "hammer", weapon: 0x6a7a6a}),
   profeten: c => makeCultist({shirt: c, cape: 0x1a3a3a, shoulders: 0x7fffd4, weapon: 0x7fffd4, mask: null, skin: 0x7a9a8a, hair: 0x2a4a3a, beard: true}),

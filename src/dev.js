@@ -93,11 +93,14 @@ const ROT = {
   priest: [["pws", () => !P.shield && P.hp / P.maxHp < 0.85], ["heal", lowHp(0.45)], ["renew", () => P.hp / P.maxHp < 0.7 && !P.hots.some(h => h.key === "renew")], ["swp", noDot("swp")], ["mindblast"], ["judgment"], ["holynova", near(3)], ["darkpulse", near(3)], ["smite"]],
   druid: [["touch", lowHp(0.4)], ["rejuv", () => P.hp / P.maxHp < 0.7 && !P.hots.some(h => h.key === "rejuv")], ["bark", lowHp(0.6)], ["moonfire", noDot("moonfire")], ["starfire"], ["hurricane"], ["wrath"]],
   druid_bear: [["frenzy"], ["roar", near(2.6)], ["bash"], ["swipe", near(2.6)], ["maul"]],
-  druid_cat: [["bite", () => P.cp >= 4], ["pounce"], ["rake", noDot("rake")], ["claw"]]
+  druid_cat: [["bite", () => P.cp >= 4], ["pounce"], ["rake", noDot("rake")], ["claw"]],
+  warlock: [["lifetap", () => P.mana / P.maxMana < 0.25 && P.hp / P.maxHp > 0.5], ["drainlife", lowHp(0.5)], ["deathcoil"], ["corruption", noDot("corruption")], ["agony", noDot("agony")], ["immolate", noDot("immolate")], ["soulfire"], ["shadowbolt"]],
+  rogue: [["evasion", lowHp(0.5)], ["slicedice", () => P.cp >= 2 && !P.buffs.slice], ["eviscerate", () => P.cp >= 4], ["kidney", () => P.cp >= 5], ["gouge", () => P.cp < 3], ["backstab"], ["sinister"]],
+  shaman: [["healwave", lowHp(0.4)], ["lshield", noBuff("lshield")], ["searing", () => !G.totemList().some(o => o.kind === "searing" || o.kind === "magma")], ["stoneskin", () => !G.totemList().some(o => o.kind === "stoneskin" || o.kind === "strength")], ["flameshock", noDot("flameshock")], ["earthshock"], ["chain"], ["lightning"]]
 };
-const MELEE = new Set(["warrior", "paladin", "druid_bear", "druid_cat"]);
+const MELEE = new Set(["warrior", "paladin", "druid_bear", "druid_cat", "rogue"]);
 const VARIANTS = lvl => [["warrior", "Warrior"], ["paladin", "Paladin"], ["hunter", "Hunter + bear", {pet: "bear"}], ...(lvl >= 10 ? [["hunter", "Hunter + wolf", {pet: "wolf"}]] : []),
-  ["mage", "Mage"], ["priest", "Priest"], ["druid", "Druid (caster)"], ...(lvl >= 10 ? [["druid", "Druid (bear)", {form: "bear"}]] : []), ...(lvl >= 15 ? [["druid", "Druid (wolf)", {form: "cat"}]] : [])];
+  ["mage", "Mage"], ["priest", "Priest"], ["warlock", "Warlock + imp", {pet: "imp"}], ...(lvl >= 10 ? [["warlock", "Warlock + voidwalker", {pet: "voidwalker"}]] : []), ["rogue", "Rogue"], ["shaman", "Shaman"], ["druid", "Druid (caster)"], ...(lvl >= 10 ? [["druid", "Druid (bear)", {form: "bear"}]] : []), ...(lvl >= 15 ? [["druid", "Druid (wolf)", {form: "cat"}]] : [])];
 const SCEN = [{id: "one", name: "1 monster", n: 1}, {id: "two", name: "2 monsters", n: 2}, {id: "elite", name: "Elite (3× health)", n: 1, elite: true}];
 function canUse(id, m){ const a = AB[id]; if(!a || !S.cur.learned.includes(id)) return false;
   if((P.cds[id] || 0) > 0 || (!a.offGcd && P.gcd > 0) || P.casting) return false;

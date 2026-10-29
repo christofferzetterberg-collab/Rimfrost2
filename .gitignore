@@ -1,1 +1,11 @@
 .DS_Store
+.idea/
+Claude outputs/
+
+# downloaded model packs (the game only uses assets/)
+KayKit_Adventurers_2.0_FREE/
+KayKit_Character_Animations_1.1/
+Animal Pack Vol.2 by @Quaternius/
+Animals Pack by Quaternius/
+Farm animals/
+Monster pack/

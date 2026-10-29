@@ -1,5 +1,7 @@
 // Low-poly characters and monsters built from simple shapes. Each model has an animate(walk, moving, attack) function.
 import * as THREE from "three";
+import {makeAvatar} from "./avatar.js";
+import {makeAnimal} from "./beasts.js";
 
 const mats = new Map();
 const flat = (color) => { if(!mats.has(color)) mats.set(color, new THREE.MeshLambertMaterial({color, flatShading: true})); return mats.get(color); };
@@ -28,8 +30,18 @@ export function makeHumanoid(c = {}){
   if(wt === "mace"){ const w = part(new THREE.BoxGeometry(0.07, 0.8, 0.07), 0x6b4a2e, 0, -0.72, 0.38); w.rotation.x = Math.PI / 2; w.add(part(new THREE.DodecahedronGeometry(0.17, 0), col.weapon, 0, 0.42, 0)); armR.add(w); }
   if(wt === "wand"){ const w = part(new THREE.CylinderGeometry(0.03, 0.035, 0.5, 6), 0x5a3a2a, 0, -0.75, 0.22); w.rotation.x = Math.PI / 2; w.add(part(new THREE.OctahedronGeometry(0.08, 0), col.weapon, 0, 0.28, 0)); armR.add(w); }
   if(col.offhand === "shield"){ const sh = part(new THREE.BoxGeometry(0.08, 0.62, 0.52), col.offColor || 0x8a8f96, -0.1, -0.5, 0.12); sh.add(part(new THREE.BoxGeometry(0.1, 0.18, 0.18), col.offTrim || 0xd8b04a, -0.01, 0, 0)); armL.add(sh); }
+  if(col.offhand === "dagger"){ const w = part(new THREE.BoxGeometry(0.06, 0.5, 0.1), col.offColor || 0xb8bec4, 0, -0.74, 0.25); w.rotation.x = Math.PI / 2; armL.add(w); }   // rogues: a second weapon
+  if(col.offhand === "sword"){ const w = part(new THREE.BoxGeometry(0.07, 0.8, 0.1), col.offColor || 0xb8bec4, 0, -0.7, 0.38); w.rotation.x = Math.PI / 2; armL.add(w); }
   if(col.offhand === "tome"){ const tb = part(new THREE.BoxGeometry(0.1, 0.3, 0.24), col.offColor || 0x5a2a6a, 0, -0.8, 0.12); armL.add(tb); }
-  if(wt === "bow"){ const w = part(new THREE.TorusGeometry(0.5, 0.03, 4, 12, Math.PI), 0x7a5a3a, 0, -0.72, 0.12); w.rotation.set(0, Math.PI / 2, Math.PI / 2); armL.add(w); }
+  let bowG = null;
+  if(wt === "bow"){                                     // the bow sits in the left hand: upright while you walk, upright and pointing at the target while you shoot
+    bowG = new THREE.Group(); bowG.position.set(0, -0.74, 0.04); armL.add(bowG);
+    const R = 0.58, bulge = 0.42, geo = new THREE.TorusGeometry(R, 0.035, 4, 14, Math.PI); geo.scale(1, bulge, 1);
+    const limb = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color: 0x7a5a3a, flatShading: true})); limb.castShadow = true;
+    limb.matrixAutoUpdate = false; limb.matrix.makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0), new THREE.Vector3(1, 0, 0)); limb.matrix.setPosition(0, R * bulge, 0);
+    const grip = part(new THREE.BoxGeometry(0.07, 0.07, 0.16), 0x3a2a1a, 0, 0, 0);
+    const str = part(new THREE.BoxGeometry(0.012, 0.012, R * 2), 0xe8e0c8, 0, R * bulge, 0);
+    bowG.add(limb, grip, str); bowG.userData.str = str; bowG.userData.rest = R * bulge; }
   body.add(torso, head, hat, legL, legR, armL, armR);
   if(col.robe) body.add(part(new THREE.BoxGeometry(0.66, 0.5, 0.4), col.shirt, 0, 0.72, 0));
   if(col.belt) body.add(part(new THREE.BoxGeometry(0.64, 0.1, 0.38), col.belt, 0, 0.9, 0));
@@ -49,11 +61,15 @@ export function makeHumanoid(c = {}){
   g.userData.animate = (walk, moving, attack, pose) => {
     const sw = Math.sin(walk) * (moving ? 0.7 : 0);
     legL.rotation.x = sw; legR.rotation.x = -sw; armL.rotation.set(-sw * 0.8, 0, 0); armR.rotation.set(sw * 0.8, 0, 0);
-    body.position.y = 0;
+    body.position.y = 0; body.rotation.y = 0;
+    if(bowG){ bowG.rotation.set(-Math.PI / 2, 0, 0); bowG.userData.str.position.y = bowG.userData.rest; }
     if(pose === "sit"){ body.position.y = -0.62 * body.scale.y; legL.rotation.x = legR.rotation.x = -1.45; armL.rotation.set(-0.5, 0, 0.1); armR.rotation.set(-0.5, 0, -0.1); return; }
     if(pose === "cast"){ armL.rotation.set(-1.7, 0, 0.35); armR.rotation.set(-1.7, 0, -0.35); }
+    const aim = d => { armL.rotation.set(-1.57, 0.25, 0); armR.rotation.set(-1.5, 0, -0.95 + d * 0.5); body.rotation.y = 0.3;   /* side-on stance, left arm at the target, right hand at the string (d: 1 = fully drawn) */
+      if(bowG){ bowG.rotation.set(0, -0.25, 0); bowG.userData.str.position.y = bowG.userData.rest + d * 0.32; } };
+    if(pose === "bow" && wt === "bow") aim(1);
     else if(pose === "bow"){ armL.rotation.set(-1.55, 0, 0); armR.rotation.set(-1.45, 0, 0.6); }
-    if(attack > 0){ if(wt === "bow") { armL.rotation.set(-1.55, 0, 0); armR.rotation.set(-1.5, 0, 0.6 - (1 - attack) * 0.5); }
+    if(attack > 0){ if(wt === "bow") aim(attack > 0.7 ? (1 - attack) / 0.3 : 0);                        /* draw, then release */
       else if(wt === "staff") armR.rotation.set(-1.6 + (1 - attack) * 0.6, 0, 0);
       else armR.rotation.set(-2.2 + (1 - attack) * 2.6, 0, 0); }                                          // overhead swing
   };
@@ -83,7 +99,7 @@ export function makeBeast(o){
   g.userData.height = o.legH + o.h + 0.5;
   return g;
 }
-export const makeWolf = () => makeBeast({w: 0.5, h: 0.5, l: 1.2, legH: 0.5, head: 0.42, color: 0x8a8f96, snout: 0x6f747a, leg: 0x6f747a, ears: true, tail: 0.6});
+export const makeWolf = () => makeAnimal("petWolf") || makeBeast({w: 0.5, h: 0.5, l: 1.2, legH: 0.5, head: 0.42, color: 0x8a8f96, snout: 0x6f747a, leg: 0x6f747a, ears: true, tail: 0.6});
 export const makeBoar = () => makeBeast({w: 0.75, h: 0.7, l: 1.3, legH: 0.38, head: 0.55, color: 0x6b4a32, snout: 0xc49a82, leg: 0x4a3222, tusks: true, tail: 0.25});
 export const makeBandit = () => makeHumanoid({shirt: 0x5a4632, pants: 0x3a3028, hair: 0x2a2a2a, cape: null, mask: 0x2a2020, weapon: 0x9aa0a6});
 // Rurik the Scarred, the bandit leader (an elite)
@@ -156,8 +172,8 @@ export const makeDraug = (o = {}) => { const g = makeSkeleton(Object.assign({ski
   const s2 = o.scale || 2.0; g.scale.setScalar(s2); g.userData.height *= s2; return g; };
 // druid shapes
 export const makeBearForm = () => makeBeast({w: 0.95, h: 0.9, l: 1.5, legH: 0.5, head: 0.6, color: 0x6a4a30, snout: 0x9a7a58, leg: 0x4e3622, ears: true, tail: 0.15});
-export const makeWolfForm = () => makeBeast({w: 0.55, h: 0.55, l: 1.3, legH: 0.55, head: 0.45, color: 0x4a5866, snout: 0x9fb0bc, leg: 0x3a4652, ears: true, tail: 0.7});
-export const makeLeopardForm = () => makeBeast({w: 0.5, h: 0.48, l: 1.4, legH: 0.55, head: 0.42, color: 0xd8b04a, snout: 0xf0dca0, leg: 0xb08a34, ears: true, tail: 0.9});
+export const makeWolfForm = race => makeAnimal("wolfForm", race) || makeBeast({w: 0.55, h: 0.55, l: 1.3, legH: 0.55, head: 0.45, color: 0x4a5866, snout: 0x9fb0bc, leg: 0x3a4652, ears: true, tail: 0.7});
+export const makeLeopardForm = race => makeAnimal("leopard", race) || makeBeast({w: 0.5, h: 0.48, l: 1.4, legH: 0.55, head: 0.42, color: 0xd8b04a, snout: 0xf0dca0, leg: 0xb08a34, ears: true, tail: 0.9});
 const hex = s => parseInt(s.slice(1), 16);
 const CLASS_LOOK = {
   mage:    {shirt: 0x3a5ab8, robe: true, cape: null, weaponType: "staff", weapon: 0xff9a4a, shoulders: 0x2a3f86, belt: 0xd8b04a},
@@ -165,7 +181,10 @@ const CLASS_LOOK = {
   hunter:  {shirt: 0x4f6f3a, pants: 0x5a4632, cape: 0x3a4f2a, weaponType: "bow", belt: 0x6b4a2e},
   priest:  {shirt: 0xe8e4d6, robe: true, cape: null, weaponType: "staff", weapon: 0xffe37a, belt: 0xc8a040},
   druid:   {shirt: 0x7a5a32, robe: true, cape: 0x4f7a3a, weaponType: "staff", weapon: 0x7fdc5a, belt: 0x4f7a3a},
-  paladin: {shirt: 0xc8ccd2, pants: 0x6a6f76, cape: 0x2f4f9f, weaponType: "hammer", weapon: 0xe0c050, shoulders: 0xe0c050, belt: 0x8a6a2a}
+  paladin: {shirt: 0xc8ccd2, pants: 0x6a6f76, cape: 0x2f4f9f, weaponType: "hammer", weapon: 0xe0c050, shoulders: 0xe0c050, belt: 0x8a6a2a},
+  warlock: {shirt: 0x3a2a4a, robe: true, cape: 0x1a1020, weaponType: "staff", weapon: 0x7aff6a, shoulders: 0x5a3a6a, belt: 0x6a4a8a},
+  rogue:   {shirt: 0x3a3a3e, pants: 0x2a2a2e, cape: null, weaponType: "dagger", weapon: 0xc8ced4, offhand: "dagger", offColor: 0xc8ced4, belt: 0x5a3a22, mask: 0x2a2a2e},
+  shaman:  {shirt: 0x3a5a8a, pants: 0x5a4632, cape: null, weaponType: "mace", weapon: 0x9a8a6a, shoulders: 0x6a5a3a, belt: 0x8a6a3a, offhand: "shield", offColor: 0x6a5a3a, offTrim: 0x5fa8e0}
 };
 // a player character from race + class (RACES colours come from Rimfrost 1)
 // what your equipment looks like: armor type colours, tinted by quality (green, blue, purple, orange)
@@ -174,6 +193,7 @@ const ARMOR_COL = {cloth: 0x5a4a8a, leather: 0x6b4a2e, plate: 0xa8aeb4};
 const tint = (base, q, k = 0.3) => q >= 2 ? new THREE.Color(base).lerp(new THREE.Color(QCOL[q]), k).getHex() : base;
 const metal = q => q >= 2 ? tint(0xc8ced4, q, 0.45) : 0xb8bec4;
 export function makeHero(race = "human", cls = "warrior", RACES = {}, eq = {}){
+  { const av = makeAvatar(race, cls, eq); if(av) return av; }                                  // the new KayKit models (where ready)
   const r = RACES[race] || {}, o = Object.assign({}, CLASS_LOOK[cls] || {});
   const arm = it => it.arm === "cloth" ? (CLASS_LOOK[cls].shirt || ARMOR_COL.cloth) : ARMOR_COL[it.arm];
   if(eq.chest){ o.shirt = tint(arm(eq.chest), eq.chest.q); }
@@ -183,7 +203,7 @@ export function makeHero(race = "human", cls = "warrior", RACES = {}, eq = {}){
   if(eq.shoulder){ o.shoulders = tint(eq.shoulder.arm === "plate" ? 0xb8bec4 : eq.shoulder.arm === "leather" ? 0x5a3a22 : 0x3a2a5a, eq.shoulder.q, 0.4); }
   if(eq.head){ o.helm = {type: eq.head.arm, color: tint(eq.head.arm === "plate" ? 0xa8aeb4 : eq.head.arm === "leather" ? 0x5a3a22 : (CLASS_LOOK[cls].shirt || 0x4a3a6a), eq.head.q, 0.4)}; }
   if(eq.weapon){ const wt = eq.weapon.wt; o.weaponType = wt === "mace" ? "mace" : wt; o.weapon = wt === "staff" || wt === "wand" ? (eq.weapon.q >= 2 ? QCOL[eq.weapon.q] : 0x9fd6e8) : metal(eq.weapon.q); }
-  if(eq.offhand){ o.offhand = eq.offhand.wt; o.offColor = eq.offhand.wt === "shield" ? tint(0x7a7f86, eq.offhand.q, 0.4) : tint(0x5a2a6a, eq.offhand.q, 0.4); o.offTrim = eq.offhand.q >= 2 ? QCOL[eq.offhand.q] : 0xd8b04a; }
+  if(eq.offhand){ o.offhand = eq.offhand.wt; o.offColor = eq.offhand.wt === "shield" ? tint(0x7a7f86, eq.offhand.q, 0.4) : eq.offhand.wt === "dagger" || eq.offhand.wt === "sword" ? metal(eq.offhand.q) : tint(0x5a2a6a, eq.offhand.q, 0.4); o.offTrim = eq.offhand.q >= 2 ? QCOL[eq.offhand.q] : 0xd8b04a; }
   if(r.skin) o.skin = hex(r.skin); if(r.hair) o.hair = hex(r.hair);
   if(race === "elf"){ o.ears = true; }
   if(race === "orc"){ o.tusks = true; }
@@ -300,3 +320,18 @@ export function makeGargoyle(o = {}){
   g.userData.height = 2.3;
   return g;
 }
+
+// warlock demons and shaman totems
+export function makeImp(){ const g = new THREE.Group(), h = makeHumanoid({skin: 0xc8402a, shirt: 0x8a2a1a, pants: 0x6a1a10, boots: 0x3a1a10, hair: 0x3a1a10, cape: null, eyes: 0xffd040, weaponType: null, gaunt: true});
+  for(const s of [-1, 1]){ const horn = part(new THREE.ConeGeometry(0.07, 0.3, 5), 0x2a1a10, s * 0.15, 2.12, 0.02); horn.rotation.z = -s * 0.4; h.children[0].add(horn);
+    const wing = part(new THREE.BoxGeometry(0.5, 0.36, 0.03), 0x6a1a10, s * 0.38, 1.4, -0.24); wing.rotation.y = s * 0.5; wing.rotation.z = s * 0.3; h.children[0].add(wing); }
+  g.add(h); g.scale.setScalar(0.55); g.userData.animate = (...a) => h.userData.animate(...a); g.userData.height = 1.3; return g; }
+export function makeVoidwalker(){ const g = new THREE.Group(), h = makeHumanoid({skin: 0x4a3a8a, shirt: 0x3a2a6a, pants: 0x2a1a4a, boots: 0x2a1a4a, hair: 0x2a1a4a, cape: null, eyes: 0xd0b0ff, weaponType: null, stocky: true, shoulders: 0x6a5ab0});
+  for(const s of [-1, 1]) h.children[0].add(part(new THREE.BoxGeometry(0.26, 0.2, 0.26), 0x8a7ad0, s * 0.42, 0.85, 0));                    // glowing cuffs
+  g.add(h); g.scale.setScalar(1.25); let t = Math.random() * 6;
+  g.userData.animate = (w, mv, atk, pose) => { t += 0.03; h.userData.animate(w, mv, atk, pose); h.position.y = 0.25 + Math.sin(t * 2) * 0.08; };            // it floats
+  g.userData.height = 2.9; return g; }
+export function makeTotem(color){ const g = new THREE.Group();
+  g.add(part(new THREE.CylinderGeometry(0.16, 0.2, 1.1, 6), 0x6a4a2e, 0, 0.55, 0), part(new THREE.BoxGeometry(0.38, 0.3, 0.38), color, 0, 0.9, 0), part(new THREE.BoxGeometry(0.06, 0.06, 0.02), 0x111111, -0.08, 0.95, 0.2), part(new THREE.BoxGeometry(0.06, 0.06, 0.02), 0x111111, 0.08, 0.95, 0.2));
+  for(const s of [-1, 1]){ const w = part(new THREE.BoxGeometry(0.3, 0.08, 0.1), color, s * 0.3, 1.1, 0); w.rotation.z = s * 0.4; g.add(w); }
+  const glow = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), new THREE.MeshBasicMaterial({color})); glow.position.y = 1.3; g.add(glow); return g; }

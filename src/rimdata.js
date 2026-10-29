@@ -27,6 +27,7 @@ const shieldP = (...a) => E.shieldP(...a);
 const pdist = (...a) => E.pdist(...a);
 const fmt = (...a) => E.fmt(...a);
 const T = (...a) => E.T(...a);
+const curse = (...a) => E.curse(...a), totem = (...a) => E.totem(...a), finisher = (...a) => E.finisher(...a), drain = (...a) => E.drain(...a);
 const coopGroupFx = (...a) => E.coopGroupFx(...a);
 const petCallCheck = (...a) => E.petCallCheck(...a), petCall = (...a) => E.petCall(...a), petMend = (...a) => E.petMend(...a), petDismiss = (...a) => E.petDismiss(...a), petFight = (...a) => E.petFight(...a), PET_CAST = 10;
 const MAX_LVL = 30;
@@ -43,11 +44,11 @@ export const RACES = {
 export const RACIAL = {human:"sprint", orc:"bloodrage", elf:"meld", dwarf:"stoneform", undead:"willdead"};
 // which classes each race may choose
 export const RACE_CLASSES = {
-  human:["mage","warrior","priest","druid"],
-  orc:["warrior","hunter","mage"],
-  elf:["mage","warrior","hunter","priest","druid"],
-  dwarf:["warrior","hunter","paladin"],
-  undead:["mage","warrior","priest","paladin"]
+  human:["mage","warrior","priest","druid","warlock","rogue"],
+  orc:["warrior","hunter","mage","warlock","rogue","shaman"],
+  elf:["mage","warrior","hunter","priest","druid","rogue"],
+  dwarf:["warrior","hunter","paladin","rogue","shaman"],
+  undead:["mage","warrior","priest","paladin","warlock","rogue"]
 };
 export const CLASSES = {
   mage:{name:"Mage", color:"#4a7be0", res:"mana", hp:0.9, armor:1},
@@ -55,12 +56,15 @@ export const CLASSES = {
   hunter:{name:"Hunter", color:"#5f8f3e", res:"focus", hp:1.05, armor:0.92},
   priest:{name:"Priest", color:"#ecebe2", res:"mana", hp:0.95, armor:1},
   druid:{name:"Druid", color:"#b8742f", res:"mana", hp:1.05, armor:0.95},
-  paladin:{name:"Paladin", color:"#e0c050", res:"mana", hp:1.15, armor:0.88}
+  paladin:{name:"Paladin", color:"#e0c050", res:"mana", hp:1.15, armor:0.88},
+  warlock:{name:"Warlock", color:"#8a5ad0", res:"mana", hp:0.95, armor:1},
+  rogue:{name:"Rogue", color:"#e8d84a", res:"energy", hp:1.05, armor:0.92},
+  shaman:{name:"Shaman", color:"#3a7ad8", res:"mana", hp:1.1, armor:0.9}
 };
 // Balance: damage multiplier per class (applies to direct hits and damage-over-time). 1 = unchanged. Tune these after running the dev balance test.
 // Balance: PLAYER_DMG scales ALL player damage (every class). MANA_COST_MULT scales every mana cost, so you can cast more before running dry.
 export const PLAYER_DMG = 0.8, MANA_COST_MULT = 0.7;
-export const CLASS_DMG = {mage:1.15, warrior:1.15, hunter:1, priest:1, druid:1.10, paladin:0.70};
+export const CLASS_DMG = {mage:1.15, warrior:1.15, hunter:1, priest:1, druid:1.10, paladin:0.70, warlock:1.05, rogue:1.0, shaman:1.1};
 export const RES_COLOR = {mana:"var(--mana)", rage:"var(--rage)", focus:"var(--focus)", energy:"var(--energy)"};
 export const RES_NAME = {mana:"Mana", rage:"Rage", focus:"Focus", energy:"Energy"};
 export const SCHOOL_COLOR = {fire:"#ff8a3a", frost:"#8fd8ff", arcane:"#d38cff", nature:"#7fdc5a", holy:"#ffe37a", shadow:"#a77bff", phys:"#f2f2f2"};
@@ -95,9 +99,9 @@ export const AB = {
   fireblast:{name:"Ember Blast", lvl:4, cost:20, cd:8, range:220, school:"fire", icon:"burst", tgt:"enemy",
     desc:()=>`Blasts the target for ${fmt(spow()*1.5)} Fire damage.`,
     run:t=>{burst(t.px,t.py,"#ff8a3a",14);hit(t,spow()*1.5,"fire","fireblast");}},
-  frostnova:{name:"Frost Ring", lvl:6, cost:25, cd:20, range:0, school:"frost", icon:"nova", tgt:"self",
-    desc:()=>`Freezes enemies within 4 m in place for 4 sec and deals ${fmt(spow()*0.5)} Frost damage.`,
-    run:()=>{ring(P.px,P.py,100,"#bfe9ff");aoe(P.px,P.py,100,m=>{hit(m,spow()*0.5,"frost","frostnova");root(m,4);});}},
+  frostnova:{name:"Frost Ring", lvl:6, cost:25, cd:25, range:0, school:"frost", icon:"nova", tgt:"self",
+    desc:()=>`Freezes enemies within 4 m in place for 8 sec and deals ${fmt(spow()*0.5)} Frost damage.`,
+    run:()=>{ring(P.px,P.py,100,"#bfe9ff");aoe(P.px,P.py,100,m=>{hit(m,spow()*0.5,"frost","frostnova");root(m,8,true);});}},
   blizzard:{name:"Blizzard", lvl:10, cost:45, cd:12, range:300, school:"frost", icon:"storm", tgt:"enemy",
     desc:()=>`Calls down a blizzard at the target area for 4 sec, dealing ${fmt(spow()*0.7)} Frost damage per second and slowing enemies.`,
     run:t=>zone(t.px,t.py,90,4,spow()*0.7,"frost","blizzard",true)},
@@ -221,7 +225,7 @@ export const AB = {
   rejuv:{name:"Lifebud", lvl:4, cost:22, range:0, school:"nature", icon:"bloom", tgt:"self",
     desc:()=>`Heals the target for ${fmt(P.maxHp*0.35*(1+0.1*T("impRejuv")))} over 12 sec.`,
     run:()=>{hot("rejuv",P.maxHp*0.35*(1+0.1*T("impRejuv")),12);burst(P.px,P.py,"#9cf07a",10);}},
-  roots:{name:"Entangling Roots", lvl:6, cost:20, cast:1.2, range:290, school:"nature", icon:"roots", tgt:"enemy",
+  roots:{name:"Entangling Roots", lvl:6, cost:20, cd:20, cast:1.2, range:290, school:"nature", icon:"roots", tgt:"enemy",
     desc:()=>`Roots the target in place for 8 sec and deals ${fmt(spow()*0.6)} Nature damage.`,
     run:t=>{root(t,8);dot(t,"roots",spow()*0.6,8,"nature");burst(t.px,t.py,"#6a9a3a",10);}},
   starfire:{name:"Starfall", lvl:12, cost:40, cast:3.0, range:300, school:"arcane", icon:"star", tgt:"enemy",
@@ -313,6 +317,9 @@ Object.assign(AB, {
   mendpet:{name:"Mend Pet", lvl:7, cost:20, cd:12, range:0, school:"nature", icon:"bloom", tgt:"self",
     desc:()=>`Heals your pet for 40% of its health.`,
     check:()=>(E.pet && !E.pet.dead) ? true : "You have no pet", run:()=>petMend()},
+  icebarrier:{name:"Ice Barrier", lvl:10, talent:"m_barrier", cost:30, cd:60, range:0, school:"frost", icon:"crystal", tgt:"self",
+    desc:()=>`Surrounds you with a barrier of ice that absorbs ${fmt(P.maxHp*0.25+spow()*1.5)} damage. Lasts 1 min. Can only be cast on yourself.`,
+    run:()=>{P.shield=Math.max(P.shield||0,P.maxHp*0.25+spow()*1.5);P.shieldT=60;ring(P.px,P.py,40,"#bfe9ff");burst(P.px,P.py,"#dff6ff",16);}},
   intimidate:{name:"Intimidation", lvl:10, talent:"h_intim", cost:10, cd:30, range:0, school:"phys", icon:"roar", tgt:"self", offGcd:true,
     desc:()=>`Your pet stuns its target for 3 sec.`,
     check:()=>E.petIntimidateCheck(), run:()=>E.petIntimidate()},
@@ -324,8 +331,144 @@ Object.assign(AB, {
     check:()=>petCallCheck("wolf"), run:()=>petCall("wolf")}
 });
 
+// ---- Warlock: curses and damage over time, Shadow and Fire magic, and a demon at your side (the Imp, later the Voidwalker)
+Object.assign(AB, {
+  shadowbolt:{name:"Shadow Bolt", lvl:1, cost:18, cast:2.0, range:300, school:"shadow", icon:"orb", tgt:"enemy",
+    desc:()=>`Sends a bolt of shadow at the target, dealing ${fmt(spow()*2.1)} Shadow damage.`,
+    run:t=>proj(t,"#a77bff",7,()=>hit(t,spow()*2.1,"shadow","shadowbolt"))},
+  summonimp:{name:"Summon Imp", lvl:1, cost:0, cast:6, range:0, school:"fire", icon:"imp", tgt:"self",
+    desc:()=>`Summons an Imp that hurls Firebolts at your enemies. Out of combat only.`,
+    check:()=>petCallCheck("imp"), run:()=>petCall("imp")},
+  immolate:{name:"Immolate", lvl:2, cost:22, cast:1.5, range:300, school:"fire", icon:"flame", tgt:"enemy",
+    desc:()=>`Burns the target for ${fmt(spow()*0.9)} Fire damage and an additional ${fmt(spow()*1.6)} over 12 sec.`,
+    run:t=>{burst(t.px,t.py,"#ff7a2a",12);hit(t,spow()*0.9,"fire","immolate");dot(t,"immolate",spow()*1.6*tmul("immolate","fire"),12,"fire");}},
+  corruption:{name:"Corruption", lvl:4, cost:18, range:300, school:"shadow", icon:"drop", tgt:"enemy",
+    desc:()=>`Corrupts the target, causing ${fmt(spow()*2.4)} Shadow damage over 15 sec.`,
+    run:t=>{burst(t.px,t.py,"#7a4ad0",8);dot(t,"corruption",spow()*2.4*tmul("corruption","shadow"),15,"shadow");}},
+  agony:{name:"Curse of Agony", lvl:6, cost:18, range:300, school:"shadow", icon:"skull", tgt:"enemy",
+    desc:()=>`Curses the target with agony, causing ${fmt(spow()*2.8)} Shadow damage over 21 sec. Only one curse per target.`,
+    run:t=>{burst(t.px,t.py,"#8a5ad0",8);curse(t,"agony");dot(t,"agony",spow()*2.8*tmul("agony","shadow"),21,"shadow");}},
+  lifetap:{name:"Life Tap", lvl:8, cost:0, range:0, school:"shadow", icon:"heart", tgt:"self",
+    check:()=>P.hp/P.maxHp > 0.2 || "Not enough health",
+    desc:()=>`Converts ${fmt(P.maxHp*0.15)} health into ${fmt(P.maxHp*0.15*1.5)} mana.`,
+    run:()=>{const h=P.maxHp*0.15;P.hp=Math.max(1,P.hp-h);addRes("mana",h*1.5);burst(P.px,P.py,"#8a5ad0",10);}},
+  drainlife:{name:"Drain Life", lvl:10, cost:28, cast:2.0, cd:8, range:300, school:"shadow", icon:"drop", tgt:"enemy",
+    desc:()=>`Drains ${fmt(spow()*1.6)} health from the target and heals you for the damage dealt.`,
+    run:t=>{burst(t.px,t.py,"#5ad06a",10);drain(t,spow()*1.6,"drainlife",1+0.2*T("wl_drain"));}},
+  summonvoid:{name:"Summon Voidwalker", lvl:10, cost:0, cast:6, range:0, school:"shadow", icon:"void", tgt:"self",
+    desc:()=>`Summons a Voidwalker that holds the attention of enemies. Out of combat only.`,
+    check:()=>petCallCheck("voidwalker"), run:()=>petCall("voidwalker")},
+  dismissdemon:{name:"Dismiss Demon", lvl:1, cost:0, cast:3, needs:"summonimp", range:0, school:"shadow", icon:"dismiss", tgt:"self",
+    desc:()=>`Dismisses your demon. Out of combat only.`,
+    check:()=>!E.pet ? "You have no demon" : petFight() ? "You cannot dismiss your demon in combat" : true, run:()=>petDismiss()},
+  healthfunnel:{name:"Health Funnel", lvl:12, cost:0, cd:10, range:0, school:"shadow", icon:"heart", tgt:"self",
+    check:()=>(E.pet && !E.pet.dead) ? (P.hp/P.maxHp > 0.2 || "Not enough health") : "You have no demon",
+    desc:()=>`Gives ${fmt(P.maxHp*0.15)} of your health to your demon, healing it for 40% of its maximum health.`,
+    run:()=>{P.hp=Math.max(1,P.hp-P.maxHp*0.15);petMend();}},
+  weakness:{name:"Curse of Weakness", lvl:14, cost:15, range:300, school:"shadow", icon:"skull", tgt:"enemy",
+    desc:()=>`Curses the target, reducing the damage it deals by 20% for 2 min. Only one curse per target.`,
+    run:t=>{burst(t.px,t.py,"#6a6a7a",8);curse(t,"weak");}},
+  rainfire:{name:"Rain of Fire", lvl:18, cost:45, cd:12, range:300, school:"fire", icon:"meteor", tgt:"enemy",
+    desc:()=>`Calls down fire on the target area for 6 sec, dealing ${fmt(spow()*0.65)} Fire damage per second.`,
+    run:t=>zone(t.px,t.py,95,6,spow()*0.65,"fire","rainfire",false)},
+  soulfire:{name:"Soul Fire", lvl:22, cost:55, cd:20, cast:4.0, range:300, school:"fire", icon:"flame", tgt:"enemy",
+    desc:()=>`Burns the target's soul for ${fmt(spow()*5.0)} Fire damage.`,
+    run:t=>proj(t,"#ff4a1a",10,()=>hit(t,spow()*5.0,"fire","soulfire"))},
+  deathcoil:{name:"Death Coil", lvl:26, cost:35, cd:30, range:280, school:"shadow", icon:"skull", tgt:"enemy",
+    desc:()=>`Deals ${fmt(spow()*2.5)} Shadow damage, heals you for the damage dealt and stuns the target for 3 sec.`,
+    run:t=>proj(t,"#5a3a8a",8,()=>{drain(t,spow()*2.5,"deathcoil",1);stun(t,3);})},
+  demonfrenzy:{name:"Demonic Frenzy", lvl:10, talent:"wl_frenzy", cost:0, cd:60, range:0, school:"shadow", icon:"fang", tgt:"self", offGcd:true,
+    desc:()=>`Your demon deals 50% more damage and attacks 30% faster. Lasts 10 sec.`,
+    check:()=>(E.pet && !E.pet.dead) ? true : "You have no demon", run:()=>E.petWrath()},
+
+// ---- Rogue: two weapons, fast attacks, energy and combo points (as in Wolf Form)
+  sinister:{name:"Sinister Strike", lvl:1, cost:40, res:"energy", range:52, school:"phys", icon:"sword", tgt:"enemy",
+    desc:()=>`A vicious strike that deals ${fmt(pow()*1.4)} damage. Awards 1 combo point.`, run:t=>{slash(t);hit(t,pow()*1.4,"phys","sinister");addCP(t);}},
+  eviscerate:{name:"Eviscerate", lvl:2, cost:35, res:"energy", range:52, school:"phys", icon:"fang", tgt:"enemy",
+    check:()=>P.cp>0||"You need combo points",
+    desc:()=>`Finishing move that deals ${fmt(pow()*0.8)} damage plus ${fmt(pow()*0.85)} per combo point.`,
+    run:t=>{slash(t);const cp=finisher(t);hit(t,pow()*(0.8+0.85*cp)*tmul("eviscerate","phys"),"phys","eviscerate");}},
+  stealth:{name:"Stealth", lvl:4, cost:0, res:"energy", cd:6, range:0, school:"phys", icon:"moon", tgt:"self", offGcd:true,
+    check:()=>P.buffs.stealth ? true : P.combatT > 0 ? "You cannot do that in combat" : true,
+    desc:()=>`Conceals you from enemies. Movement speed reduced by 30%. Attacking or taking damage breaks the effect. Use again to cancel.`,
+    run:()=>{ if(P.buffs.stealth){ delete P.buffs.stealth; return; } P.buffs.stealth=3600; P.auto=false; burst(P.px,P.py,"#3a3a4a",14);}},
+  gouge:{name:"Gouge", lvl:6, cost:45, res:"energy", cd:10, range:52, school:"phys", icon:"fist", tgt:"enemy",
+    desc:()=>`Deals ${fmt(pow()*0.6)} damage and stuns the target for 4 sec. Awards 1 combo point.`, run:t=>{slash(t);hit(t,pow()*0.6,"phys","gouge");stun(t,4);addCP(t);}},
+  backstab:{name:"Backstab", lvl:8, cost:60, res:"energy", range:52, school:"phys", icon:"dagger", tgt:"enemy",
+    desc:()=>`Stabs the target for ${fmt(pow()*2.6)} damage. Awards 1 combo point.`, run:t=>{slash(t);hit(t,pow()*2.6*tmul("backstab","phys"),"phys","backstab");addCP(t);}},
+  slicedice:{name:"Slice and Dice", lvl:10, cost:25, res:"energy", range:52, school:"phys", icon:"swipe", tgt:"enemy",
+    check:()=>P.cp>0||"You need combo points",
+    desc:()=>`Finishing move that increases attack speed by 30%. Lasts 6 sec plus 3 sec per combo point.`,
+    run:t=>{const cp=finisher(t);buff("slice",6+3*cp);burst(P.px,P.py,"#e8d84a",10);}},
+  rupture:{name:"Rupture", lvl:12, cost:25, res:"energy", range:52, school:"phys", icon:"rake", tgt:"enemy",
+    check:()=>P.cp>0||"You need combo points",
+    desc:()=>`Finishing move that causes ${fmt(pow()*1.0)} bleed damage plus ${fmt(pow()*0.6)} per combo point over 8 sec plus 2 sec per combo point.`,
+    run:t=>{slash(t);const cp=finisher(t);dot(t,"rupture",pow()*(1+0.6*cp)*tmul("rupture","phys"),8+2*cp,"phys");}},
+  evasion:{name:"Evasion", lvl:14, cost:0, res:"energy", cd:90, range:0, school:"phys", icon:"leap", tgt:"self", offGcd:true,
+    desc:()=>`Increases dodge chance by 50%. Lasts 10 sec.`, run:()=>{buff("evasion",10);ring(P.px,P.py,40,"#e8d84a");}},
+  ambush:{name:"Ambush", lvl:16, cost:60, res:"energy", range:52, school:"phys", icon:"fang", tgt:"enemy",
+    check:()=>P.buffs.stealth?true:"Requires Stealth",
+    desc:()=>`Ambushes the target from Stealth for ${fmt(pow()*3.5)} damage. Awards 2 combo points.`, run:t=>{slash(t);hit(t,pow()*3.5*tmul("ambush","phys"),"phys","ambush");addCP(t);addCP(t);}},
+  fanknives:{name:"Fan of Knives", lvl:18, cost:50, res:"energy", cd:6, range:0, school:"phys", icon:"multi", tgt:"self",
+    desc:()=>`Throws knives at all enemies within 4 m, dealing ${fmt(pow()*1.0)} damage. Awards 1 combo point on your target.`,
+    run:()=>{ring(P.px,P.py,90,"#e8e8e8");aoe(P.px,P.py,90,m=>hit(m,pow()*1.0,"phys","fanknives"));if(P.target&&!P.target.dead)addCP(P.target);}},
+  kidney:{name:"Kidney Shot", lvl:22, cost:25, res:"energy", cd:20, range:52, school:"phys", icon:"fist", tgt:"enemy",
+    check:()=>P.cp>0||"You need combo points",
+    desc:()=>`Finishing move that stuns the target for 1 sec plus 1 sec per combo point.`,
+    run:t=>{slash(t);const cp=finisher(t);hit(t,pow()*0.5,"phys","kidney");stun(t,1+cp);}},
+  vanish:{name:"Vanish", lvl:26, cost:0, res:"energy", cd:120, range:0, school:"phys", icon:"moon", tgt:"self", offGcd:true,
+    desc:()=>`Vanishes from sight: enemies lose track of you and you enter Stealth.`,
+    run:()=>{P.auto=false;P.combatT=0;P.buffs.stealth=3600;for(const m of mobs) if(m.state==="chase"&&E.targetsMe(m)) E.evade(m);burst(P.px,P.py,"#2a2a3a",24);}},
+  adrenaline:{name:"Adrenaline Rush", lvl:10, talent:"r_adren", cost:0, res:"energy", cd:120, range:0, school:"phys", icon:"bolt", tgt:"self", offGcd:true,
+    desc:()=>`Doubles your energy regeneration. Lasts 15 sec.`, run:()=>{buff("adren",15);ring(P.px,P.py,50,"#ffd84a");}},
+
+// ---- Shaman: Nature magic, shocks and totems
+  lightning:{name:"Lightning Bolt", lvl:1, cost:18, cast:2.0, range:300, school:"nature", icon:"bolt", tgt:"enemy",
+    desc:()=>`Casts a bolt of lightning at the target for ${fmt(spow()*2.0)} Nature damage.`,
+    run:t=>proj(t,"#cfe8ff",6,()=>hit(t,spow()*2.0,"nature","lightning"))},
+  healwave:{name:"Healing Wave", lvl:2, cost:25, cast:2.5, range:0, school:"nature", icon:"wave", tgt:"self",
+    desc:()=>`Heals the target for ${fmt(P.maxHp*0.38)}.`,
+    run:()=>{healP(P.maxHp*0.38);burst(P.px,P.py,"#7fd0ff",12);}},
+  earthshock:{name:"Earth Shock", lvl:4, cost:20, cd:6, range:220, school:"nature", icon:"quake", tgt:"enemy",
+    desc:()=>`Instantly shocks the target for ${fmt(spow()*1.5)} Nature damage. Shares a cooldown with other shocks.`,
+    run:t=>{E.shockCd();burst(t.px,t.py,"#9ad06a",12);hit(t,spow()*1.5,"nature","earthshock");}},
+  searing:{name:"Searing Totem", lvl:6, cost:15, range:0, school:"fire", icon:"totem", tgt:"self",
+    desc:()=>`Places a Fire totem that attacks enemies within 9 m for ${fmt(spow()*0.55)} Fire damage. Lasts 30 sec.`,
+    run:()=>totem("searing")},
+  flameshock:{name:"Flame Shock", lvl:8, cost:20, cd:6, range:220, school:"fire", icon:"flame", tgt:"enemy",
+    desc:()=>`Burns the target for ${fmt(spow()*0.7)} Fire damage and an additional ${fmt(spow()*1.4)} over 12 sec. Shares a cooldown with other shocks.`,
+    run:t=>{E.shockCd();burst(t.px,t.py,"#ff8a3a",12);hit(t,spow()*0.7,"fire","flameshock");dot(t,"flameshock",spow()*1.4*tmul("flameshock","fire"),12,"fire");}},
+  stoneskin:{name:"Stoneskin Totem", lvl:10, cost:15, range:0, school:"nature", icon:"totem", tgt:"self",
+    desc:()=>`Places an Earth totem that reduces damage taken by you and nearby allies by 10%. Lasts 2 min.`,
+    run:()=>totem("stoneskin")},
+  hstream:{name:"Healing Stream Totem", lvl:12, cost:20, range:0, school:"nature", icon:"totem", tgt:"self",
+    desc:()=>`Places a Water totem that heals you and nearby allies for 3% of maximum health every 2 sec. Lasts 1 min.`,
+    run:()=>totem("hstream")},
+  lshield:{name:"Lightning Shield", lvl:14, cost:20, range:0, school:"nature", icon:"bubble", tgt:"self",
+    desc:()=>`Surrounds you with lightning. Melee attackers take ${fmt(spow()*0.6)} Nature damage. 3 charges. Lasts 10 min.`,
+    run:()=>{buff("lshield",600);P.lsCharges=3;ring(P.px,P.py,40,"#cfe8ff");}},
+  chain:{name:"Chain Lightning", lvl:16, cost:35, cd:6, cast:2.0, range:300, school:"nature", icon:"bolt", tgt:"enemy",
+    desc:()=>`Hurls lightning that strikes the target for ${fmt(spow()*1.6)} Nature damage and jumps to up to 2 nearby enemies.`,
+    run:t=>{const near=mobs.filter(m=>m!==t&&!m.dead&&m.state!=="return"&&pdist(m,t)<140).slice(0,2);[t,...near].forEach((m,i)=>proj(m,"#e8f4ff",5,()=>hit(m,spow()*[1.6,1.2,0.9][i],"nature","chain")));}},
+  frostshock:{name:"Frost Shock", lvl:18, cost:22, cd:6, range:220, school:"frost", icon:"snowflake", tgt:"enemy",
+    desc:()=>`Shocks the target for ${fmt(spow()*1.4)} Frost damage and slows it by 50% for 8 sec. Shares a cooldown with other shocks.`,
+    run:t=>{E.shockCd();burst(t.px,t.py,"#8fd8ff",12);hit(t,spow()*1.4,"frost","frostshock");slow(t,0.5,8);}},
+  strengthtotem:{name:"Strength of Earth Totem", lvl:20, cost:15, range:0, school:"nature", icon:"totem", tgt:"self",
+    desc:()=>`Places an Earth totem that increases damage dealt by you and nearby allies by 10%. Lasts 2 min.`,
+    run:()=>totem("strength")},
+  magma:{name:"Magma Totem", lvl:22, cost:30, range:0, school:"fire", icon:"totem", tgt:"self",
+    desc:()=>`Places a Fire totem that deals ${fmt(spow()*0.6)} Fire damage to enemies within 4 m every 2 sec. Lasts 20 sec.`,
+    run:()=>totem("magma")},
+  heroism:{name:"Heroism", lvl:26, cost:30, cd:180, range:0, school:"nature", icon:"horn", tgt:"self", offGcd:true,
+    desc:()=>`Increases damage dealt by you and nearby allies by 20%. Lasts 15 sec.`,
+    run:()=>{buff("heroism",15);ring(P.px,P.py,120,"#ffb84a");coopGroupFx(700,[["buff","heroism",15]],"Heroism");}},
+  stormstrike:{name:"Stormstrike", lvl:10, talent:"s_storm", cost:20, cd:10, range:52, school:"nature", icon:"bolt", tgt:"enemy",
+    desc:()=>`Strikes the target with lightning-charged weapons for ${fmt(hpow()*2.2)} Nature damage.`,
+    run:t=>{slash(t);burst(t.px,t.py,"#cfe8ff",14);hit(t,hpow()*2.2,"nature","stormstrike");}}
+});
+
 export const BARS = {
-  mage:["fireball","frostbolt","fireblast","frostnova","blizzard","pyroblast","sparkrain","icearmor","meteor"],
+  mage:["fireball","frostbolt","fireblast","frostnova","blizzard","pyroblast","sparkrain","icearmor","meteor","icebarrier"],
   warrior:["heroic","charge","shout","rend","whirlwind","execute","shieldbash","secondwind","quake"],
   hunter:["steady","raptor","wingclip","firearrow","icearrow","disengage","multishot","aimed","poison","snare","stormarrow","callbear","dismisspet","mendpet","callwolf","intimidate","bestialwrath"],
   priest:["smite","heal","swp","pws","mindblast","holynova","renew","darkpulse","judgment"],
@@ -333,13 +476,16 @@ export const BARS = {
   druid_bear:["maul","swipe","frenzy","bash","roar","bear","cat","leopard"],
   druid_cat:["claw","rake","bite","dash","pounce","bear","cat","leopard"],
   druid_leopard:["leopard","bear","cat"],
-  paladin:["palstrike","palheal","hammer","holyshield","crusader","consecrate","avenging","bubble","judge"]
+  paladin:["palstrike","palheal","hammer","holyshield","crusader","consecrate","avenging","bubble","judge"],
+  warlock:["shadowbolt","summonimp","immolate","corruption","agony","lifetap","drainlife","summonvoid","healthfunnel","weakness","rainfire","soulfire","deathcoil","dismissdemon","demonfrenzy"],
+  rogue:["sinister","eviscerate","stealth","gouge","backstab","slicedice","rupture","evasion","ambush","fanknives","kidney","vanish","adrenaline"],
+  shaman:["lightning","healwave","earthshock","searing","flameshock","stoneskin","hstream","lshield","chain","frostshock","strengthtotem","magma","heroism","stormstrike"]
 };
 
 // the healing abilities: their strength grows with spell healing (and spell power) on your gear and with healing talents
-export const HEAL_AB = new Set(["heal", "pws", "holynova", "renew", "touch", "rejuv", "bloom", "palheal"]);
+export const HEAL_AB = new Set(["heal", "pws", "holynova", "renew", "touch", "rejuv", "bloom", "palheal", "healwave"]);
 // longer reach for bows and spells: every ranged attack of mages, hunters, priests and druids reaches 25% further
-for(const c of ["mage", "hunter", "priest", "druid"]) for(const id of BARS[c]){ const a = AB[id]; if(a && a.tgt === "enemy" && a.range >= 150) a.range = Math.round(a.range * 1.25); }
+for(const c of ["mage", "hunter", "priest", "druid", "warlock", "shaman"]) for(const id of BARS[c]){ const a = AB[id]; if(a && a.tgt === "enemy" && a.range >= 150) a.range = Math.round(a.range * 1.25); }
 
 // Talents: every class has three specializations (trees). A tier opens when you have spent enough points IN THAT TREE: 1:0, 2:3, 3:6, 4:8, 5:10.
 // eff = generic bonus per rank: dmg, crit, dodge, parry, def (less damage taken), hp, mana, heal (healing done), form (damage in Bear/Wolf Form),
@@ -353,7 +499,10 @@ export const TREES = {
   hunter:[{id:"beast",name:"Beast Mastery",d:"Pet damage, survivability and pet abilities."},{id:"marks",name:"Marksmanship",d:"Critical strikes and Aimed Shot."},{id:"surv",name:"Survival",d:"Elemental arrows and survivability."}],
   priest:[{id:"disc",name:"Discipline",d:"Shields, mana and survivability."},{id:"holy",name:"Holy",d:"Healing."},{id:"shadow",name:"Shadow",d:"Shadow damage and Shadowform."}],
   druid:[{id:"balance",name:"Balance",d:"Nature and Arcane spells."},{id:"feral",name:"Feral",d:"Wolf Form damage and Bear Form tanking."},{id:"resto",name:"Restoration",d:"Healing."}],
-  paladin:[{id:"pholy",name:"Holy",d:"Healing and mana."},{id:"pprot",name:"Protection",d:"Tanking, health and damage reduction."},{id:"ret",name:"Retribution",d:"Holy and physical damage."}]
+  paladin:[{id:"pholy",name:"Holy",d:"Healing and mana."},{id:"pprot",name:"Protection",d:"Tanking, health and damage reduction."},{id:"ret",name:"Retribution",d:"Holy and physical damage."}],
+  warlock:[{id:"affl",name:"Affliction",d:"Curses, damage over time and Drain Life."},{id:"demo",name:"Demonology",d:"Your demon and survivability."},{id:"destr",name:"Destruction",d:"Fire and Shadow damage."}],
+  rogue:[{id:"assa",name:"Assassination",d:"Critical strikes and finishing moves."},{id:"combat",name:"Combat",d:"Weapon damage and dual wielding."},{id:"subt",name:"Subtlety",d:"Stealth, Ambush and survivability."}],
+  shaman:[{id:"elem",name:"Elemental",d:"Lightning, shocks and Fire totems."},{id:"enh",name:"Enhancement",d:"Melee combat and Stormstrike."},{id:"sresto",name:"Restoration",d:"Healing and mana."}]
 };
 export const TALENTS = {
   mage:[
@@ -373,9 +522,9 @@ export const TALENTS = {
     {id:"m_pyro",tree:"fire",tier:5,max:1,name:"Pyromaniac",eff:{fire:0.1,crit:0.03},d:()=>`Increases Fire spell damage by 10% and critical strike chance by 3%.`},
     {id:"iceShards",tree:"frost",tier:1,max:3,name:"Ice Shards",d:r=>`Increases Frost spell damage by ${8*r}%.`},
     {id:"m_frostarmor",tree:"frost",tier:1,max:3,name:"Frost Warding",eff:{def:0.02},d:r=>`Reduces damage taken by ${2*r}%.`},
-    {id:"shatter",tree:"frost",tier:2,max:3,name:"Shatter",d:r=>`Increases critical strike chance against slowed or frozen targets by ${12*r}%.`},
+    {id:"shatter",tree:"frost",tier:2,max:3,name:"Shatter",d:r=>`Increases critical strike chance against frozen targets by ${12*r}%.`},
     {id:"m_pierce",tree:"frost",tier:2,max:2,name:"Piercing Ice",eff:{frost:0.04},d:r=>`Increases Frost spell damage by ${4*r}%.`},
-    {id:"m_barrier",tree:"frost",tier:3,max:1,name:"Ice Barrier",eff:{hp:0.08},d:()=>`Increases maximum health by 8%.`},
+    {id:"m_barrier",tree:"frost",tier:3,max:1,name:"Ice Barrier",grants:"icebarrier",d:()=>`Teaches Ice Barrier: absorbs damage for 1 min. 1 min cooldown.`},
     {id:"m_winter",tree:"frost",tier:4,max:3,name:"Winter's Chill",eff:{frost:0.02,crit:0.02},d:r=>`Increases Frost spell damage by ${2*r}% and critical strike chance by ${2*r}%.`},
     {id:"m_icy",tree:"frost",tier:5,max:1,name:"Heart of Winter",eff:{frost:0.1,def:0.05},d:()=>`Increases Frost spell damage by 10% and reduces damage taken by 5%.`}],
   warrior:[
@@ -406,7 +555,7 @@ export const TALENTS = {
     {id:"h_frenzy",tree:"beast",tier:2,max:3,name:"Frenzy",d:r=>`Increases your pet\'s attack speed by ${7*r}%.`},
     {id:"h_mend",tree:"beast",tier:2,max:2,name:"Improved Mend Pet",d:r=>`Increases the healing of Mend Pet by ${25*r}%. Mend Pet also heals you for ${15*r}% of the amount.`},
     {id:"h_intim",tree:"beast",tier:3,max:1,name:"Intimidation",grants:"intimidate",d:()=>`Teaches Intimidation: your pet stuns its target for 3 sec. 30 sec cooldown.`},
-    {id:"h_bond",tree:"beast",tier:4,max:3,name:"Spirit Bond",d:r=>`You and your pet regenerate ${(0.6*r).toFixed(1)}% of maximum health every second.`},
+    {id:"h_bond",tree:"beast",tier:4,max:3,name:"Spirit Bond",d:r=>`You and your pet regenerate ${(0.6*r).toFixed(1)}% of maximum health every 5 sec.`},
     {id:"h_bestial",tree:"beast",tier:5,max:1,name:"Bestial Wrath",grants:"bestialwrath",d:()=>`Teaches Bestial Wrath: your pet deals 50% more damage and attacks 30% faster for 10 sec. 1 min cooldown.`},
     {id:"lethal",tree:"marks",tier:1,max:3,name:"Lethal Shots",d:r=>`Increases critical strike chance by ${3*r}%.`},
     {id:"efficiency",tree:"marks",tier:1,max:2,name:"Efficiency",d:r=>`Reduces the focus cost of your shots by ${10*r}%.`},
@@ -488,12 +637,78 @@ export const TALENTS = {
     {id:"lightbringer",tree:"ret",tier:3,max:1,name:"Lightbringer",d:()=>`Your Holy critical strikes heal you for 30% of the damage dealt.`},
     {id:"pal_sanct",tree:"ret",tier:4,max:3,name:"Sanctified Wrath",eff:{holy:0.03,dmg:0.02},d:r=>`Increases Holy damage by ${3*r}% and all damage dealt by ${2*r}%.`},
     {id:"pal_champ",tree:"ret",tier:5,max:1,name:"Champion of the Light",eff:{dmg:0.08,hp:0.08},d:()=>`Increases all damage dealt by 8% and maximum health by 8%.`}]
+  ,warlock:[
+    {id:"wl_corr",tree:"affl",tier:1,max:3,name:"Improved Corruption",eff:{shadow:0.04},d:r=>`Increases Shadow damage by ${4*r}%.`},
+    {id:"wl_agony",tree:"affl",tier:1,max:3,name:"Improved Curse of Agony",d:r=>`Increases the damage of Curse of Agony and Corruption by ${10*r}%.`},
+    {id:"wl_focus",tree:"affl",tier:2,max:3,name:"Fel Concentration",eff:{crit:0.02},d:r=>`Increases critical strike chance by ${2*r}%.`},
+    {id:"wl_drain",tree:"affl",tier:2,max:3,name:"Improved Drain Life",d:r=>`Increases the healing of Drain Life by ${20*r}%.`},
+    {id:"wl_night",tree:"affl",tier:3,max:1,name:"Nightfall",eff:{dmg:0.05},d:()=>`Increases all damage dealt by 5%.`},
+    {id:"wl_shadowm",tree:"affl",tier:4,max:3,name:"Shadow Mastery",eff:{shadow:0.04},d:r=>`Increases Shadow damage by ${4*r}%.`},
+    {id:"wl_unstable",tree:"affl",tier:5,max:1,name:"Unstable Affliction",eff:{shadow:0.1,dmg:0.03},d:()=>`Increases Shadow damage by 10% and all damage dealt by 3%.`},
+    {id:"wl_pethp",tree:"demo",tier:1,max:3,name:"Fel Vitality",eff:{pethp:0.08},d:r=>`Increases your demon's health by ${8*r}%.`},
+    {id:"wl_embrace",tree:"demo",tier:1,max:3,name:"Demonic Embrace",eff:{hp:0.03},d:r=>`Increases maximum health by ${3*r}%.`},
+    {id:"wl_unholy",tree:"demo",tier:2,max:3,name:"Unholy Power",eff:{petdmg:0.08},d:r=>`Increases your demon's damage by ${8*r}%.`},
+    {id:"wl_aegis",tree:"demo",tier:2,max:3,name:"Demonic Aegis",eff:{def:0.02},d:r=>`Reduces damage taken by ${2*r}%.`},
+    {id:"wl_soul",tree:"demo",tier:3,max:1,name:"Soul Link",d:()=>`Reduces damage taken by 10% while your demon is active.`},
+    {id:"wl_master",tree:"demo",tier:4,max:3,name:"Master Demonologist",eff:{petdmg:0.05,dmg:0.02},d:r=>`Increases your demon's damage by ${5*r}% and all damage dealt by ${2*r}%.`},
+    {id:"wl_frenzy",tree:"demo",tier:5,max:1,name:"Demonic Frenzy",grants:"demonfrenzy",d:()=>`Teaches Demonic Frenzy: your demon deals 50% more damage and attacks 30% faster for 10 sec. 1 min cooldown.`},
+    {id:"wl_bane",tree:"destr",tier:1,max:3,name:"Bane",d:r=>`Reduces the cast time of Shadow Bolt and Soul Fire by ${(0.1*r).toFixed(1)} sec.`},
+    {id:"wl_cata",tree:"destr",tier:1,max:3,name:"Cataclysm",eff:{fire:0.04},d:r=>`Increases Fire damage by ${4*r}%.`},
+    {id:"wl_devast",tree:"destr",tier:2,max:3,name:"Devastation",eff:{crit:0.02},d:r=>`Increases critical strike chance by ${2*r}%.`},
+    {id:"wl_ruin",tree:"destr",tier:2,max:3,name:"Ruin",d:r=>`Increases critical strike damage by ${10*r}%.`},
+    {id:"wl_burn",tree:"destr",tier:3,max:1,name:"Shadowburn",eff:{dmg:0.05},d:()=>`Increases all damage dealt by 5%.`},
+    {id:"wl_ember",tree:"destr",tier:4,max:3,name:"Emberstorm",eff:{fire:0.05},d:r=>`Increases Fire damage by ${5*r}%.`},
+    {id:"wl_conflag",tree:"destr",tier:5,max:1,name:"Conflagration",eff:{fire:0.1,shadow:0.1},d:()=>`Increases Fire and Shadow damage by 10%.`}],
+  rogue:[
+    {id:"r_malice",tree:"assa",tier:1,max:3,name:"Malice",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${r}%.`},
+    {id:"r_evisc",tree:"assa",tier:1,max:3,name:"Improved Eviscerate",d:r=>`Increases the damage of Eviscerate and Rupture by ${10*r}%.`},
+    {id:"r_lethal",tree:"assa",tier:2,max:3,name:"Lethality",d:r=>`Increases critical strike damage by ${10*r}%.`},
+    {id:"r_murder",tree:"assa",tier:2,max:3,name:"Murder",eff:{dmg:0.02},d:r=>`Increases all damage dealt by ${2*r}%.`},
+    {id:"r_relentless",tree:"assa",tier:3,max:1,name:"Relentless Strikes",d:()=>`Your finishing moves restore 20 energy.`},
+    {id:"r_precise",tree:"assa",tier:4,max:3,name:"Deadly Precision",eff:{dmg:0.03,crit:0.01},d:r=>`Increases all damage dealt by ${3*r}% and critical strike chance by ${r}%.`},
+    {id:"r_cold",tree:"assa",tier:5,max:1,name:"Cold Blood",eff:{dmg:0.08,crit:0.05},d:()=>`Increases all damage dealt by 8% and critical strike chance by 5%.`},
+    {id:"r_precision",tree:"combat",tier:1,max:3,name:"Precision",eff:{dmg:0.02},d:r=>`Increases all damage dealt by ${2*r}%.`},
+    {id:"r_impss",tree:"combat",tier:1,max:2,name:"Improved Sinister Strike",d:r=>`Reduces the energy cost of Sinister Strike by ${3*r}.`},
+    {id:"r_dual",tree:"combat",tier:2,max:3,name:"Dual Wield Specialization",d:r=>`Increases the damage of your off-hand weapon by ${10*r}%.`},
+    {id:"r_reflex",tree:"combat",tier:2,max:3,name:"Lightning Reflexes",eff:{dodge:0.01},d:r=>`Increases dodge chance by ${r}%.`},
+    {id:"r_aggr",tree:"combat",tier:3,max:1,name:"Aggression",eff:{dmg:0.05},d:()=>`Increases all damage dealt by 5%.`},
+    {id:"r_expert",tree:"combat",tier:4,max:3,name:"Weapon Expertise",eff:{phys:0.04},d:r=>`Increases physical damage by ${4*r}%.`},
+    {id:"r_adren",tree:"combat",tier:5,max:1,name:"Adrenaline Rush",grants:"adrenaline",d:()=>`Teaches Adrenaline Rush: doubles your energy regeneration for 15 sec. 2 min cooldown.`},
+    {id:"r_camo",tree:"subt",tier:1,max:3,name:"Camouflage",eff:{dodge:0.01},d:r=>`Increases dodge chance by ${r}%.`},
+    {id:"r_opp",tree:"subt",tier:1,max:3,name:"Opportunity",d:r=>`Increases the damage of Ambush and Backstab by ${10*r}%.`},
+    {id:"r_elusive",tree:"subt",tier:2,max:3,name:"Elusiveness",eff:{def:0.02},d:r=>`Reduces damage taken by ${2*r}%.`},
+    {id:"r_vigor",tree:"subt",tier:2,max:3,name:"Vigor",eff:{hp:0.03},d:r=>`Increases maximum health by ${3*r}%.`},
+    {id:"r_deceive",tree:"subt",tier:3,max:1,name:"Master of Deception",eff:{dmg:0.05},d:()=>`Increases all damage dealt by 5%.`},
+    {id:"r_dead",tree:"subt",tier:4,max:3,name:"Deadliness",eff:{dmg:0.03},d:r=>`Increases all damage dealt by ${3*r}%.`},
+    {id:"r_shadow",tree:"subt",tier:5,max:1,name:"Shadow Dance",eff:{dmg:0.08,def:0.05},d:()=>`Increases all damage dealt by 8% and reduces damage taken by 5%.`}],
+  shaman:[
+    {id:"s_concuss",tree:"elem",tier:1,max:3,name:"Concussion",eff:{nature:0.04},d:r=>`Increases Nature damage by ${4*r}%.`},
+    {id:"s_flame",tree:"elem",tier:1,max:3,name:"Call of Flame",d:r=>`Increases the damage of Fire totems by ${10*r}%.`},
+    {id:"s_focus",tree:"elem",tier:2,max:3,name:"Elemental Focus",eff:{crit:0.02},d:r=>`Increases critical strike chance by ${2*r}%.`},
+    {id:"s_reverb",tree:"elem",tier:2,max:2,name:"Reverberation",d:r=>`Reduces the cooldown of your shocks by ${(0.5*r).toFixed(1)} sec.`},
+    {id:"s_fury",tree:"elem",tier:3,max:1,name:"Elemental Fury",eff:{dmg:0.05},d:()=>`Increases all damage dealt by 5%.`},
+    {id:"s_lmastery",tree:"elem",tier:4,max:3,name:"Lightning Mastery",d:r=>`Reduces the cast time of Lightning Bolt and Chain Lightning by ${(0.1*r).toFixed(1)} sec.`},
+    {id:"s_elemm",tree:"elem",tier:5,max:1,name:"Elemental Mastery",eff:{nature:0.1,fire:0.1},d:()=>`Increases Nature and Fire damage by 10%.`},
+    {id:"s_ancest",tree:"enh",tier:1,max:3,name:"Ancestral Knowledge",eff:{mana:0.05},d:r=>`Increases maximum mana by ${5*r}%.`},
+    {id:"s_shield",tree:"enh",tier:1,max:3,name:"Shield Specialization",eff:{parry:0.01},d:r=>`Increases parry chance by ${r}%.`},
+    {id:"s_thunder",tree:"enh",tier:2,max:3,name:"Thundering Strikes",eff:{crit:0.02},d:r=>`Increases critical strike chance by ${2*r}%.`},
+    {id:"s_tough",tree:"enh",tier:2,max:3,name:"Toughness",eff:{hp:0.04},d:r=>`Increases maximum health by ${4*r}%.`},
+    {id:"s_flurry",tree:"enh",tier:3,max:1,name:"Flurry",eff:{phys:0.05,nature:0.05},d:()=>`Increases physical and Nature damage by 5%.`},
+    {id:"s_totems",tree:"enh",tier:4,max:3,name:"Enhancing Totems",eff:{dmg:0.03},d:r=>`Increases all damage dealt by ${3*r}%.`},
+    {id:"s_storm",tree:"enh",tier:5,max:1,name:"Stormstrike",grants:"stormstrike",d:()=>`Teaches Stormstrike: strikes the target with lightning-charged weapons. 10 sec cooldown.`},
+    {id:"s_tidal",tree:"sresto",tier:1,max:3,name:"Tidal Focus",eff:{heal:0.03},d:r=>`Increases healing done by ${3*r}%.`},
+    {id:"s_totemic",tree:"sresto",tier:1,max:3,name:"Totemic Focus",eff:{mana:0.05},d:r=>`Increases maximum mana by ${5*r}%.`},
+    {id:"s_way",tree:"sresto",tier:2,max:3,name:"Healing Way",eff:{heal:0.04},d:r=>`Increases healing done by ${4*r}%.`},
+    {id:"s_guide",tree:"sresto",tier:2,max:3,name:"Nature's Guidance",eff:{crit:0.01,dodge:0.01},d:r=>`Increases critical strike chance and dodge chance by ${r}%.`},
+    {id:"s_grace",tree:"sresto",tier:3,max:1,name:"Healing Grace",eff:{heal:0.08},d:()=>`Increases healing done by 8%.`},
+    {id:"s_purif",tree:"sresto",tier:4,max:3,name:"Purification",eff:{heal:0.03,hp:0.02},d:r=>`Increases healing done by ${3*r}% and maximum health by ${2*r}%.`},
+    {id:"s_tide",tree:"sresto",tier:5,max:1,name:"Mana Tide",eff:{heal:0.12,mana:0.1},d:()=>`Increases healing done by 12% and maximum mana by 10%.`}]
 };
 
 export const AB_ICON = {
   sprint:["boot","#5fc8e8"], bloodrage:["flame","#d8302a"], meld:["moon","#7a5ab0"], stoneform:["shield","#9a9488"], willdead:["skull","#5ab04a"],
   fireball:["orb","#ff8a3a"], frostbolt:["shard","#8fd8ff"], fireblast:["burst","#ff5a2a"], frostnova:["snowflake","#bfe9ff"], blizzard:["storm","#5fa8e0"],
-  pyroblast:["flame","#ffb02e"], sparkrain:["spark","#d38cff"], icearmor:["crystal","#7fd0e8"], meteor:["meteor","#d8482a"],
+  pyroblast:["flame","#ffb02e"], sparkrain:["spark","#d38cff"], icearmor:["crystal","#7fd0e8"], icebarrier:["shield","#bfe9ff"], meteor:["meteor","#d8482a"],
   dismisspet:["dismiss","#8a9199"], intimidate:["roar","#e0a050"], bestialwrath:["fang","#ff5a3a"],
   heroic:["sword","#c9ced4"], charge:["dash","#e0a060"], shout:["horn","#d8b070"], rend:["drop","#d0453a"], whirlwind:["whirl","#9fb0bc"],
   execute:["axe","#b03a2e"], shieldbash:["shield","#8a96a2"], secondwind:["heart","#e05a6a"], quake:["quake","#a07850"],
@@ -508,6 +723,14 @@ export const AB_ICON = {
   claw:["claw","#e2e2e2"], rake:["rake","#c84a4a"], bite:["fang","#f0e0c0"], dash:["boot","#7fd8e8"], pounce:["leap","#e8a050"],
   palstrike:["sword","#ffe37a"], palheal:["cross","#ffd890"], hammer:["hammer","#ffd060"], holyshield:["shield","#ffe9a0"], crusader:["axe","#f0c040"],
   consecrate:["ground","#ffd84a"], avenging:["wings","#ffb84a"], bubble:["bubble","#fff6d0"], judge:["scales","#ffcf4a"],
+  shadowbolt:["orb","#8a5ad0"], summonimp:["imp","#e0603a"], immolate:["flame","#ff6a2a"], corruption:["drop","#7a4ad0"], agony:["skull","#9a6ae0"], lifetap:["heart","#8a5ad0"],
+  drainlife:["drop","#5ad06a"], summonvoid:["void","#6a4ab0"], dismissdemon:["imp","#7a7a8a"], healthfunnel:["heart","#5ad06a"], weakness:["skull","#7a7a8a"],
+  rainfire:["meteor","#ff7a2a"], soulfire:["flame","#ff3a1a"], deathcoil:["skull","#5a3a8a"], demonfrenzy:["fang","#b04ae0"],
+  sinister:["sword","#e8d84a"], eviscerate:["fang","#d84a42"], stealth:["moon","#5a5a6a"], gouge:["fist","#d8a040"], backstab:["dagger","#e0e0e0"], slicedice:["swipe","#e8d84a"],
+  rupture:["rake","#c83a3a"], evasion:["leap","#e8d84a"], ambush:["dagger","#b03a3a"], fanknives:["multi","#d8d8d8"], kidney:["fist","#e0803a"], vanish:["moon","#3a3a4a"], adrenaline:["bolt","#ffd84a"],
+  lightning:["bolt","#9fd0ff"], healwave:["wave","#5fc0ff"], earthshock:["quake","#9ad06a"], searing:["totem","#ff7a2a"], flameshock:["flame","#ff8a3a"], stoneskin:["totem","#a89a80"],
+  hstream:["totem","#5fc0ff"], lshield:["bubble","#cfe8ff"], chain:["bolt","#e8f4ff"], frostshock:["snowflake","#8fd8ff"], strengthtotem:["totem","#c8a060"], magma:["totem","#d84a1a"],
+  heroism:["horn","#ffb84a"], stormstrike:["bolt","#7fb8ff"],
 };
 export function abIcon(id){ const a = AB[id], x = AB_ICON[id]; return x || [a.icon, SCHOOL_COLOR[a.school]==="#f2f2f2"?"#8c939a":SCHOOL_COLOR[a.school]]; }
 export function drawIcon(cv, icon, color){
@@ -582,6 +805,11 @@ export function drawIcon(cv, icon, color){
     case "wings": for(const sx of [-1,1]){ g.beginPath(); g.moveTo(sx*2,4); g.quadraticCurveTo(sx*10,-16,sx*17,-12); g.quadraticCurveTo(sx*15,-2,sx*17,0); g.quadraticCurveTo(sx*12,6,sx*15,10); g.quadraticCurveTo(sx*8,10,sx*2,4); g.fill(); } C(0,4,3,true); break;
     case "bubble": C(0,0,15); g.globalAlpha=0.35; C(0,0,15,true); g.globalAlpha=1; g.beginPath(); g.arc(0,0,10,Math.PI*1.1,Math.PI*1.45); g.stroke(); break;
     case "scales": P_([[0,-14],[0,14]]); P_([[-9,14],[9,14]]); P_([[-13,-8],[13,-8]]); P_([[-13,-8],[-17,4],[-9,4],[-13,-8]]); P_([[13,-8],[9,4],[17,4],[13,-8]]); C(0,-14,2.5,true); break;
+    case "imp": C(0,3,10,true); P_([[-8,-4],[-13,-16],[-3,-7]], true); P_([[8,-4],[13,-16],[3,-7]], true); g.fillStyle="#3a1a10"; C(-4,2,2.2,true); C(4,2,2.2,true); g.fillRect(-4,8,8,2); break;
+    case "void": C(0,0,14); g.beginPath(); for(let a=0;a<10;a+=0.2){ const r=1+a*1.3; const x=Math.cos(a)*r, y=Math.sin(a)*r; a?g.lineTo(x,y):g.moveTo(x,y);} g.stroke(); break;
+    case "dagger": P_([[-12,12],[6,-6],[12,-14],[4,-8]], true); P_([[-12,12],[6,-6]]); P_([[-10,2],[2,14]]); break;
+    case "totem": g.fillRect(-6,-16,12,32); g.fillStyle="#222"; g.fillRect(-4,-11,3,3); g.fillRect(1,-11,3,3); g.fillRect(-3,-4,6,2); P_([[-12,-14],[-6,-10]]); P_([[12,-14],[6,-10]]); break;
+    case "wave": for(const y of [-7,1,9]){ g.beginPath(); g.moveTo(-16,y); g.quadraticCurveTo(-8,y-8,0,y); g.quadraticCurveTo(8,y+8,16,y); g.stroke(); } break;
     default: g.font = "800 20px sans-serif"; g.textAlign = "center"; g.fillText("?",0,7);
   }
   g.restore();

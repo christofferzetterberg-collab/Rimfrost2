@@ -3,25 +3,33 @@ Add to list:
  - 
 
 - Dungeons:
- - Iron mine:
-  - 
-  - 
-  - 
+ - 
+ - 
+  - Iron mine:
+   - 
+   - 
+   - 
 
 - General:
- - 
+ - Adjust the combo point system for druid wolf form and rogues. Combo points should be saved only during the fight and per target. 
  - 
  - 
 
+- Feature:
+ - New class: Warlock, using curses, DoTs with Shadow & Fire magic. Should have an Imp pet that cast firebolts, no taunt. And a voidwalker pet similar to hunter bear pet.
+ - New class: Rogue, Dual wield, fast attackspeed, uses combopoints, similar to druid wolf form.
+ - New class: Shaman, Using totems and Nature specialization.
+
 - Bugs:
- - 
+ - Buff/debuffs on the player's hunter pet is not showing, for example when casting the talent active skill Bestial wrath, it does not show. And I'm also not able to target the pet which should be possible to do. 
 
 - Classes:
  - Hunters:
-  - Pet health regain as well as player's regain during combat is way to high when pet is active and spirit bond is used, we nearly does not loose any health in 1 on 1 combat. instead of every second, it should be every 5 sec.
- 
+  - 
+  - 
+
 - Druid:
-  - Set Entangling roots to a 20 sec cooldown. 
+  -  
 
  - Paladin:
   - 
@@ -33,7 +41,7 @@ Add to list:
   - 
 
  - Mage:
-  - Ice barrier talent should be a skill that learns with the talent and as a active skill that absorbs some damage. it should last for 60 seconds or until the damaged is absorbed only castable on self and not on co-op teammates and have a cooldown of 60 seconds
-  - Shatter talent should only be aplied to frozen target, not slowed.
-  - Frost Ring should freeze targets for 8 seconds and have cooldown of 25 sec
+  - 
+  - 
+  - 
 

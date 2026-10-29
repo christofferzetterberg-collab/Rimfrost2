@@ -114,7 +114,7 @@ export function learnAbility(id){ const a = AB[id], cost = abCost(id);
 export function buyRespec(){ const c = respecCost(C().level); if(!G.talentsSpent()) return; if(C().gold < c) return H.err("You don't have enough gold");
   C().gold -= c; G.resetTalents(); }
 // the abilities a new character starts with
-export const STARTERS = {druid: ["wrath", "touch"], paladin: ["palstrike", "palheal"], warrior: ["heroic"], priest: ["smite", "heal"], mage: ["fireball"], hunter: ["steady"]};
+export const STARTERS = {druid: ["wrath", "touch"], paladin: ["palstrike", "palheal"], warrior: ["heroic"], priest: ["smite", "heal"], mage: ["fireball"], hunter: ["steady"], warlock: ["shadowbolt", "summonimp", "dismissdemon"], rogue: ["sinister"], shaman: ["lightning"]};
 export const starterAbilities = cls => (STARTERS[cls] || [G.allBarIdsFor(cls)[0]]).slice();
 
 // ---------------------------------------------------------------- shops

@@ -212,6 +212,33 @@ Numbered so we can refer to them. Tick them off as they get done.
 #### Classes
 - [x] 44. Hunter: Raptor Strike's text is "A quick melee strike"
 
+### To fix – list 5
+
+#### Dungeons
+- [x] 45. A unique layout for every dungeon, larger than today, with its own mechanics where possible
+- [x] 46. Every dungeon quest can be completed in one run (enough monsters inside, or larger dungeons)
+
+#### Classes
+- [x] 47. Hunter: Spirit Bond heals every 5 sec instead of every second
+- [x] 48. Hunter: better bow animation; the bow is held upright while shooting
+- [x] 49. Druid: Entangling Roots has a 20 sec cooldown
+- [x] 50. Mage: Ice Barrier talent teaches an active self-only absorb shield (lasts 1 min, 1 min cooldown)
+- [x] 51. Mage: Shatter only applies to frozen targets (not rooted or slowed)
+- [x] 52. Mage: Frost Ring freezes for 8 sec, 25 sec cooldown
+
+### To fix – list 6
+
+#### General
+- [x] 53. Combo points (Wolf Form and rogues) belong to one target and are lost when the fight ends
+
+#### Bugs
+- [x] 54. Effects on your pet (such as Bestial Wrath) are shown; your pet can be selected, and your heals go to it
+
+#### New classes
+- [x] 55. Warlock: curses, damage over time, Shadow and Fire magic; an Imp (Firebolt, no taunt) and a Voidwalker (tank, like the hunter's bear)
+- [x] 56. Rogue: two weapons, fast attacks, energy and combo points, Stealth
+- [x] 57. Shaman: Nature magic, shocks and totems (Fire, Earth and Water)
+
 ### Stage 10 – day and night
 - [x] Game clock: a day lasts 80 minutes (night 20), the same for everyone in co-op; light, sky, mist, town firelight and a small light around you at night
 - [x] More wolves, undead and spirits at night (a level higher); monsters see you from a bit shorter range in the dark
@@ -231,7 +258,16 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [ ] The smith's weapon upgrades and other crafting (on hold)
 
 ### Art
-- [ ] Replace the shape-built characters and monsters with free CC0 low-poly models with animations (for example Quaternius, KayKit or Kenney)
+- [ ] Replace the shape-built characters and monsters with free CC0 low-poly models with animations: KayKit Adventurers and KayKit Character Animations (CC0, Kay Lousberg)
+  - [x] Step 1: style test (the six KayKit characters in the game's lighting)
+  - [x] Step 2: one character in the game: human warriors (Knight) with idle, run, attack, cast, sit and death animations
+  - [x] Step 3: the races (skin, size, ears, tusks, beards) – on warriors
+  - [x] Step 4: every class with its own model, colours and weapons; equipped gear changes the look
+  - [ ] Step 5: pets and druid forms
+    - [x] Hunter wolf, Wolf Form and Leopard Form (Quaternius Animal Pack Vol. 2, CC0), druid forms coloured by race
+    - [ ] Bear (hunter pet and Bear Form), Imp and Voidwalker: no fitting model yet
+  - [ ] Step 6: NPCs and monsters, zone by zone
+  - [ ] Step 7: environment (trees, rocks, buildings, dungeon walls)
 
 ## Ideas to investigate
 

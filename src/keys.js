@@ -4,7 +4,7 @@ export const ACTIONS = [
   ["Movement", [["up", "Move forward"], ["down", "Move back"], ["left", "Move left"], ["right", "Move right"]]],
   ["Camera", [["zoomIn", "Zoom in"], ["zoomOut", "Zoom out"]]],
   ["Combat", [["attack", "Start / stop attacking"], ["target", "Target nearest enemy"], ["interact", "Talk / pick up"], ["rest", "Rest (sit down)"], ["potHp", "Healing potion"], ["potMana", "Mana potion"], ["mount", "Mount / dismount"], ["chat", "Co-op chat"]]],
-  ["Pet", [["petAttack", "Pet: attack your target"], ["petFollow", "Pet: stop attacking and follow"], ["petSkill1", "Pet: switch skill 1 on / off"], ["petSkill2", "Pet: switch skill 2 on / off"], ["petSkill3", "Pet: switch skill 3 on / off"]], "hunter"],
+  ["Pet", [["petAttack", "Pet: attack your target"], ["petFollow", "Pet: stop attacking and follow"], ["petSkill1", "Pet: switch skill 1 on / off"], ["petSkill2", "Pet: switch skill 2 on / off"], ["petSkill3", "Pet: switch skill 3 on / off"]], ["hunter", "warlock"]],
   ["Shapeshift", [["formBear", "Bear Form"], ["formCat", "Wolf Form"], ["formTravel", "Travel Form"]], "druid"],
   ["Windows", [["map", "World map"], ["quests", "Quest log"], ["char", "Character"], ["bag", "Bag"], ["spells", "Spellbook"], ["tal", "Talents"], ["keys", "Key bindings"], ["coop", "Co-op"]]],
   ["Action bar", Array.from({length: 10}, (_, i) => ["b" + (i + 1), `Action bar slot ${i + 1}`])],
@@ -21,11 +21,12 @@ export const DEFAULTS = {
 for(let i = 0; i < 10; i++){ DEFAULTS["b" + (i + 1)] = [digit(i)]; DEFAULTS["s" + (i + 1)] = ["Shift+" + digit(i)]; }
 
 // class keys: hunters order their pet, druids change shape (Ctrl+1, Ctrl+2, ...)
-const CLASS_DEFAULTS = {hunter: {petAttack: ["Ctrl+Digit1"], petFollow: ["Ctrl+Digit2"], petSkill1: ["Ctrl+Digit3"], petSkill2: ["Ctrl+Digit4"], petSkill3: ["Ctrl+Digit5"]},
+const PET_KEYS = {petAttack: ["Ctrl+Digit1"], petFollow: ["Ctrl+Digit2"], petSkill1: ["Ctrl+Digit3"], petSkill2: ["Ctrl+Digit4"], petSkill3: ["Ctrl+Digit5"]};
+const CLASS_DEFAULTS = {hunter: PET_KEYS, warlock: PET_KEYS,
   druid: {formBear: ["Ctrl+Digit1"], formCat: ["Ctrl+Digit2"], formTravel: ["Ctrl+Digit3"]}};
 const ALL_IDS = ACTIONS.flatMap(g => g[1].map(a => a[0]));
 export function defaultsFor(cls){ const b = {}; for(const k of ALL_IDS) b[k] = (DEFAULTS[k] || []).slice(); Object.assign(b, JSON.parse(JSON.stringify(CLASS_DEFAULTS[cls] || {}))); return b; }
-export const groupsFor = cls => ACTIONS.filter(g => !g[2] || g[2] === cls);
+export const groupsFor = cls => ACTIONS.filter(g => !g[2] || [].concat(g[2]).includes(cls));
 const OLD_STORE = "rimfrost2-keys";                      // before: one set of keys for everyone in this browser
 let cur = null; export let onSave = null; export const setOnSave = f => { onSave = f; };
 export let binds = defaultsFor(null);

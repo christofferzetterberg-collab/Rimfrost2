@@ -1,0 +1,2 @@
+Wolf and cat models: Animal Pack Vol. 2 by Quaternius (quaternius.com), CC0 1.0 Universal (public domain).
+Converted from FBX to glTF for Rimfrost 2.
