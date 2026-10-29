@@ -1,5 +1,19 @@
 # Rimfrost 2 – Release notes
 
+## v0.29.3
+
+### Changed
+- Quests that repeated another quest's task now ask for something new:
+  - **Scout Reports** (Holger): bring 5 reports from bandit scouts.
+  - **Thorn Roots** (Herbmaster Faelin): bring 6 roots from thorn creepers.
+  - **Charms of the Lost** (Lyra): bring 5 charms from Lost Druids.
+  - **Crag Boar Hides** (Torvald): bring 5 hides from crag boars.
+  - **Stolen Traps** (Sune): take back 5 traps from frost kobolds.
+  - **Swallowed Cargo** (Kruk): recover 5 crates of cargo from sand golems.
+  - **Stolen Grave Goods** (Ulvar): take back 6 grave goods from grave robbers.
+  - **Tainted Glands** (Ulvar): bring 5 glands from plague bears.
+- If you already have one of these quests, its new objective starts from zero.
+
 ## v0.29.2
 
 ### New
