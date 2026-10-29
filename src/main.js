@@ -219,10 +219,16 @@ function makeMob(kind, p, lvl, r){ const K = KINDS[kind];
     for(let i = 0; i < n; i++){ const p = zoneSpot(r2, zone, null, null, md) || zoneSpot(r2, zone, null, null, md * 0.7); if(!p) continue; const m = makeMob(kind, p, Math.min(K.lv[1] + 1, lvlAt(K, p, zone) + 1), r2);
       m.night = true; m.dead = true; m.state = "dead"; m.deadT = 99; m.mesh.visible = false; m.nightGone = true; } } };
   for(const d of DUNGEONS) for(const [kind, i, j] of d.mobs){ const K = KINDS[kind]; makeMob(kind, d.tileCenter(i, j), K.boss || K.elite ? K.lv[0] : lvlOf(K), r); }
-  NIGHT_EXTRA(); }
-function respawn(m){ if(m.night && !isNight()){ Object.assign(m, {dead: true, state: "dead", deadT: 99, nightGone: true, x: m.hx, z: m.hz}); m.mesh.visible = false; return; }   // night monsters wait for the dark
+  NIGHT_EXTRA();
+  // the helpers a boss calls during the fight: made now (so every computer numbers them the same) and kept hidden until called
+  const r3 = rng(77); for(const b of mobs.filter(m => m.boss && m.dg && m.K.mech && m.K.mech.adds)){ const ad = b.K.mech.adds; b.adds = [];
+    for(let k = 0; k < ad.at.length * ad.n; k++){ const K = KINDS[ad.kind], m = makeMob(ad.kind, {x: b.hx, z: b.hz}, K.lv[1], r3); m.summon = true; m.summoner = b;
+      Object.assign(m, {dead: true, state: "dead", deadT: 99, hp: 0}); m.mesh.visible = false; b.adds.push(m); } } }
+function respawn(m){ if(m.summon){ Object.assign(m, {dead: true, state: "dead", deadT: 99, hp: 0, x: m.hx, z: m.hz, dots: []}); m.mesh.visible = false; return; }   // a boss's helpers wait until called
+  bossReset(m);
+  if(m.night && !isNight()){ Object.assign(m, {dead: true, state: "dead", deadT: 99, nightGone: true, x: m.hx, z: m.hz}); m.mesh.visible = false; return; }   // night monsters wait for the dark
   m.nightGone = false; Object.assign(m, {x: m.hx, z: m.hz, hp: m.maxHp, state: "idle", dead: false, deadT: 0, wx: null, path: null, dots: [], slowT: 0, rootT: 0, stunT: 0, novaT: m.K.nova ? m.K.nova.every : 0}); clearNova(m); m.mesh.visible = true; m.mesh.rotation.z = 0; }
-function evade(m){ m.state = "return"; m.dots = []; m.path = null; m.thMe = m.thPet = 0; m.tauntT = 0; if(m.nova) clearNova(m); }
+function evade(m){ m.state = "return"; m.dots = []; m.path = null; m.thMe = m.thPet = 0; m.tauntT = 0; if(m.nova) clearNova(m); bossReset(m); }
 
 // ---------------------------------------------------------------- characters: create, pick, save (kept in this browser)
 const KEY = "rimfrost2-chars";
@@ -267,7 +273,7 @@ function play(c){
   // health and mana as you left them; Resurrection Sickness keeps ticking; and if you were dead, you still are
   if(c.sick > 0){ P.buffs.ressick = c.sick; P.sickOn = true; G.recompute(false); }
   if(c.hpPct != null){ P.hp = Math.max(1, Math.round(P.maxHp * c.hpPct)); P.mana = Math.round(P.maxMana * (c.mpPct ?? 1)); }
-  if(c.death){ P.dead = true; P.hp = 0;
+  if(c.death){ P.dead = true; P.hp = 0; G.petLost();
     if(c.death.ghost){ P.corpse = {x: P.x, z: P.z}; P.x = c.death.gx; P.z = c.death.gz; G.petStash(); setGhost(true); }
     else $("dead").hidden = false; }
   updTracker();
@@ -704,12 +710,22 @@ function releaseSpirit(){ if(!P.dead || P.ghost) return;
   P.corpse = {x: P.x, z: P.z}; G.petStash(); P.target = null; P.auto = false; P.combatT = 0; CO.select(null);
   const sp = nearestGraveyard(); P.x = sp.x + 1.6; P.z = sp.z + 1.6; P.hp = 0; $("dead").hidden = true; setGhost(true);
   log(`You have released your spirit at ${sp.name}. Return to your corpse to resurrect.`, "#9fd6e8"); save(); }
-function comeBack(hpPct){ P.dead = false; P.corpse = null; P.shield = 0; P.hots = []; setGhost(false); G.recompute(false); P.hp = Math.max(1, P.maxHp * hpPct); P.mana = P.maxMana * hpPct; P.combatT = 0; G.petLoad(); }
+function comeBack(hpPct){ P.dead = false; P.corpse = null; P.shield = 0; P.hots = []; setGhost(false); G.recompute(false); P.hp = Math.max(1, P.maxHp * hpPct); P.mana = P.maxMana * hpPct; P.combatT = 0; }   // (a pet must be called again)
 function resurrectAtCorpse(){ if(!P.ghost || !P.corpse || Math.hypot(P.x - P.corpse.x, P.z - P.corpse.z) > CORPSE_RANGE) return;
   P.x = P.corpse.x; P.z = P.corpse.z; comeBack(0.5); G.burst(P.px, P.py, "#ffffff", 20); log("You have been resurrected.", "#7be08a"); save(); }
 function resurrectAtSpirit(){ if(!P.ghost) return; closePanel();
   P.buffs.ressick = SICK_TIME; P.sickOn = true; comeBack(1); G.burst(P.px, P.py, "#9fd6ff", 24);
   log(`You have been resurrected with Resurrection Sickness (${SICK_TIME / 60} min).`, "#e6bd5c"); save(); }
+// a friend's Resurrection, Revive or Redemption: back to life at their side with 20% health and mana
+// you are asked first; the offer lasts one minute
+let rezOffer = null;
+function rezAt(x, z, from){ if(!P.dead) return; rezOffer = {x, z, from, t: performance.now()}; $("rezask").firstChild.textContent = `${from} wants to resurrect you.`; $("rezask").hidden = false;
+  log(`${from} wants to resurrect you.`, "#fff2b0"); }
+function rezAnswer(yes){ const o = rezOffer; rezOffer = null; $("rezask").hidden = true; if(!o || !yes || !P.dead) return;
+  closePanel(); $("dead").hidden = true; P.x = o.x + 0.9; P.z = o.z + 0.9; P.path = null; P.dest = null; comeBack(0.2);
+  G.burst(P.px, P.py, "#fff2b0", 22); log(`${o.from} has resurrected you.`, "#7be08a"); save(); }
+$("rezyes").onclick = () => rezAnswer(true); $("rezno").onclick = () => rezAnswer(false);
+setInterval(() => { if(rezOffer && (performance.now() - rezOffer.t > 60000 || !P.dead)) rezAnswer(false); }, 1000);
 // the bar at the top while you are a spirit
 function updGhostBar(){ const el = $("ghostbar"); el.hidden = !P.ghost; if(!P.ghost) return;
   const cm = corpseMark2(), d = cm ? Math.hypot(P.x - cm.x, P.z - cm.z) : 1e9, near = !!cm && !cm.dg && P.corpse && Math.hypot(P.x - P.corpse.x, P.z - P.corpse.z) <= CORPSE_RANGE;
@@ -726,7 +742,7 @@ function scaleDungeons(){ if(CO.COOP.role === "guest") return;
       const pct = m.maxHp ? m.hp / m.maxHp : 1; m.maxHp = Math.round(m.baseHp * (1 + GROUP_HP * (n - 1))); m.dmg = m.baseDmg * (1 + GROUP_DMG * (n - 1)); if(!m.dead) m.hp = Math.max(1, Math.round(m.maxHp * pct)); m.scaleN = n; } } }
 // a dungeon keeps its state: what you killed stays dead until you choose to reset it at the door
 const dgDead = d => mobs.filter(m => m.dg && dungeonAt(m.hx) === d);
-const resetDungeon = d => { for(const m of mobs) if(m.dg && dungeonAt(m.hx) === d){ respawn(m); m.dead = false; } saveWorld(); log(`${d.name} has been reset.`, "#e6bd5c"); };
+const resetDungeon = d => { for(const m of mobs) if(m.dg && dungeonAt(m.hx) === d){ respawn(m); if(!m.summon) m.dead = false; } saveWorld(); log(`${d.name} has been reset.`, "#e6bd5c"); };
 let dgAsk = null;
 function askEnter(d){ if(P.ghost) return ghostEnter(d); dgAsk = d; panelTab = "dgenter"; sureId = null; hideTip(); $("panel").hidden = false; renderPanel(); }
 function dgEnterHTML(d){ const all = dgDead(d), dead = all.filter(m => m.dead).length, guest = CO.COOP.role === "guest", inside = CO.anyRemoteIn(regionOf(d.x0));
@@ -768,9 +784,10 @@ fxRing.rotation.x = -Math.PI / 2; fxRing.visible = false; fxRing.raycast = () =>
 const raiseCol = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.3, 9, 16, 1, true), new THREE.MeshBasicMaterial({color: 0x7aff6a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending}));
 raiseCol.visible = false; raiseCol.raycast = () => {}; scene.add(raiseCol);
 let raiseFx = 0, heroLook = "", puffT = 0;
-const lookOf = () => P.ghost ? "" : P.buffs.meld ? "meld" : P.buffs.stoneform ? "stone" : P.buffs.bloodrage ? "rage" : "";
+const lookOf = () => P.ghost ? "" : P.buffs.meld ? "meld" : P.buffs.stealth ? "stealth" : P.buffs.stoneform ? "stone" : P.buffs.bloodrage ? "rage" : "";
 function tintHero(){ if(!hero || !heroLook) return; const L = heroLook;
   hero.traverse(o => { if(!o.isMesh) return; o.material = o.material.clone();
+    if(L === "stealth"){ o.material.transparent = true; o.material.opacity = 0.42; o.material.depthWrite = false; if(o.material.color) o.material.color.lerp(new THREE.Color(0x2a2a3a), 0.4); o.castShadow = false; }
     if(L === "meld"){ o.material.transparent = true; o.material.opacity = 0.32; o.material.depthWrite = false; if(o.material.color) o.material.color.lerp(new THREE.Color(0x2a1a4a), 0.55); o.castShadow = false; }
     if(L === "stone" && o.material.color) o.material.color.lerp(new THREE.Color(0x9a948a), 0.75);
     if(L === "rage" && o.material.emissive){ o.material.emissive.setHex(0x8a1a0a); o.userData.rage = true; } }); }
@@ -804,9 +821,9 @@ $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("ch
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
 G.initEngine(scene, {floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
-CO.initCoop({scene, hud, log, err, save, floatText, chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? makeMount(MOUNTS[k]) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
+CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? makeMount(MOUNTS[k]) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
-  leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t),
+  leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t), zoneVis: (m, l) => zoneVis(m, l), bossSync: (m, f) => bossSync(m, f),
   someoneEnters: () => {}});
 K.setOnSave(() => save());
 Q.initQuests({shareExplore: CO.shareExplore, log, err, banner, save, refresh, buildBar, openPick, mobName: k => KINDS[k].name});
@@ -910,7 +927,7 @@ function moveMob(m, gx, gz, speed, dt){            // walks around houses, rocks
 }
 function updMob(m, dt){
   m.flash = Math.max(0, m.flash - dt); m.attackAnim = Math.max(0, m.attackAnim - dt * 3);
-  if(m.dead){ m.deadT += dt; if(!m.mesh.userData.ownDeath) m.mesh.rotation.z = Math.min(1.4, m.deadT * 4);   // tips over, then sinks and respawns
+  if(m.dead){ if(m.zones && m.zones.length) clearZones(m); m.deadT += dt; if(!m.mesh.userData.ownDeath) m.mesh.rotation.z = Math.min(1.4, m.deadT * 4);   // tips over, then sinks and respawns
     if(m.deadT > 4) m.mesh.position.y -= dt * 0.6; if(m.deadT > 6) m.mesh.visible = false; if(!m.dg && !CO.guestMob(m) && !(m.night && (m.nightGone || !nightNow)) && m.deadT > (m.elite ? RESPAWN_ELITE : RESPAWN)) respawn(m); return; }
   if(CO.guestMob(m)){ CO.guestUpd(m, dt); return; }                                        // a friend hosts this monster: just follow what they send
   const dp = P.dead || !running ? 1e9 : distU(m, P);
@@ -919,8 +936,8 @@ function updMob(m, dt){
   if(m.state === "idle"){
     m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.1 * dt);
     if(m.far) return;                                                                        // nobody near: it just stands there
-    if(!m.K.passive) for(const c of CO.cands(m)){ const range = clamp(9 + (m.lvl - (c.pet ? S.cur.level : c.lvl)) * 1.2, 5, 13) * (c.pet ? 0.7 : 1) * (nightNow ? 0.85 : 1);   // harder to see you at night
-      if(distU(m, c.e) < range && sees(m, c.e)){ G.aggro(m); G.social(m); if(CO.coopMob(m)){ m.threat = m.threat || {}; m.threat[c.id] = (m.threat[c.id] || 0) + 1; } if(c.me) log(`${m.name} attacks you!`, "#ff9a7a"); return; } }
+    if(!m.K.passive) for(const c of CO.cands(m)){ const range = clamp(9 + (m.lvl - (c.pet ? S.cur.level : c.lvl)) * 1.2, 5, 13) * (c.pet ? 0.7 : 1) * (nightNow ? 0.85 : 1) * (c.stealth ? 0.4 : 1);   // harder to see you at night, much harder in Stealth
+      if(distU(m, c.e) < range && sees(m, c.e)){ if(c.me && P.buffs.stealth){ G.breakStealth(); log(`${m.name} has discovered you!`, "#ff9a7a"); } G.aggro(m); G.social(m); if(CO.coopMob(m)){ m.threat = m.threat || {}; m.threat[c.id] = (m.threat[c.id] || 0) + 1; } if(c.me) log(`${m.name} attacks you!`, "#ff9a7a"); return; } }
     m.wanderT -= dt; if(m.wanderT <= 0){ m.wanderT = 3 + Math.random() * 5; const a = Math.random() * 6.28, d = Math.random() * 5; m.wx = m.hx + Math.cos(a) * d; m.wz = m.hz + Math.sin(a) * d; }
     if(m.wx != null){ const dx = m.wx - m.x, dz = m.wz - m.z, d = Math.hypot(dx, dz); if(d < 0.3) m.wx = null; else { if(tryMove(m, dx / d * 1.6 * dt, dz / d * 1.6 * dt)) m.moving = true; else m.wx = null; turnTo(m, dx, dz, dt, 6); } }
   } else if(m.state === "chase"){
@@ -932,13 +949,14 @@ function updMob(m, dt){
     const dt2 = distU(m, tg), seen = sees(m, tg), rg = m.K.ranged, reach = rg && !m.nova ? rg.range : m.K.reach + tg.r;   // casters stay at range and throw bolts
     if(m.nova){ m.nova.t -= dt; m.nova.mesh.scale.setScalar(1 - Math.max(0, m.nova.t) / m.K.nova.warn * 0.85); if(m.nova.t <= 0) novaBlast(m); else if(!m.K.nova.atTarget) return; }   // Morvane holds still while his nova builds
     else if(m.K.nova){ m.novaT -= dt; if(m.novaT <= 0 && dt2 < 14){ m.novaT = m.K.nova.every; startNova(m, tg); if(!m.K.nova.atTarget) return; } }
+    if(m.K.mech) bossMech(m, dt);
     if((dt2 > reach || !seen) && m.rootT <= 0){ const ok = moveMob(m, tg.x, tg.z, m.K.speed * (m.slowT > 0 ? 1 - m.slowPct : 1), dt);
       m.stuckT = ok ? 0 : (m.stuckT || 0) + dt; if(m.stuckT > 3){ m.stuckT = 0; evade(m); if(c.me) log(`${m.name} is evading.`, "#93a4ad"); return; } }   // can't get there (a cliff in the way): give up
     else m.stuckT = 0;
     if(dt2 <= reach + 0.5) turnTo(m, tg.x - m.x, tg.z - m.z, dt, 10);
     m.atkT -= dt;
-    if(dt2 <= reach + 0.3 && seen && m.atkT <= 0){ m.atkT = ATK_SPEED; m.attackAnim = 1;
-      const dm = m.dmg * (m.weakT > 0 ? 0.8 : 1);                                                // (Curse of Weakness)
+    if(dt2 <= reach + 0.3 && seen && m.atkT <= 0){ m.atkT = ATK_SPEED * (m.enraged ? 0.75 : 1); m.attackAnim = 1;
+      const dm = m.dmg * (m.weakT > 0 ? 0.8 : 1) * (m.enraged ? 1.4 : 1);                         // (Curse of Weakness; an enraged boss hits harder)
       if(rg && dt2 > m.K.reach + tg.r + 0.5) mobBolt(m, c, dm, rg.color);                     // a spell from range
       else CO.mobAttack(m, c, dm, "melee"); }
   } else if(m.state === "return"){
@@ -962,6 +980,41 @@ function startNova(m, tg){ const N = m.K.nova, g = new THREE.CircleGeometry(N.r,
   const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color: 0xff3a2a, transparent: true, opacity: 0.35, depthWrite: false})); mesh.position.set(at.x, height(at.x, at.z) + 0.1, at.z); scene.add(mesh);
   m.nova = {t: N.warn, mesh, x: at.x, z: at.z}; m.attackAnim = 1; const nm = N.name || "Ashen Nova";
   log(N.atTarget ? `${m.name} brings the ceiling down – get out of the red circle!` : `${m.name} begins to cast ${nm} – get away from ${N.she ? "her" : "him"}!`, "#ff8a7a"); floatText(m, nm + "!", "#ff5a2a", true); }
+// ---------------------------------------------------------------- the dungeon bosses' extra mechanics (see BOSS_MECH in mobs.js); the host runs them
+function bossReset(m){ m.enraged = false; m.phase = 0; m.zoneT = m.K.mech && m.K.mech.zones ? m.K.mech.zones.every * 0.6 : 0; clearZones(m); }
+function bossMech(m, dt){ const M = m.K.mech, pct = m.hp / m.maxHp;
+  if(M.enrage && !m.enraged && pct < M.enrage){ m.enraged = true; bossSay(m, "enrage"); }
+  if(M.adds && m.adds && (m.phase || 0) < M.adds.at.length && pct < M.adds.at[m.phase || 0]){ const A = M.adds, k0 = (m.phase || 0) * A.n; m.phase = (m.phase || 0) + 1;
+    for(let k = 0; k < A.n; k++){ const a = m.adds[k0 + k]; if(!a || !a.dead) continue; const ang = k / A.n * 6.28 + m.rot, x = m.x + Math.cos(ang) * 2.2, z = m.z + Math.sin(ang) * 2.2;
+      Object.assign(a, {x, z, hp: a.maxHp, dead: false, deadT: 0, state: "idle", dots: [], slowT: 0, rootT: 0, stunT: 0, path: null}); a.mesh.visible = true; a.mesh.rotation.z = 0;
+      if(m.threat) a.threat = Object.assign({}, m.threat); G.aggro(a); G.burst(a.px, a.py, "#9a8aff", 16); }
+    bossSay(m, "adds"); }
+  const Z = M.zones; if(!Z) return;
+  for(const zn of m.zones || []){ zn.t -= dt; zn.mesh.scale.setScalar(1 - Math.max(0, zn.t) / Z.warn * 0.85);
+    if(zn.t <= 0){ G.ring(zn.x * PXU, zn.z * PXU, Z.r * PXU, "#" + Z.color.toString(16).padStart(6, "0")); G.burst(zn.x * PXU, zn.z * PXU, "#" + Z.color.toString(16).padStart(6, "0"), 18);
+      for(const c of CO.cands(m)) if(Math.hypot(c.e.x - zn.x, c.e.z - zn.z) < Z.r) CO.mobAttack(m, c, m.dmg * Z.dmg * (m.weakT > 0 ? 0.8 : 1), "spell");
+      scene.remove(zn.mesh); zn.mesh.geometry.dispose(); zn.done = true; } }
+  if(m.zones) m.zones = m.zones.filter(z => !z.done);
+  if((m.zoneT -= dt) > 0) return; m.zoneT = Z.every * (m.enraged ? 0.7 : 1);
+  const spots = [];
+  if(Z.under) for(const c of CO.cands(m)) if(!c.pet && Math.hypot(c.e.x - m.x, c.e.z - m.z) < 30) spots.push({x: c.e.x, z: c.e.z});
+  for(let k = 0; k < (Z.scatter || 0); k++){ const a = Math.random() * 6.28, d = 3 + Math.random() * 7, x = m.x + Math.cos(a) * d, z = m.z + Math.sin(a) * d; if(!blocked(x, z, x, z, 0.5)) spots.push({x, z}); }
+  for(const p of spots) addZone(m, p.x, p.z, Z.warn);
+  log(`${m.name} casts ${Z.name} – move out of the circles!`, "#ff8a7a"); }
+function bossSay(m, what){ const A = m.K.mech.adds;
+  if(what === "enrage"){ log(`${m.name} becomes enraged!`, "#ff6a4a"); floatText(m, "Enraged!", "#ff4a2a", true); } else if(A) log(`${KINDS[A.kind].name}s ${A.say}!`, "#ff9a7a"); }
+// a guest: the host says the boss became enraged or called its helpers
+function bossSync(m, f){ const enr = !!(f & 1), ph = f >> 1; if(enr && !m.enraged) bossSay(m, "enrage"); if(ph > (m.phase || 0)) bossSay(m, "adds"); m.enraged = enr; m.phase = ph; }
+function addZone(m, x, z, t){ const Z = m.K.mech.zones, g = new THREE.CircleGeometry(Z.r, 32); g.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color: Z.color, transparent: true, opacity: 0.4, depthWrite: false})); mesh.position.set(x, height(x, z) + 0.11, z); scene.add(mesh);
+  (m.zones = m.zones || []).push({x, z, t, mesh}); }
+function clearZones(m){ for(const zn of m.zones || []){ scene.remove(zn.mesh); zn.mesh.geometry.dispose(); } m.zones = []; }
+// a guest sees the host's circles: [[x, z, seconds left], ...]
+function zoneVis(m, list){ if(!m.K.mech || !m.K.mech.zones) return; const Z = m.K.mech.zones; list = list || [];
+  while((m.zones || []).length > list.length){ const zn = m.zones.pop(); scene.remove(zn.mesh); zn.mesh.geometry.dispose(); }
+  list.forEach(([x, z, t], k) => { let zn = (m.zones || [])[k]; if(!zn){ addZone(m, x, z, t); zn = m.zones[k]; }
+    zn.x = x; zn.z = z; zn.t = t; zn.mesh.position.set(x, height(x, z) + 0.11, z); zn.mesh.scale.setScalar(1 - Math.max(0, t) / Z.warn * 0.85); });
+  }
 // a guest sees the host's nova (t = seconds left, 0 = none)
 function novaVis(m, nv){ const t = nv ? nv[0] : 0; if(t > 0){ if(!m.nova){ const N = m.K.nova, g = new THREE.CircleGeometry(N.r, 40); g.rotateX(-Math.PI / 2);
       const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({color: 0xff3a2a, transparent: true, opacity: 0.35, depthWrite: false})); scene.add(mesh); m.nova = {t, mesh}; }
@@ -1029,7 +1082,7 @@ const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir
 function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good}; }
 function playerAuras(){ const L = [];
   for(const k in P.buffs){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], left: P.buffs[k], good: true});
-    else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], P.buffs[k], true, k === "hotstreak" ? "Hot Streak" : null)); }
+    else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : P.buffs[k], true, k === "hotstreak" ? "Hot Streak" : null)); }   // (Stealth has no time limit)
   for(const h of P.hots) L.push(AB[h.key] ? abAura(h.key, h.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", left: h.left, good: true});
   if(P.shield > 0) L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(P.shield)} left)`, left: P.shieldT, good: true});
   if(P.sitting) L.push({url: iconURL("halo", "#7fa8b8"), name: "Resting", left: null, good: true});
@@ -1349,5 +1402,5 @@ initDev({update, save, refresh, buildBar, buildHero, hubSpot, log, arena: ARENA,
   makeMob: (kind, p, lvl) => { const m = makeMob(kind, p, lvl, rng(7)); m.dev = true; return m; },
   removeMob: m => { const i = mobs.indexOf(m); if(i >= 0) mobs.splice(i, 1); scene.remove(m.mesh); const pl = plates.get(m); if(pl){ pl.remove(); plates.delete(m); } if(P.target === m) P.target = null; },
   restore: c => { G.clearFx(); play(c); }});
-window.R2 = {renderer, setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
+window.R2 = {renderer, rezAt, setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
 requestAnimationFrame(loop);

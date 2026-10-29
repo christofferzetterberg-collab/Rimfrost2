@@ -53,6 +53,8 @@
   #dead{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(40,46,52,.5);backdrop-filter:grayscale(1);z-index:4}
   #dead[hidden]{display:none}
   #ghostbar{position:fixed;bottom:200px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid #9fd6ff;border-radius:8px;padding:8px 14px;z-index:4;font-size:14px;color:#dff4ff;display:flex;gap:10px;align-items:center;white-space:nowrap}
+  #rezask{position:fixed;top:24%;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid #fff2b0;border-radius:8px;padding:10px 16px;z-index:6;font-size:15px;color:#fff6d8;display:flex;gap:10px;align-items:center;white-space:nowrap}
+  #rezask[hidden]{display:none} #rezask button{font:800 14px 'Alegreya Sans';padding:5px 14px;border-radius:6px;border:0;background:#7be08a;color:#0b1013;cursor:pointer} #rezask button.no{background:#93a4ad}
   #ghostbar[hidden]{display:none} #ghostbar button{font:800 14px 'Alegreya Sans';padding:5px 14px;border-radius:6px;border:0;background:#9fd6e8;color:#0b1013;cursor:pointer} #ghostbar button:disabled{opacity:.4;cursor:default}
   #dead .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 26px;text-align:center}
   #dead h2{font-family:'Uncial Antiqua',serif;font-weight:400;color:#ff6b5e;margin:0 0 12px}
@@ -154,7 +156,7 @@
   #load[hidden]{display:none}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261105d", "./src/dungeon.js": "./src/dungeon.js?v=20261105d", "./src/dev.js": "./src/dev.js?v=20261105d", "./src/clock.js": "./src/clock.js?v=20261105d", "./src/coop.js": "./src/coop.js?v=20261105d", "./src/content.js": "./src/content.js?v=20261105d", "./src/engine.js": "./src/engine.js?v=20261105d", "./src/items.js": "./src/items.js?v=20261105d", "./src/keys.js": "./src/keys.js?v=20261105d", "./src/main.js": "./src/main.js?v=20261105d", "./src/models.js": "./src/models.js?v=20261105d", "./src/nav.js": "./src/nav.js?v=20261105d", "./src/quests.js": "./src/quests.js?v=20261105d", "./src/rimdata.js": "./src/rimdata.js?v=20261105d", "./src/state.js": "./src/state.js?v=20261105d", "./src/util.js": "./src/util.js?v=20261105d", "./src/world.js": "./src/world.js?v=20261105d", "./src/worlddata.js": "./src/worlddata.js?v=20261105d", "./src/mobs.js": "./src/mobs.js?v=20261105d", "./src/dgmech.js": "./src/dgmech.js?v=20261105d", "./src/avatar.js": "./src/avatar.js?v=20261105d", "./src/glb.js": "./src/glb.js?v=20261105d", "./src/beasts.js": "./src/beasts.js?v=20261105d", "./src/nature.js": "./src/nature.js?v=20261105d", "./src/buildings.js": "./src/buildings.js?v=20261105d", "./src/dgkit.js": "./src/dgkit.js?v=20261105d" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261106b", "./src/dungeon.js": "./src/dungeon.js?v=20261106b", "./src/dev.js": "./src/dev.js?v=20261106b", "./src/clock.js": "./src/clock.js?v=20261106b", "./src/coop.js": "./src/coop.js?v=20261106b", "./src/content.js": "./src/content.js?v=20261106b", "./src/engine.js": "./src/engine.js?v=20261106b", "./src/items.js": "./src/items.js?v=20261106b", "./src/keys.js": "./src/keys.js?v=20261106b", "./src/main.js": "./src/main.js?v=20261106b", "./src/models.js": "./src/models.js?v=20261106b", "./src/nav.js": "./src/nav.js?v=20261106b", "./src/quests.js": "./src/quests.js?v=20261106b", "./src/rimdata.js": "./src/rimdata.js?v=20261106b", "./src/state.js": "./src/state.js?v=20261106b", "./src/util.js": "./src/util.js?v=20261106b", "./src/world.js": "./src/world.js?v=20261106b", "./src/worlddata.js": "./src/worlddata.js?v=20261106b", "./src/mobs.js": "./src/mobs.js?v=20261106b", "./src/dgmech.js": "./src/dgmech.js?v=20261106b", "./src/avatar.js": "./src/avatar.js?v=20261106b", "./src/glb.js": "./src/glb.js?v=20261106b", "./src/beasts.js": "./src/beasts.js?v=20261106b", "./src/nature.js": "./src/nature.js?v=20261106b", "./src/buildings.js": "./src/buildings.js?v=20261106b", "./src/dgkit.js": "./src/dgkit.js?v=20261106b" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -166,7 +168,6 @@
   <div class="frame" id="pframe"><div class="n"><span id="pname">Adventurer</span><span id="plvl">Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt"></b></div><div class="bar res"><i id="presi"></i><b id="prest"></b></div><div id="pcp"></div><div class="auras" id="pbuffs"></div><div id="ppet" hidden><div class="n"><span id="ppetn"></span><span id="ppetm"></span></div><div class="bar"><i id="ppethi"></i><b id="ppetht"></b></div><div class="bar res"><i id="ppetri"></i><b id="ppetrt"></b></div><div class="auras" id="ppetb"></div></div></div>
   <div id="party"></div>
   <div class="frame" id="tframe" hidden><div class="n"><span id="tname"></span><span id="tlvl"></span></div><div class="bar"><i id="thpi"></i><b id="thpt"></b></div><div class="s" id="tstate"></div><div class="auras" id="tauras"></div></div>
-  <div id="title">Rimfrost 2</div>
   <div id="mini"><canvas id="minimap" width="180" height="180"></canvas><div id="zone"></div><div id="clock"></div></div>
   <div id="banner"></div>
   <div id="log"></div>
@@ -196,7 +197,8 @@
   </div>
 </div></div>
 <div id="ghostbar" hidden></div>
+<div id="rezask" hidden><span></span><button id="rezyes">Accept</button><button id="rezno" class="no">Decline</button></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261105d"></script>
+<script type="module" src="./src/main.js?v=20261106b"></script>
 </body>
 </html>

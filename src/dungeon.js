@@ -46,7 +46,7 @@ function makeDungeon(def){
       if(!free(i + di, j + dj)) continue; used.add((i + di) + "," + (j + dj)); d.mobs.push([d.pack[(n + k) % 3], i + di, j + dj]); k++; } });
   if(spots.a && d.elites[0]) d.mobs.push([d.elites[0], ...spots.a]);
   if(spots.b && d.elites[1]) d.mobs.push([d.elites[1], ...spots.b]);
-  if(spots.K) d.mobs.push([d.boss, ...spots.K]);
+  if(spots.K) d.mobs.push([d.boss, ...spots.K]); d.bossTile = spots.K || null;
   // features for the dungeon mechanics (dgmech.js)
   const runs = (c, vertical) => { const out = [];
     if(!vertical){ for(let j = 0; j < d.H; j++) for(let i = 0; i < d.W; i++) if(ch(i, j) === c && (i === 0 || ch(i - 1, j) !== c)){ let i1 = i; while(i1 + 1 < d.W && ch(i1 + 1, j) === c) i1++; if(i1 > i) out.push({a: [i, j], b: [i1, j]}); } }

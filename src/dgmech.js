@@ -4,6 +4,7 @@
 //  Ember Forge: lava can't be crossed, and fire vents erupt now and then.
 //  Frost Vault: ice is slippery, and freezing gusts blow through the wind tunnels.
 //  Draug King's Crypt: the gates only open when every monster before them is dead.
+// Mine carts, falling rocks and fire vents are deadly along the way (not in the boss's hall, where they only hurt); the tide and the gusts, which can't be avoided, only hurt.
 // Everything runs on the computer's clock, so every player in co-op sees the same carts, rocks, vents and gusts.
 import * as THREE from "three";
 import {P, mobs} from "./state.js";
@@ -17,6 +18,10 @@ const hash = (a, b) => { let h = Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 
 const dmgBase = d => 3 + d.lv[1] * 2.4;
 const mat = (c, o = 1) => new THREE.MeshBasicMaterial({color: c, transparent: o < 1, opacity: o, depthWrite: o >= 1});
 const hurt = (d, mult, name, color) => { if(P.dead || P.ghost) return; G.playerDamage(dmgBase(d) * mult, null, "env"); H.floatText(P, name, color); };
+// deadly away from the boss (its hall is about nine tiles across): otherwise just a hard hit
+const inBossHall = (d, x, z) => { if(!d.bossTile) return false; const c = d.tileCenter(...d.bossTile); return Math.hypot(x - c.x, z - c.z) < 9 * d.T; };
+const deadly = (d, mult, name, color, how) => { if(P.dead || P.ghost) return; if(inBossHall(d, P.x, P.z)) return hurt(d, mult, name, color);
+  G.playerDamage(P.maxHp * 50 + 99999, null, "env"); H.floatText(P, name, color); if(P.dead) H.log(how, "#ff8a7a"); };
 
 const CART_SPEED = 6, ROCK_EVERY = 6, ROCK_WARN = 1.8, SURGE_EVERY = 20, SURGE_WARN = 3, VENT_EVERY = 8, VENT_WARN = 1.5, VENT_BURN = 1.2, GUST_EVERY = 12, GUST_WARN = 2, GUST_LEN = 2.5;
 
@@ -60,7 +65,7 @@ export function updMech(dt){
   // ---- Iron Mine
   for(const c of db.carts){ const L = Math.max(0.1, c.len), p = (t * CART_SPEED + c.seed * 2 * L) % (2 * L), s = p < L ? p : 2 * L - p, k = s / L;
     const x = c.a.x + (c.b.x - c.a.x) * k, z = c.a.z + (c.b.z - c.a.z) * k; c.mesh.position.set(x, Y, z);
-    if(alive && Math.hypot(P.x - x, P.z - z) < 1.3 && !(P.cartT > 0)){ P.cartT = 1.5; hurt(d, 1.8, "Mine Cart", "#ffb060");
+    if(alive && Math.hypot(P.x - x, P.z - z) < 1.3 && !(P.cartT > 0)){ P.cartT = 1.5; deadly(d, 1.8, "Mine Cart", "#ffb060", "You were crushed by a mine cart.");
       const hx = c.a.z === c.b.z, side = hx ? Math.sign(P.z - z) || 1 : Math.sign(P.x - x) || 1;               // knocked off the track
       for(let n = 0; n < 10; n++) G.tryMove(P, hx ? 0 : side * 0.3, hx ? side * 0.3 : 0); } }
   if(P.cartT > 0) P.cartT -= dt;
@@ -68,7 +73,7 @@ export function updMech(dt){
     z.drops.forEach((dr, n) => { const tile = z.tiles[Math.floor(hash(cyc, n * 31 + z.off * 10) * z.tiles.length)], c = d.tileCenter(...tile); dr.x = c.x; dr.z = c.z;
       dr.ring.visible = f < ROCK_WARN + 0.4; dr.ring.position.set(c.x, Y + 0.05, c.z); dr.ring.scale.setScalar(0.4 + Math.min(1, f / ROCK_WARN) * 0.6);
       dr.rock.visible = f > ROCK_WARN - 0.5 && f < ROCK_WARN + 0.9; dr.rock.position.set(c.x, Y + 0.5 + Math.max(0, (ROCK_WARN - f) * 12), c.z); dr.rock.rotation.set(f * 3, f * 2, 0); });
-    if(f >= ROCK_WARN && z.last !== cyc){ z.last = cyc; if(alive && z.drops.some(dr => Math.hypot(P.x - dr.x, P.z - dr.z) < 1.7)) hurt(d, 2.2, "Falling Rocks", "#d8b070"); } }
+    if(f >= ROCK_WARN && z.last !== cyc){ z.last = cyc; if(alive && z.drops.some(dr => Math.hypot(P.x - dr.x, P.z - dr.z) < 1.7)) deadly(d, 2.2, "Falling Rocks", "#d8b070", "You were buried by falling rocks."); } }
   // ---- Drowned Temple
   if(here === "~") P.envSpeed = 0.55;
   if(db.waterMat){ const cyc = Math.floor(t / SURGE_EVERY), f = t - cyc * SURGE_EVERY, warn = f > SURGE_EVERY - SURGE_WARN, surge = f < 1.2;
@@ -81,7 +86,7 @@ export function updMech(dt){
     const warn = f < VENT_WARN, burn = f >= VENT_WARN && f < VENT_WARN + VENT_BURN;
     v.glow.material.color.setHex(burn ? 0xffd06a : warn ? (Math.sin(t * 18) > 0 ? 0xff6a1a : 0xc0300a) : 0x4a140a);
     v.flame.visible = burn; if(burn){ v.flame.scale.set(1, 0.7 + Math.sin(t * 20 + v.i) * 0.2 + Math.min(1, (f - VENT_WARN) * 5) * 0.3, 1); }
-    if(burn && alive && Math.hypot(P.x - v.x, P.z - v.z) < 1.5 && !(P.ventT > 0)){ P.ventT = 0.5; hurt(d, 0.9, "Fire Vent", "#ff8a2a"); } }
+    if(burn && alive && Math.hypot(P.x - v.x, P.z - v.z) < 1.5 && !(P.ventT > 0)){ P.ventT = 0.5; deadly(d, 0.9, "Fire Vent", "#ff8a2a", "You were burned to ashes by a fire vent."); } }
   if(P.ventT > 0) P.ventT -= dt;
   // ---- Frost Vault
   for(const gs of db.gusts){ const ln = gs.ln, tt = t + gs.off, cyc = Math.floor(tt / GUST_EVERY), f = tt - cyc * GUST_EVERY, warn = f < GUST_WARN, gust = f >= GUST_WARN && f < GUST_WARN + GUST_LEN;

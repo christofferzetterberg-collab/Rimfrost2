@@ -201,13 +201,23 @@ function makeModel(kind, d){
     default: { const look = LOOKS[kind]; const g = look ? look(c) : makeHumanoid({shirt: c, cape: null}); return s > 1.05 ? scaled(g, s) : g; }
   }
 }
+// the dungeon bosses' extra mechanics (main.js runs them):
+//  zones: glowing circles that erupt after a warning (under each player, or scattered around the boss)
+//  adds: helpers called at these health levels; enrage: below this health the boss hits harder and faster
+export const BOSS_MECH = {
+  djuptjur: {zones: {name: "Cave-in", every: 11, warn: 2, r: 2.6, dmg: 2.2, under: true, color: 0xd8b070}, enrage: 0.3},
+  profeten: {zones: {name: "Drowning Pool", every: 12, warn: 2.2, r: 3, dmg: 1.8, scatter: 4, color: 0x3fb0e0}, adds: {kind: "drunknad", at: [0.7, 0.35], n: 2, say: "rise from the depths"}, enrage: 0.2},
+  eldtyrann: {zones: {name: "Flame Pillar", every: 9, warn: 1.8, r: 2.4, dmg: 2.4, scatter: 5, under: true, color: 0xff6a1a}, adds: {kind: "eldhund", at: [0.5], n: 2, say: "leap from the flames"}, enrage: 0.3},
+  skadi: {zones: {name: "Frozen Tomb", every: 10, warn: 2, r: 2.4, dmg: 2.2, under: true, color: 0x9fd6ff}, adds: {kind: "frostulv", at: [0.66, 0.33], n: 2, say: "answer her call"}, enrage: 0.2},
+  boss: {zones: {name: "Grave Rot", every: 12, warn: 2, r: 2.6, dmg: 1.8, scatter: 3, color: 0x7aff6a}, adds: {kind: "cryptguard", at: [0.66, 0.33], n: 2, say: "rise from their tombs"}, enrage: 0.2}
+};
 // Rimfrost 2 stats: health and damage multipliers like Rimfrost 1; sizes and speeds turned into world units
 export const KINDS = {};
 for(const [id, d] of Object.entries(MOBS)){ const ru = d.r / 20;
   KINDS[id] = {id, name: d.name, lv: d.lv, make: () => makeModel(id, d), hp: (d.elite ? d.elite * ELITE_HP : 1) * (d.boss ? BOSS_HP : 1) * (d.hpm || 1), dmg: (d.elite ? 1.25 : 1) * (d.passive ? 0.6 : 1) * (d.dmm || 1),
     speed: d.sp * 0.068, r: ru, reach: 1.4 + ru, elite: !!d.elite, boss: !!d.boss, passive: !!d.passive, dg: !!d.dg,
     ranged: d.ranged ? {range: d.ranged >= 220 ? 12 : 11, color: d.color} : null,
-    nova: d.special ? {every: d.special.every, r: d.special.r / 23, warn: d.special.windup, dmg: d.special.mult, name: d.special.name, she: /Queen|Witch/.test(d.name)} : null}; }
+    nova: d.special ? {every: d.special.every, r: d.special.r / 23, warn: d.special.windup, dmg: d.special.mult, name: d.special.name, she: /Queen|Witch/.test(d.name)} : null, mech: BOSS_MECH[id] || null}; }
 // how many of each live in each zone (Rimfrost 1's numbers; the big end zones get more)
 export const SPAWNS = [
   ["wolf", 12, "frostang"], ["boar", 10, "frostang"], ["thief", 9, "frostang"],

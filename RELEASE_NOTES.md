@@ -1,5 +1,37 @@
 # Rimfrost 2 – Release notes
 
+## v0.29.1
+
+### Changed
+- When a hunter or warlock dies, their pet dies or their demon vanishes. After coming back to life, call it again.
+- **Resurrection, Revive and Redemption** now ask the dead player first: Accept or Decline (the offer lasts 1 minute).
+
+### Note
+- Everyone in a co-op group must run the same version of the game for resurrection to work. Reload the page after updating.
+
+## v0.29.0
+
+### New
+- **Resurrection spells** for co-op: **Resurrection** (Priest, level 10), **Revive** (Druid, level 10) and **Redemption** (Paladin, level 12). Select a dead friend and cast for 10 sec out of combat; they return at your side with 20% health and mana. Learn them from your class trainer.
+- **Boss mechanics** in every dungeon:
+  - **The Bull from the Deep:** Cave-in – the ceiling falls on every player. Enrages at 30% health.
+  - **The Sunken Prophet:** Drowning Pools around him, and the Drowned Ones rise at 70% and 35% health. Enrages at 20% health.
+  - **The Fire Tyrant:** Flame Pillars under every player and around him, and Ember Hounds leap from the flames at 50% health. Enrages at 30% health.
+  - **Skadi the Ice Queen:** Frozen Tomb under every player, and Frost Wargs answer her call at 66% and 33% health. Enrages at 20% health.
+  - **The Draug King:** Grave Rot around him, and Draug Warriors rise at 66% and 33% health. Enrages at 20% health.
+  - Step out of the glowing circles before they erupt. An enraged boss hits harder, attacks faster and casts more often.
+
+### Changed
+- **Deadly dungeon hazards:** mine carts, falling rocks and fire vents now kill instantly along the way. In a boss's hall they still only hurt. The tide in the Drowned Temple and the gusts in the Frost Vault are unchanged.
+- **Rogue – Stealth:**
+  - No time limit. It ends when you attack, use it again, take any damage (traps too) or are discovered.
+  - Enemies can still notice you, but only at close range.
+  - You look faded while in Stealth, and so do friends in co-op.
+  - The cooldown starts when Stealth ends.
+- **Warlock – Imp:** uses mana. It stands still and casts Firebolt (1.6 sec cast) when in range, and follows its target when out of range. It no longer jumps back to you during a fight. Scorch costs 30 mana, 6 sec cooldown.
+- **Warlock – Voidwalker:** uses mana. Suffering costs 20 mana (8 sec cooldown) and Void Strike 10 mana (5 sec cooldown).
+- The game title no longer shows at the top of the screen while you play.
+
 ## v0.28.0
 
 ### New

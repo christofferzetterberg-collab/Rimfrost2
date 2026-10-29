@@ -114,7 +114,7 @@ function lookKey(){ const eq = S.cur.eq || {}, o = {}; for(const k of ["head", "
 function state(){
   const pet = G.getPet();
   return {t: "st", id: COOP.peer.id, name: S.cur.name, race: S.cur.race, cls: S.cur.cls, lvl: S.cur.level, x: +P.x.toFixed(2), z: +P.z.toFixed(2), rot: +P.rot.toFixed(2), mv: !!P.moving,
-    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!(P.buffs.meld || P.buffs.stealth), mt: P.mount || null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
+    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!P.buffs.meld, st: !!P.buffs.stealth, mt: P.mount || null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
     pet: pet ? {k: pet.kind, x: +pet.x.toFixed(2), z: +pet.z.toFixed(2), rot: +pet.rot.toFixed(2), hp: Math.round(pet.hp), mhp: pet.maxHp, dead: !!pet.dead, mv: !!pet.moving, atk: +(pet.attackAnim || 0).toFixed(2), res: Math.round(pet.res || 0)} : null};
 }
 function sendState(){ if(!on() || !COOP.peer || !S.cur) return; broadcast(state()); }
@@ -150,6 +150,8 @@ export function render(){
       r.mesh = r.form === "bear" ? makeBearForm() : r.form === "cat" ? makeWolfForm(r.race) : r.form === "leopard" ? makeLeopardForm(r.race) : makeHero(r.race, r.cls, RACES, r.eq || {});
       r.mesh.traverse(m => { if(m.isMesh) m.userData.remote = r; }); H.scene.add(r.mesh); }
     const vis = sameRegion(r, P) && !r.gh; r.mesh.visible = vis;                     // (a friend's spirit is not seen by the living)
+    { const fade = !!(r.meld || r.st); if(fade !== !!r.mesh.userData.faded){ r.mesh.userData.faded = fade;   // a friend in Stealth or Shadowmeld looks faded
+      r.mesh.traverse(o => { if(!o.isMesh) return; if(fade){ o.userData.m0 = o.material; o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.4; o.material.depthWrite = false; } else if(o.userData.m0){ o.material = o.userData.m0; o.userData.m0 = null; } }); } }
     if((r.mt || null) !== (r.mtShown || null)){ if(r.mtMesh) H.scene.remove(r.mtMesh); r.mtMesh = r.mt && H.mountMesh ? H.mountMesh(r.mt) : null; if(r.mtMesh) H.scene.add(r.mtMesh); r.mtShown = r.mt || null; }
     r.mesh.userData.animate(r.walk, r.mv, r.ak === "cast" ? 0 : r.atk || 0, r.sit || r.mt ? "sit" : r.pose || null);
     r.mesh.position.set(r.x, height(r.x, r.z) + (r.dead ? 0.3 : 0), r.z); r.mesh.rotation.set(r.dead ? -1.4 : 0, r.rot, 0);
@@ -198,10 +200,10 @@ export function taunt(m){ if(COOP.role === "guest") op("taunt", m, []); else hos
 // everyone a monster could go after: you, your pet, friends and their pets in the same place
 export function cands(m){
   const L = [], inC = reg(m.x), pet = G.getPet();
-  if(H.running() && !P.dead && !P.buffs.meld && !P.buffs.stealth && reg(P.x) === inC) L.push({id: myId(), e: P, me: true, lvl: S.cur.level});
+  if(H.running() && !P.dead && !P.buffs.meld && reg(P.x) === inC) L.push({id: myId(), e: P, me: true, lvl: S.cur.level, stealth: !!P.buffs.stealth});
   if(pet && !pet.dead && reg(pet.x) === inC) L.push({id: on() ? myId() + ":pet" : "pet", e: pet, pet: true, mine: true});
   if(coopMob(m)) for(const r of Object.values(COOP.remotes)){
-    if(!r.dead && !r.meld && reg(r.x) === inC) L.push({id: r.id, e: r, lvl: r.lvl});
+    if(!r.dead && !r.meld && reg(r.x) === inC) L.push({id: r.id, e: r, lvl: r.lvl, stealth: !!r.st});
     const po = r.petObj; if(po && !po.dead && reg(po.x) === inC) L.push({id: r.id + ":pet", e: po, pet: true, owner: r.id}); }
   return L; }
 export function mobTarget(m){
@@ -260,7 +262,8 @@ function hostMobs(){ const rs = Object.values(COOP.remotes); if(!rs.length) retu
   for(const m of mobs){ if(m.nid == null) continue;
     if(!rs.some(r => reg(r.x) === reg(m.x) && Math.hypot(r.x - m.x, r.z - m.z) < 90)) continue;
     out.push([m.nid, +m.x.toFixed(2), +m.z.toFixed(2), Math.round(m.hp), ST[m.state] || 0, m.dead ? 1 : 0, +m.rot.toFixed(2), m.moving ? 1 : 0, m.tgtId || 0,
-      m.nova ? [+m.nova.t.toFixed(2), +m.nova.x.toFixed(1), +m.nova.z.toFixed(1)] : 0, +m.stunT.toFixed(1), +m.rootT.toFixed(1), +m.slowT.toFixed(1), m.dots.map(d => [d.key, d.left]), +(m.attackAnim || 0).toFixed(2), m.slowPct || 0, m.maxHp, m.state === "chase" && m.threat ? Object.entries(m.threat).map(([k, v]) => [k, Math.round(v)]) : 0, +(m.freezeT || 0).toFixed(1)]); }
+      m.nova ? [+m.nova.t.toFixed(2), +m.nova.x.toFixed(1), +m.nova.z.toFixed(1)] : 0, +m.stunT.toFixed(1), +m.rootT.toFixed(1), +m.slowT.toFixed(1), m.dots.map(d => [d.key, d.left]), +(m.attackAnim || 0).toFixed(2), m.slowPct || 0, m.maxHp, m.state === "chase" && m.threat ? Object.entries(m.threat).map(([k, v]) => [k, Math.round(v)]) : 0, +(m.freezeT || 0).toFixed(1),
+      m.zones && m.zones.length ? m.zones.map(z => [+z.x.toFixed(1), +z.z.toFixed(1), +z.t.toFixed(2)]) : 0, (m.enraged ? 1 : 0) + (m.phase || 0) * 2]); }
   broadcast({t: "mobs", m: out}); }
 function applyMobs(list){
   for(const s of list){ const m = mobByNid(s[0]); if(!m) continue;
@@ -273,7 +276,7 @@ function applyMobs(list){
     m.trot = s[6]; m.moving = !!s[7]; m.tgtId = s[8] || null; m.stunT = s[10]; m.rootT = s[11]; m.slowT = s[12]; m.slowPct = s[15];
     m.dots = (s[13] || []).map(([key, left]) => ({key, left, per: 0, tick: 1}));
     if(s[14] > (m.attackAnim || 0) + 0.3) m.attackAnim = s[14];
-    H.novaVis(m, s[9]);
+    H.novaVis(m, s[9]); if(m.K.mech){ H.zoneVis(m, s[19] || []); H.bossSync(m, s[20] || 0); }
     m.seenT = performance.now(); } }
 export function guestUpd(m, dt){
   m.flash = Math.max(0, (m.flash || 0) - dt); m.attackAnim = Math.max(0, (m.attackAnim || 0) - dt * 3);
@@ -296,7 +299,13 @@ function sendFx(r, fx, label){ if(!fx.length) return; const msg = {t: "fx", to: 
   for(const f of fx) if(f[0] === "heal") H.floatText(r, "+" + f[1], "#7be08a"); }
 // War Cry, Holy Wave and the like also reach friends near you (radius in Rimfrost pixels)
 export function groupFx(radius, fx, label){ if(!on()) return; for(const r of visible()) if(!r.dead && Math.hypot(r.x - P.x, r.z - P.z) * PXU < radius) sendFx(r, fx.map(f => f.slice()), label); }
-function receiveFx(d){ if(P.dead) return;
+// resurrection: a dead friend comes back at the caster's side
+function rezTarget(){ const r = on() && P.ftarget && COOP.remotes[P.ftarget]; return r && r.dead ? r : null; }
+export function rezCheck(){ if(!on()) return "There is no one to resurrect"; const r = rezTarget(); if(!r) return "Select a dead friend first";
+  if(P.combatT > 0) return "You cannot do that in combat"; if(!r.gh && Math.hypot(r.x - P.x, r.z - P.z) > 30) return `${r.name} is too far away`; return true; }
+export function rezSend(label){ const r = rezTarget(); if(!r) return; sendFx(r, [["rez", +P.x.toFixed(2), +P.z.toFixed(2)]], label); H.log(`You offer to resurrect ${r.name}.`, "#7be08a"); }
+function receiveFx(d){ const rz = d.fx.find(f => f[0] === "rez"); if(rz){ if(P.dead && H.rezAt) H.rezAt(rz[1], rz[2], d.from); return; }
+  if(P.dead) return;
   for(const f of d.fx){
     if(f[0] === "heal") G.healP(f[1]); else if(f[0] === "healPct") G.healP(P.maxHp * f[1]);
     else if(f[0] === "hot") G.hot(f[1] + "_" + d.from, f[2], f[3]); else if(f[0] === "shield") G.shieldP(f[1], f[2]); else if(f[0] === "buff") G.buff(f[1], f[2]); }

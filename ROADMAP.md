@@ -239,6 +239,20 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] 56. Rogue: two weapons, fast attacks, energy and combo points, Stealth
 - [x] 57. Shaman: Nature magic, shocks and totems (Fire, Earth and Water)
 
+### To fix – list 7
+
+#### Dungeons
+- [x] 58. Hazards along the way are deadly (mine carts, lava, fire vents and more); nothing that must be passed to finish a dungeon kills instantly
+- [x] 59. More boss mechanics
+
+#### General
+- [x] 60. Remove "Rimfrost 2" at the top of the screen while playing
+
+#### Classes
+- [x] 61. Druid (level 10), Priest (level 10) and Paladin (level 12): a resurrect spell for co-op – 10 sec cast, out of combat only; the friend returns at the caster with 20% health and mana
+- [x] 62. Warlock: the Imp uses mana, stands still and casts Firebolt when in range and follows you when out of range; the Voidwalker uses mana and its abilities have cooldowns instead of rage costs
+- [x] 63. Rogue Stealth: no time limit (still shown as a buff); ends when you attack, use it again, take damage (also from traps) or are discovered; enemies notice you from a shorter range; you look faded (also to friends); the cooldown starts when Stealth ends
+
 ### Stage 10 – day and night
 - [x] Game clock: a day lasts 80 minutes (night 20), the same for everyone in co-op; light, sky, mist, town firelight and a small light around you at night
 - [x] More wolves, undead and spirits at night (a level higher); monsters see you from a bit shorter range in the dark
