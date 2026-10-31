@@ -386,6 +386,7 @@ export function updPlayer(dt, moving){
   if(P.casting && moving) cancelCast("Interrupted – you moved");
   if(P.buffs.meld && (moving || P.auto || P.casting || P.dash)) delete P.buffs.meld;      // Shadowmeld ends when you move or act
   if(P.casting){ const a = AB[P.casting.id], t = P.casting.t; if(a && a.minRange && t && !t.dead && rangePx(t) < a.minRange) cancelCast("Too close"); }
+  if(P.casting && P.casting.id && P.casting.t && P.casting.t.dead && AB[P.casting.id] && AB[P.casting.id].tgt === "enemy") cancelCast();   // the target died: the spell stops at once (heals go on)
   if(P.casting && (P.casting.kind === "gather" || P.casting.kind === "mount") && P.combatT > 0){ const k = P.casting.kind; P.casting = null; H.err(k === "mount" ? "You cannot mount in combat" : "You cannot pick that up in combat"); }
   if(P.casting){ P.casting.el += dt; if(P.casting.el >= P.casting.total){ const c = P.casting;
     if(c.kind === "gather" || c.kind === "mount"){ P.casting = null; P.castDone = {label: c.label, t: 0.3}; if(c.kind === "gather") H.finishGather(c.node); else H.finishMount(c.mount); } else completeCast(); } }
@@ -546,7 +547,7 @@ const GROWL_CD = 12, GROWL_TAUNT = 3;
 export const PETS = {
   bear: {name: "Bear", sp: 125, hp: 1.2, taken: 0.85, coef: 0.18, atk: 2.0, threat: 4, ownerThreat: 0.8, r: 0.6, role: "tank", res: "rage"},
   wolf: {name: "Wolf", sp: 135, hp: 0.8, taken: 1.0, coef: 0.20, atk: 1.1, threat: 0.5, ownerThreat: 1, r: 0.5, role: "dps", res: "energy"},
-  imp: {name: "Imp", sp: 120, hp: 0.55, taken: 1.1, coef: 0.30, atk: 2.2, threat: 0.4, ownerThreat: 1, r: 0.35, role: "caster", res: "mana", school: "fire", range: 10},
+  imp: {name: "Imp", sp: 120, hp: 0.55, taken: 1.1, coef: 0.30, atk: 2.2, threat: 0.4, ownerThreat: 1, r: 0.35, role: "caster", res: "mana", school: "fire", range: 13},
   voidwalker: {name: "Voidwalker", sp: 115, hp: 1.3, taken: 0.8, coef: 0.16, atk: 2.0, threat: 4.5, ownerThreat: 0.8, r: 0.6, role: "tank", res: "mana", school: "shadow"}
 };
 // a tank pet's three skills: the taunt, the hit-everything skill and the single-target threat strike
@@ -558,7 +559,7 @@ export const PET_SKILLS = {
          {id: "sweep", name: "Sweep", icon: "whirl", color: "#d84a42", desc: "Costs 40 rage. Strikes all nearby enemies. Used when two or more enemies are close."},
          {id: "maul", name: "Maul", icon: "claw", color: "#c8783a", desc: "Costs 25 rage. A heavy strike against a single target that causes a high amount of threat."}],
   wolf: [{id: "claw", name: "Claw", icon: "claw", color: "#e8c84a", desc: "Costs 40 energy. A powerful strike."}],
-  imp: [{id: "scorch", name: "Scorch", icon: "flame", color: "#ff7a2a", desc: "Costs 30 mana. Hurls a blast of fire at the target. 6 sec cooldown."}],
+  imp: [{id: "scorch", name: "Scorch", icon: "flame", color: "#ff7a2a", desc: "Costs 15 mana. Hurls a blast of fire at the target."}],
   voidwalker: [{id: "torment", name: "Torment", icon: "horn", color: "#8a6ad0", desc: "Taunts the target, forcing it to attack your Voidwalker for 3 sec. 12 sec cooldown."},
          {id: "suffering", name: "Suffering", icon: "whirl", color: "#6a4ab0", desc: "Costs 20 mana. Strikes all nearby enemies. Used when two or more enemies are close. 8 sec cooldown."},
          {id: "voidstrike", name: "Void Strike", icon: "claw", color: "#8a5ad0", desc: "Costs 10 mana. A heavy strike against a single target that causes a high amount of threat. 5 sec cooldown."}]
@@ -662,13 +663,13 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
     if(pet.casting.left <= 0){ pet.casting = null; pet.res -= IMP_BOLT; pet.attackAnim = 1; petBolt(t, d.coef, 5); pet.atkT = 0.3; } }
   else if(t){
     const reach = pet.r + t.r + (d.range ? d.range : 0.5);
-    if(d.role === "caster" && distU(pet, t) <= reach && pet.atkT <= 0 && pet.res >= IMP_BOLT && !pet.casting) pet.casting = {t, left: 1.6 / (pet.wrathT > 0 ? 1.3 : 1)};
+    if(d.role === "caster" && distU(pet, t) <= reach && pet.atkT <= 0 && pet.res >= IMP_BOLT && !pet.casting) { const ct = 1.6 / (pet.wrathT > 0 ? 1.3 : 1); pet.casting = {t, left: ct, total: ct}; }
     if(distU(pet, t) > reach){ const dir = steer(pet, t.x, t.z, dt, blockedFn); if(dir && tryMoveFn(pet, dir.dx * sp / PXU * dt, dir.dz * sp / PXU * dt)){ pet.moving = true; turnTo(pet, dir.dx, dir.dz, dt, 12); } }
     else { turnTo(pet, t.x - pet.x, t.z - pet.z, dt, 12);
       if(pet.atkT <= 0){ pet.atkT = d.atk / ((1 + 0.07 * T("h_frenzy")) * (pet.wrathT > 0 ? 1.3 : 1)); pet.attackAnim = 1; if(d.role !== "caster"){ petStrike(t, d.coef); if(tank && !demon) pet.res = Math.min(100, pet.res + 8); } }
       if(tank && petSkillOn(SK.one) && pet.res >= (demon ? 10 : MAUL_COST) && pet.maulT <= 0 && !t.dead && !(petSkillOn(SK.aoe) && pet.sweepT <= 0 && mobs.filter(m => !m.dead && m.state === "chase" && distU(m, pet) < 3.9).length >= 2)){   // Maul (25 rage) / Void Strike (10 mana, 5 sec cooldown): single target, extra threat; Sweep goes first when several enemies are close
         pet.res -= demon ? 10 : MAUL_COST; pet.maulT = demon ? 5 : MAUL_CD; pet.attackAnim = 1; H.floatText(pet, pet.kind === "bear" ? "Maul" : "Void Strike", "#e8a060"); petStrike(t, MAUL_COEF, MAUL_THREAT); }
-      if(pet.kind === "imp" && !pet.casting && petSkillOn("scorch") && pet.res >= 30 && pet.clawT <= 0 && !t.dead){ pet.res -= 30; pet.clawT = 6; pet.attackAnim = 1; H.floatText(pet, "Scorch", "#ff9a4a"); petBolt(t, 0.6, 8); }
+      if(pet.kind === "imp" && !pet.casting && petSkillOn("scorch") && pet.res >= 15 && pet.clawT <= 0 && !t.dead){ pet.res -= 15; pet.clawT = 4; pet.attackAnim = 1; H.floatText(pet, "Scorch", "#ff9a4a"); petBolt(t, 1.2, 8); }
       if(pet.kind === "wolf" && petSkillOn("claw") && pet.res >= 40 && pet.clawT <= 0 && !t.dead){ pet.res -= 40; pet.clawT = 1.2; pet.attackAnim = 1; H.floatText(pet, "Claw", "#e8c84a"); petStrike(t, 0.55); } }
   } else if(distU(pet, P) > 3){                                              // follow you at your speed (faster when far behind)
     const gx = P.x - Math.sin(P.rot) * 1.6, gz = P.z - Math.cos(P.rot) * 1.6, spd = playerSpeed() * (distU(pet, P) > 9 ? 1.3 : 1);

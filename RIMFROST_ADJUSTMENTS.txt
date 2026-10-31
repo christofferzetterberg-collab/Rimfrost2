@@ -3,8 +3,8 @@ Add to list:
  - 
 
 - Dungeons:
- - in general, some stuff, for example getting hit by mine cart in Iron Mine should instantly kill, to make things harder. 
- - Add more boss mechanics.
+ - 
+ - 
  - 
   - Iron mine:
    - 
@@ -12,17 +12,19 @@ Add to list:
    - 
 
 - General:
- - Remove "Rimfrost 2" at the top after logging into character
+ - 
  - 
  - 
 
 - Feature:
- - 
+ - Make a Login screen that is behind a username and password (Or just maybe a username, "An account") Nothing Fancy, Instead of having the character progress saved in the web browser's cookies. The progress should be stored somewhere to be used in a different browser
  - 
  - 
 
 - Bugs:
- - 
+ - When clicking on mining and herbin nodes, it should not restart the count when clicking multiple time, instead do nothing.
+ - I don't know why, but when simply clicking on anything or nothing specifically in the world, for example on the ground multiple times, it's like a frame is getting stuck and it looks like lagg. If you need a video about it let me know. 
+ - If the target dies while casting a spell on that target, (should not count for heals) the player should stop casting directly and not complete the cast.
 
 - Classes:
   - Hunters:
@@ -30,16 +32,16 @@ Add to list:
    - 
 
   - Druid:
-   - Should have a resurrect spell at lvl 10 to be used for Co-op and the resurrected player will spawn at the caster and with 20% health and mana, 10 sec cast and outside combat only. 
+   - 
 
   - Paladin:
-   - Should have a resurrect spell at lvl 12 to be used for Co-op and the resurrected player will spawn at the caster and with 20% health and mana, 10 sec cast and outside combat only. 
+   - 
 
   - Warrior:
    - 
 
   - Priest:
-   - Should have a resurrect spell at lvl 10 to be used for Co-op and the resurrected player will spawn at the caster and with 20% health and mana, 10 sec cast and outside combat only. 
+   - 
 
   - Mage:
    - 
@@ -47,13 +49,13 @@ Add to list:
    - 
 
   - Warlock:
-   - The imp has Energy. it should use mana.
-   - The imp also teleports to the caster when in combat. it should stand still casting a firebolt (using mana) when in range, and if outranged, it should cancel and follow to continue to cast, (unless told otherwise)
-   - The voidwalker has rage, it should also use mana and the skills should have cooldowns instead of rage requirements.
+   - The imps scorch ability, cost too much mana and does to little damage, should do at least double damage (counting on lvl 1) and the mana cost could be reduced by 50%.
+   - Should add cast bar on Imp so it can be seen casting. and increase the range it attacks from by some meter.
+   - The imp's scorch ability says 6 sec cooldown. that it not correct and it should be removed from the spell description
 
   - Rogue:
-   - Stealth should not have a 60 min "buff" it should still show that it's a buff, but with no time limit and only removed when attacking, using the skill again or discovered by enemies.
-   - When using stealth enemies can still aggro but they aggro on shorter range. 
-   - when using stealth, the character should be somewhat faded (like ghost) so it can be seen in both Co-op and the palyer itself that stealth is active.
-   - The stealth Cooldown should only start when it breaks, not on "activating"
-   - Stealth should break if taking damage from environmental stuff.
+   - 
+   - 
+   - 
+   - 
+   - 

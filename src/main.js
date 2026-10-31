@@ -10,6 +10,7 @@ import {preloadAvatars, makeAvatar} from "./avatar.js";
 import {preloadNature} from "./nature.js";
 import {preloadBuildings} from "./buildings.js";
 import {preloadKit} from "./dgkit.js";
+import * as ACC from "./account.js";
 import {preloadBeasts} from "./beasts.js";
 import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
@@ -232,17 +233,45 @@ function respawn(m){ if(m.summon){ Object.assign(m, {dead: true, state: "dead", 
 function evade(m){ m.state = "return"; m.dots = []; m.path = null; m.thMe = m.thPet = 0; m.tauntT = 0; if(m.nova) clearNova(m); bossReset(m); }
 
 // ---------------------------------------------------------------- characters: create, pick, save (kept in this browser)
-const KEY = "rimfrost2-chars";
+let KEY = "rimfrost2-chars";
 function loadChars(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
-function saveChars(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} }
+function saveChars(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} cloudSoon(); }
 function save(){ const c = S.cur; if(!c || !running || DEV.sim) return; const at = P.corpse || P; c.x = Math.round(at.x * 10) / 10; c.z = Math.round(at.z * 10) / 10; c.t = Date.now();   // a spirit is saved where its body lies
   // health, mana, death and Resurrection Sickness are kept, so reloading the page changes nothing
   c.hpPct = P.maxHp ? Math.round(P.hp / P.maxHp * 1000) / 1000 : 1; c.mpPct = P.maxMana ? Math.round(P.mana / P.maxMana * 1000) / 1000 : 1;
   c.sick = P.buffs.ressick ? Math.round(P.buffs.ressick) : 0;
   c.death = P.dead ? {ghost: !!P.ghost, gx: Math.round(P.x * 10) / 10, gz: Math.round(P.z * 10) / 10} : null;
   const list = loadChars(), i = list.findIndex(o => o.id === c.id); if(i >= 0) list[i] = c; else list.push(c); saveChars(list); saveWorld(); }
+// ---------------------------------------------------------------- accounts: with Firebase set up (account.js) you log in, and your characters and world are kept online
+const cloudData = () => { let w = null; try{ w = JSON.parse(localStorage.getItem(WKEY)); }catch(e){} return {chars: loadChars(), world: w}; };
+let cloudT = 0;
+function cloudSoon(){ if(!ACC.accountId()) return; const now = Date.now(); if(now - cloudT > 15000){ cloudT = now; ACC.saveCloud(cloudData()); } else if(!cloudSoon.t) cloudSoon.t = setTimeout(() => { cloudSoon.t = null; cloudT = Date.now(); ACC.saveCloud(cloudData()); }, 15000 - (now - cloudT)); }
+addEventListener("pagehide", () => { if(ACC.accountId()){ save(); ACC.saveCloud(cloudData(), true); } });
+// each account has its own place in this browser; its save comes from the server when you log in
+async function afterLogin(){ const uid = ACC.accountId(); KEY = "rimfrost2-chars:" + uid; WKEY = "rimfrost2-world:" + uid;
+  const data = await ACC.loadCloud();
+  if(data){ saveChars(data.chars || []); try{ if(data.world) localStorage.setItem(WKEY, JSON.stringify(data.world)); else localStorage.removeItem(WKEY); }catch(e){} }
+  else { let claimed = null; try{ claimed = localStorage.getItem("rimfrost2-claimed"); }catch(e){}           // a new account takes over the characters already in this browser (once)
+    if(!claimed){ let old = [], ow = null; try{ old = JSON.parse(localStorage.getItem("rimfrost2-chars")) || []; ow = localStorage.getItem("rimfrost2-world"); localStorage.setItem("rimfrost2-claimed", uid); }catch(e){}
+      if(old.length){ saveChars(old); try{ if(ow) localStorage.setItem(WKEY, ow); }catch(e){} } }
+    ACC.saveCloud(cloudData()); }
+  $("acct").hidden = false; $("acct").innerHTML = `<span>Logged in as <b>${esc(ACC.accountName())}</b></span><button class="btn ghost" id="lout">Log out</button>`;
+  $("lout").onclick = async () => { save(); $("lout").disabled = true; await ACC.saveCloud(cloudData()); ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); };
+  showChars(); }
+function showLogin(){ running = false; closePanel(); $("chars").hidden = false; $("login").hidden = false; $("clistWrap").hidden = true; $("cform").hidden = true; $("lerr").textContent = ""; $("lname").focus(); }
+async function tryLogin(make){ const name = $("lname").value.trim(), pw = $("lpass").value;
+  if(!/^[A-Za-z0-9_-]{3,16}$/.test(name)) return $("lerr").textContent = "The name must be 3–16 letters or digits";
+  if(pw.length < 6) return $("lerr").textContent = "The password must be at least 6 characters";
+  $("lerr").textContent = make ? "Creating your account…" : "Logging in…"; $("llogin").disabled = $("lnew").disabled = true;
+  try{ await (make ? ACC.signUp(name, pw) : ACC.logIn(name, pw)); $("lpass").value = ""; $("lerr").textContent = ""; $("login").hidden = true; await afterLogin(); }
+  catch(e){ $("lerr").textContent = e.message; } finally{ $("llogin").disabled = $("lnew").disabled = false; } }
+$("llogin").onclick = () => tryLogin(false); $("lnew").onclick = () => tryLogin(true);
+$("lpass").addEventListener("keydown", e => { if(e.key === "Enter") tryLogin(false); });
+async function startScreen(){ if(!ACC.accountsOn()) return showChars();
+  showLogin(); $("lerr").textContent = "Logging in…";
+  if(await ACC.resume()){ try{ await afterLogin(); return; }catch(e){ console.warn(e); } } showLogin(); $("lerr").textContent = ""; }
 // the world remembers what you killed and gathered: monsters and herbs / ore come back on their own timer, also after reloading the page
-const WKEY = "rimfrost2-world";
+let WKEY = "rimfrost2-world";
 function saveWorld(){ if(CO.COOP.role === "guest" || DEV.sim) return; const now = Date.now(), w = {mobs: {}, nodes: {}};
   for(const m of mobs) if(m.dead && !m.dg && !m.night && !m.dev && m.nid != null){ const left = (m.elite ? RESPAWN_ELITE : RESPAWN) - m.deadT; if(left > 1) w.mobs[m.nid] = Math.round(now + left * 1000); }
   nodes.forEach((n, i) => { if(!n.active && n.respawn > 1) w.nodes[i] = Math.round(now + n.respawn * 1000); });
@@ -283,7 +312,7 @@ function play(c){
   if(c.pick) openPick(); updHelp();
 }
 function showChars(){
-  save(); running = false; closePanel(); $("chars").hidden = false; $("cform").hidden = true; $("clistWrap").hidden = false; hideTip();
+  save(); running = false; closePanel(); $("chars").hidden = false; $("login").hidden = true; $("cform").hidden = true; $("clistWrap").hidden = false; hideTip();
   const list = loadChars().sort((a, b) => (b.t || 0) - (a.t || 0)), el = $("clist"); el.innerHTML = "";
   for(const c of list){ const d = document.createElement("div"); d.className = "c";
     d.innerHTML = `<div class="n"><b style="color:${CLASSES[c.cls].color}">${c.name}</b><small>Level ${c.level} ${RACES[c.race].name} ${CLASSES[c.cls].name}</small></div><button class="btn">Play</button><button class="btn ghost">Delete</button>`;
@@ -570,6 +599,7 @@ function useThing(n){
   if(n.role){ talkTo(n); return; }
   if(n.portal){ if(P.combatT > 0) return err("You cannot do that in combat"); if(n.portal === "in") askEnter(n.d); else exitDungeon(n.d); return; }
   if(!n.active) return;
+  if(P.casting && P.casting.kind === "gather" && P.casting.node === n) return;   // already gathering it: clicking again does nothing
   const gath = !!Q.gatherReq(n.item);                    // herbs and ore can always be gathered (with enough skill); other things only for a quest
   if(!gath && !Q.needsQItem(n.item)) return err("You do not need this item");
   if(n.def.night && !isNight()) return err("Moonbloom can only be gathered at night");
@@ -884,17 +914,28 @@ function updHelp(){ for(const b of document.querySelectorAll("#gmenu [data-g]"))
 const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
 const marker = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55, 20), new THREE.MeshBasicMaterial({color: 0xffe08a, transparent: true, opacity: 0.9}));
 marker.rotation.x = -Math.PI / 2; marker.visible = false; scene.add(marker);
+// what the mouse points at: people and monsters are tested as simple spheres (testing every animated model exactly made clicks stutter),
+// herbs, ore and doors as their meshes, and the ground by stepping along the ray (no ray test against the whole world)
+const pickSphere = new THREE.Sphere(), pickHit = new THREE.Vector3();
 function pick(e){ mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(mouse, camera);
-  const meshes = []; for(const m of mobs) if(!m.dead) m.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
-  if(!P.ghost) for(const n of npcs) n.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
-  else for(const gy of graveyards) gy.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });                // a spirit can talk to the Spirit Guide
-  for(const n of nodes) if(n.active && n.mesh.visible) n.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
+  let best = null, bd = 1e9; const R = ray.ray, near = o => Math.hypot(o.x - P.x, o.z - P.z) < 70;
+  const test = (o, h, rad, res) => { pickSphere.center.set(o.x, height(o.x, o.z) + h / 2, o.z); pickSphere.radius = Math.max(rad, h * 0.42);
+    if(R.intersectSphere(pickSphere, pickHit)){ const d = pickHit.distanceTo(R.origin); if(d < bd){ bd = d; best = res; } } };
+  for(const m of mobs) if(!m.dead && m.inScene && near(m)) test(m, m.mesh.userData.height || 2, (m.r || 0.5) + 0.25, {mob: m});
+  if(!P.ghost){ for(const n of npcs) if(n.mesh.visible && near(n)) test(n, n.mesh.userData.height || 2.2, 0.6, {use: n}); }
+  for(const r of Object.values(CO.COOP.remotes)) if(r.mesh && r.mesh.visible && near(r)) test(r, r.mesh.userData.height || 2.2, 0.6, {friend: r});
+  { const pt = G.getPet(); if(pt && !pt.dead) test(pt, pt.mesh.userData.height || 1.5, (pt.r || 0.5) + 0.2, {pet: pt}); }
+  const meshes = []; for(const n of nodes) if(n.active && n.mesh.visible && near(n)) n.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
   for(const p of portals) meshes.push(p.mesh);
-  for(const r of Object.values(CO.COOP.remotes)) if(r.mesh && r.mesh.visible) r.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
-  { const pt = G.getPet(); if(pt && !pt.dead) pt.mesh.traverse(o => { if(o.isMesh){ o.userData.myPet = pt; meshes.push(o); } }); }
+  if(P.ghost) for(const gy of graveyards) gy.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });                // a spirit can talk to the Spirit Guide
   const hm = ray.intersectObjects(meshes, false)[0];
-  if(hm){ const u = hm.object.userData; if(u.mob) return {mob: u.mob}; if(u.myPet) return {pet: u.myPet}; if(u.remote) return {friend: u.remote}; if(u.npc) return {use: u.npc}; if(u.node) return {use: u.node}; }
-  const ht = ray.intersectObject(terrain)[0]; return ht ? {point: ht.point} : null; }
+  if(hm && hm.distance < bd){ const u = hm.object.userData; if(u.npc) return {use: u.npc}; if(u.node) return {use: u.node}; }
+  if(best && (best.mob || best.pet || best.friend || best.use)) return best;
+  // the ground: step along the ray until it goes below the land (or the dungeon floor), then narrow it down
+  const o = R.origin, dv = R.direction, under = t => { const x = o.x + dv.x * t, z = o.z + dv.z * t; return o.y + dv.y * t <= height(x, z); };
+  let a = 0, b = 0; for(let t = 1; t < 400; t += 1){ if(under(t)){ a = t - 1; b = t; break; } } if(!b) return null;
+  for(let k = 0; k < 12; k++){ const m = (a + b) / 2; if(under(m)) b = m; else a = m; }
+  return {point: new THREE.Vector3(o.x + dv.x * b, o.y + dv.y * b, o.z + dv.z * b)}; }
 renderer.domElement.addEventListener("contextmenu", e => e.preventDefault());
 // mouse: left click targets, right click attacks / talks / picks up, hold the right button and move the mouse to turn the camera
 const rmb = {down: false, moved: 0, x: 0, y: 0};
@@ -1171,6 +1212,11 @@ function updHUD(dt){
   for(const sg of SIGNS){ let p = signPlates.get(sg); const near = distU(P, sg) < 24 && !inCrypt();
     if(!p){ if(!near) continue; p = document.createElement("div"); p.className = "plate sign"; p.innerHTML = `<span>${sg.name}</span>`; hud.appendChild(p); signPlates.set(sg, p); }
     const s = near ? toScreen(sg.x, height(sg.x, sg.z) + 2.3, sg.z) : {on: false}; if(!s.on){ p.style.display = "none"; continue; } p.style.display = ""; p.style.left = s.x + "px"; p.style.top = s.y + "px"; }
+  // the Imp's cast bar
+  { const pt = G.getPet(), el = $("petcast"); let on = false;
+    if(running && pt && !pt.dead && pt.casting && pt.casting.total){ const s = toScreen(pt.x, height(pt.x, pt.z) + (pt.mesh.userData.height || 1.4) + 0.45, pt.z);
+      if(s.on){ on = true; el.style.left = s.x + "px"; el.style.top = s.y + "px"; el.firstChild.style.width = Math.min(100, (1 - pt.casting.left / pt.casting.total) * 100) + "%"; } }
+    if(el.hidden === on) el.hidden = !on; }
   // nameplates for monsters near you
   for(const m of mobs){ const p = plateFor(m), qm = questMob(m), near = !m.dead && distU(P, m) < (P.ghost ? GHOST_SIGHT : qm ? 40 : 26);
     if(!near){ p.style.display = "none"; continue; } const s = toScreen(m.x, height(m.x, m.z) + m.mesh.userData.height + 0.3, m.z); if(!s.on){ p.style.display = "none"; continue; }
@@ -1392,7 +1438,7 @@ function loop(t){
   requestAnimationFrame(loop);
 }
 $("load").hidden = true; updHelp();
-showChars();
+startScreen();
 // dev tools (?dev): cheats, teleports and the class balance test
 const ARENA = (() => { let a = null; return () => { if(a) return a; const s = hubSpot(HUBS.jarnfastet);
   for(let k = 0; k < 24 && !a; k++){ const ang = k * 0.26, mx = s.x + Math.cos(ang) * 11, mz = s.z + Math.sin(ang) * 11;

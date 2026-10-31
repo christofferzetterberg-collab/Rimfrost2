@@ -1,5 +1,25 @@
 # Rimfrost 2 – Release notes
 
+## v0.31.0
+
+### New
+- **Accounts:** log in with a name and password. Your characters and world progress are saved online, so you can play them in any browser.
+  - **Create account** makes a new account. The characters already saved in your browser move into it the first time.
+  - You stay logged in until you choose **Log out** on the character screen.
+
+## v0.30.0
+
+### Fixed
+- Clicking in the world no longer makes the game stutter.
+- Clicking a herb or ore node again while gathering no longer restarts the gathering.
+- If your target dies while you cast a spell on it, the cast stops at once. Heals are not affected.
+
+### Changed
+- **Warlock – Imp:**
+  - Scorch deals twice as much damage and costs 15 mana (was 30).
+  - The Imp attacks from further away.
+  - A cast bar over the Imp shows when it casts Firebolt.
+
 ## v0.29.3
 
 ### Changed

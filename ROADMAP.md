@@ -253,6 +253,20 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] 62. Warlock: the Imp uses mana, stands still and casts Firebolt when in range and follows you when out of range; the Voidwalker uses mana and its abilities have cooldowns instead of rage costs
 - [x] 63. Rogue Stealth: no time limit (still shown as a buff); ends when you attack, use it again, take damage (also from traps) or are discovered; enemies notice you from a shorter range; you look faded (also to friends); the cooldown starts when Stealth ends
 
+### To fix – list 8
+
+#### Feature
+- [x] 64. Accounts: log in with a name (and password) and keep your characters online, so they can be played from any browser
+
+#### Bugs
+- [x] 65. Clicking a herb or ore node again while gathering should not restart the gathering
+- [x] 66. Clicking in the world (the ground, or anything) makes the game stutter for a moment
+- [x] 67. If the target dies while you cast a spell on it, the cast stops (not for heals)
+
+#### Classes
+- [x] 68. Warlock: the Imp's Scorch does twice the damage and costs half the mana, and its tooltip no longer mentions a cooldown
+- [x] 69. Warlock: a cast bar over the Imp while it casts, and a longer attack range
+
 ### Stage 10 – day and night
 - [x] Game clock: a day lasts 80 minutes (night 20), the same for everyone in co-op; light, sky, mist, town firelight and a small light around you at night
 - [x] More wolves, undead and spirits at night (a level higher); monsters see you from a bit shorter range in the dark

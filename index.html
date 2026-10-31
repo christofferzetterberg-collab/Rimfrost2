@@ -46,6 +46,7 @@
   .plate{position:absolute;transform:translate(-50%,-100%);text-align:center;font:700 12px 'Alegreya Sans';text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}
   .plate .hb{width:52px;height:5px;margin:2px auto 0;background:rgba(0,0,0,.7);border-radius:2px;overflow:hidden}
   .plate .hb i{display:block;height:100%;background:#d84a42}
+  #petcast{position:absolute;transform:translate(-50%,-100%);width:58px;height:6px;background:rgba(0,0,0,.75);border:1px solid #000;border-radius:3px;overflow:hidden;pointer-events:none} #petcast[hidden]{display:none} #petcast i{display:block;height:100%;width:0;background:#ff9a3a}
   .plate.sel span{text-decoration:underline}
   .plate.q span::before{content:"\2726  ";color:#ffd84a} .plate.q .hb{box-shadow:0 0 0 1px #ffd84a}
   .ft{position:absolute;transform:translate(-50%,-50%);font:800 16px 'Alegreya Sans';text-shadow:0 1px 3px #000,0 0 2px #000;white-space:nowrap}
@@ -87,6 +88,8 @@
   .pick button.on{border-color:#ffd36b;box-shadow:0 0 0 1px #ffd36b inset} .pick button:disabled{opacity:.3;cursor:default}
   #cname{width:100%;box-sizing:border-box;font:700 15px 'Alegreya Sans';padding:7px 10px;border-radius:6px;border:1px solid var(--line);background:#0d1216;color:var(--text)}
   #cdesc{color:var(--mute);font-size:13px;margin-top:8px;min-height:36px} #cerr{color:#ff8a7a;font-size:13px;min-height:16px}
+  .tin{width:100%;box-sizing:border-box;font:700 15px 'Alegreya Sans';padding:7px 10px;border-radius:6px;border:1px solid var(--line);background:#0d1216;color:var(--text);margin-bottom:8px}
+  #lerr{color:#ff8a7a;font-size:13px;min-height:16px} #login[hidden],#acct[hidden]{display:none} #acct{display:flex;justify-content:space-between;align-items:center;color:var(--mute);font-size:13px} #acct b{color:var(--text)}
   #menu{position:absolute;left:12px;bottom:160px;width:360px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:auto}
   #menu button{font:800 12.5px 'Alegreya Sans';padding:6px 10px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer}
   #menu button.glow{border-color:#ffd36b;color:#ffd36b}
@@ -158,7 +161,7 @@
   #loadtxt{font:15px 'Alegreya Sans',sans-serif;color:var(--mute)}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261106d", "./src/dungeon.js": "./src/dungeon.js?v=20261106d", "./src/dev.js": "./src/dev.js?v=20261106d", "./src/clock.js": "./src/clock.js?v=20261106d", "./src/coop.js": "./src/coop.js?v=20261106d", "./src/content.js": "./src/content.js?v=20261106d", "./src/engine.js": "./src/engine.js?v=20261106d", "./src/items.js": "./src/items.js?v=20261106d", "./src/keys.js": "./src/keys.js?v=20261106d", "./src/main.js": "./src/main.js?v=20261106d", "./src/models.js": "./src/models.js?v=20261106d", "./src/nav.js": "./src/nav.js?v=20261106d", "./src/quests.js": "./src/quests.js?v=20261106d", "./src/rimdata.js": "./src/rimdata.js?v=20261106d", "./src/state.js": "./src/state.js?v=20261106d", "./src/util.js": "./src/util.js?v=20261106d", "./src/world.js": "./src/world.js?v=20261106d", "./src/worlddata.js": "./src/worlddata.js?v=20261106d", "./src/mobs.js": "./src/mobs.js?v=20261106d", "./src/dgmech.js": "./src/dgmech.js?v=20261106d", "./src/avatar.js": "./src/avatar.js?v=20261106d", "./src/glb.js": "./src/glb.js?v=20261106d", "./src/beasts.js": "./src/beasts.js?v=20261106d", "./src/nature.js": "./src/nature.js?v=20261106d", "./src/buildings.js": "./src/buildings.js?v=20261106d", "./src/dgkit.js": "./src/dgkit.js?v=20261106d" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261107b", "./src/dungeon.js": "./src/dungeon.js?v=20261107b", "./src/dev.js": "./src/dev.js?v=20261107b", "./src/clock.js": "./src/clock.js?v=20261107b", "./src/coop.js": "./src/coop.js?v=20261107b", "./src/content.js": "./src/content.js?v=20261107b", "./src/engine.js": "./src/engine.js?v=20261107b", "./src/items.js": "./src/items.js?v=20261107b", "./src/keys.js": "./src/keys.js?v=20261107b", "./src/main.js": "./src/main.js?v=20261107b", "./src/models.js": "./src/models.js?v=20261107b", "./src/nav.js": "./src/nav.js?v=20261107b", "./src/quests.js": "./src/quests.js?v=20261107b", "./src/rimdata.js": "./src/rimdata.js?v=20261107b", "./src/state.js": "./src/state.js?v=20261107b", "./src/util.js": "./src/util.js?v=20261107b", "./src/world.js": "./src/world.js?v=20261107b", "./src/worlddata.js": "./src/worlddata.js?v=20261107b", "./src/mobs.js": "./src/mobs.js?v=20261107b", "./src/dgmech.js": "./src/dgmech.js?v=20261107b", "./src/avatar.js": "./src/avatar.js?v=20261107b", "./src/glb.js": "./src/glb.js?v=20261107b", "./src/beasts.js": "./src/beasts.js?v=20261107b", "./src/nature.js": "./src/nature.js?v=20261107b", "./src/buildings.js": "./src/buildings.js?v=20261107b", "./src/dgkit.js": "./src/dgkit.js?v=20261107b", "./src/account.js": "./src/account.js?v=20261107b" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -189,7 +192,9 @@
 <div id="panel" hidden><div class="tabs"><button data-tab="quests">Quests</button><button data-tab="char">Character</button><button data-tab="bag">Bag</button><button data-tab="spells">Spellbook</button><button data-tab="tal">Talents</button><button data-tab="keys">Keys</button><button data-tab="coop">Co-op</button><button class="x" title="Close (Esc)">✕</button></div><div id="pbody"></div></div>
 <div id="chars" hidden><div class="box">
   <h1>Rimfrost 2</h1>
-  <div id="clistWrap"><h3>Your characters</h3><div id="clist"></div><button class="btn" id="cnew">New character</button></div>
+  <div id="login" hidden><h3>Log in</h3><input id="lname" class="tin" maxlength="16" placeholder="Name" autocomplete="username"><input id="lpass" class="tin" type="password" placeholder="Password" autocomplete="current-password">
+    <div id="lerr"></div><div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="llogin">Log in</button><button class="btn ghost" id="lnew">Create account</button></div></div>
+  <div id="clistWrap"><div id="acct" hidden></div><h3>Your characters</h3><div id="clist"></div><button class="btn" id="cnew">New character</button></div>
   <div id="cform" hidden>
     <h3>Name</h3><input id="cname" maxlength="16" placeholder="Name your hero">
     <h3>Race</h3><div class="pick" id="craces"></div>
@@ -199,8 +204,9 @@
   </div>
 </div></div>
 <div id="ghostbar" hidden></div>
+<div id="petcast" hidden><i></i></div>
 <div id="rezask" hidden><span></span><button id="rezyes">Accept</button><button id="rezno" class="no">Decline</button></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261106d"></script>
+<script type="module" src="./src/main.js?v=20261107b"></script>
 </body>
 </html>
