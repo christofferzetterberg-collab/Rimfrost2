@@ -1167,12 +1167,20 @@ const AURA = {   // buff key → ability whose icon it uses
   shout: "shout", bark: "bark", avenging: "avenging", bubble: "bubble", dash: "dash", hotstreak: "pyroblast", nightfall: "shadowbolt", backlash: "soulfire",
   ignite: "fireball", deep: "rend", burn: "firearrow", pyro: "pyroblast", sprint: "sprint", bloodrage: "bloodrage", meld: "meld", stoneform: "stoneform",
   stskin: "stoneskin", earthstr: "strengthtotem", heroism: "heroism", lshield: "lshield", slice: "slicedice", evasion: "evasion", adren: "adrenaline", stealth: "stealth",
-  immolate: "immolate", corruption: "corruption", agony: "agony", rupture: "rupture", flameshock: "flameshock"};
+  immolate: "immolate", corruption: "corruption", agony: "agony", rupture: "rupture", flameshock: "flameshock",
+  // talents
+  presence: "presence", arcanepower: "arcanepower", combust: "combustion", clearcast: "sparkrain", archmage: "presence", sweep: "sweeping", sudden: "execute", enrage: "heroic", flurry: "whirlwind",
+  reckless: "recklessness", laststand: "laststand", shieldwall: "shieldwall", steadyaim: "aimed", rapidfire: "rapidfire", counter: "counter", innerfocus: "innerfocus", powerinf: "powerinf",
+  painsupp: "painsupp", guardian: "guardian", surge: "smite", borrowed: "pws", owlkin: "starfire", lunar: "starfire", solar: "wrath", berserk: "berserk", nswift: "nswift", vengeance: "palstrike",
+  artofwar: "palheal", surecrit: "crusader", bladeflurry: "bladeflurry", shadowdance: "shadowdance", efocus: "lightning", maelstrom: "lightning", emastery: "elemmastery", ancswift: "ancswift", manatide: "manatide"};
+const AURA_NAME = {hotstreak: "Hot Streak", nightfall: "Nightfall", backlash: "Backlash", clearcast: "Clearcasting", archmage: "Archmage", sudden: "Sudden Death", enrage: "Enrage", flurry: "Flurry",
+  steadyaim: "Improved Steady Shot", counter: "Counterattack ready", surge: "Surge of Light", borrowed: "Borrowed Time", owlkin: "Owlkin Frenzy", lunar: "Lunar Eclipse", solar: "Solar Eclipse",
+  vengeance: "Vengeance", artofwar: "The Art of War", surecrit: "Guaranteed critical strike", efocus: "Elemental Focus", maelstrom: "Maelstrom Weapon"};
 const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir of Ironskin", "#a8b0bc"], keen: ["Elixir of Keenness", "#ff9a4a"], sage: ["Elixir of Wisdom", "#9fd6e8"]};
 function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good}; }
 function playerAuras(){ const L = [];
   for(const k in P.buffs){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], left: P.buffs[k], good: true});
-    else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : P.buffs[k], true, ({hotstreak: "Hot Streak", nightfall: "Nightfall", backlash: "Backlash"})[k] || null)); }   // (Stealth has no time limit)
+    else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : P.buffs[k], true, AURA_NAME[k] || null)); }   // (Stealth has no time limit)
   for(const h of P.hots) L.push(AB[h.key] ? abAura(h.key, h.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", left: h.left, good: true});
   if(P.shield > 0) L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(P.shield)} left)`, left: P.shieldT, good: true});
   if(P.sitting) L.push({url: iconURL("halo", "#7fa8b8"), name: "Resting", left: null, good: true});

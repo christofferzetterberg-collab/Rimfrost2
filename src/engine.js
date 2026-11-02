@@ -64,19 +64,23 @@ let HEALING = false;                         // true while a healing ability run
 export const pow = () => 6 + C().level * 2.6 + gearStat("pow") + strAP() + agiAP();
 export const spow = () => (6 + C().level * 2.6 + gearStat("sp") + intSP() + (HEALING ? 0 : gearStat("sd"))) * (P.buffs.sage ? 1.2 : 1);
 // how much stronger your heals are: spell healing and spell power on gear, Intellect, and healing talents
-export const healMult = () => sickM() * (1 + teff("heal") + (gearStat("sh") + gearStat("sp") * 0.5 + intSP()) / (40 + 8 * C().level));
+export const healMult = () => sickM() * (1 + teff("heal") + (gearStat("sh") + gearStat("sp") * 0.5 + intSP()) / (40 + 8 * C().level))
+  * (P.buffs && P.buffs.powerinf ? 1.2 : 1) * ((CUR_AB === "heal" || CUR_AB === "renew") ? 1 + 0.05*T("p_empower") : 1);   // Power Infusion, Empowered Healing
+let CUR_AB = null;                           // the ability being used right now
 function genMult(){ let m = (1 + teff("dmg")) * (CLASS_DMG[C().cls] || 1) * PLAYER_DMG; if(C().race === "orc") m *= 1.03; if(P.buffs.bloodrage) m *= 1.2; if(P.buffs.shout) m *= 1.15; if(P.buffs.elixir) m *= 1.2;
-  if(P.buffs.avenging) m *= 1.2; if(P.buffs.heroism) m *= 1.2; if(P.buffs.earthstr) m *= 1.1; if(T("trueshot")) m *= 1.1; if(T("heartWild")) m *= 1.1;
+  if(P.buffs.avenging) m *= 1.2; if(P.buffs.heroism) m *= 1.2; if(P.buffs.earthstr) m *= 1.1; 
   if(T("wl_master") && pet && !pet.dead && pet.kind === "imp") m *= 1 + 0.03*T("wl_master");   // Master Demonologist with the Imp
+  if(P.buffs.enrage) m *= 1 + 0.05*T("w_enrage"); if(P.buffs.vengeance) m *= 1 + 0.03*T("pal_veng");   // Enrage, Vengeance
+  if(P.buffs.arcanepower) m *= 1.3; if(P.buffs.powerinf) m *= 1.2;
   return m * sickM(); }
 export function tmul(ab, school){
   let m = 1; const cls = C().cls;
   if(cls === "mage"){ if(school === "fire") m *= 1 + 0.08*T("impFire"); if(school === "frost") m *= 1 + 0.08*T("iceShards"); }
-  if(cls === "warrior"){ if(ab === "heroic") m *= 1 + 0.1*T("impHS"); if(ab === "whirlwind" || ab === "execute") m *= 1 + 0.1*T("bloodFury"); }
+  if(cls === "warrior"){ if(ab === "heroic") m *= 1 + 0.1*T("impHS"); }
   if(cls === "hunter"){ if(ab === "firearrow") m *= 1 + 0.15*T("fireArrows"); }
   if(cls === "priest"){ if(ab === "swp") m *= 1 + 0.1*T("impSWP"); if(school === "shadow") m *= (1 + 0.06*T("shadowWeave")) * (T("shadowform") ? 1.15 : 1); }
   if(cls === "paladin" && school === "holy") m *= 1 + 0.08*T("palHoly");
-  if(cls === "druid"){ if(["wrath", "moonfire", "starfire"].includes(ab)) m *= 1 + 0.08*T("moonfury"); if(P.form) m *= 1 + 0.08*T("feral"); }
+  if(cls === "druid"){ if(["wrath", "moonfire", "starfire"].includes(ab)) m *= 1 + 0.08*T("moonfury"); if(P.form) m *= 1 + 0.08*T("feral"); if(ab === "wrath" && P.buffs.solar) m *= 1.3; }
   if(cls === "warlock" && (ab === "agony" || ab === "corruption")) m *= 1 + 0.1*T("wl_agony");
   if(cls === "rogue"){ if(ab === "eviscerate" || ab === "rupture") m *= 1 + 0.1*T("r_evisc"); if(ab === "ambush" || ab === "backstab") m *= 1 + 0.1*T("r_opp"); }
   if(cls === "shaman" && (ab === "searing" || ab === "magma")) m *= 1 + 0.1*T("s_flame");
@@ -86,34 +90,100 @@ export function tmul(ab, school){
 export function critChance(m, school){
   let c = 0.05 + gearStat("crit") / 100 + (P.buffs.keen ? 0.05 : 0);
   c += (school === "phys" || !school ? attr("agi") : attr("int")) / 3000;             // 30 Agility = +1% attack crit, 30 Intellect = +1% spell crit
-  c += 0.03*T("cruelty") + 0.03*T("lethal") + teff("crit");
+  c += 0.03*T("cruelty") + 0.02*T("lethal") + teff("crit"); if(P.buffs.reckless) c += 0.3;
   if(school === "holy") c += 0.03*T("holySpec");
   if(C().cls === "mage" && m && m.freezeT > 0) c += 0.12*T("shatter");
   return c;
 }
 export function takenMult(){ let m = CLASSES[C().cls].armor; if(P.buffs.stskin) m *= 0.9; if(T("wl_master") && pet && !pet.dead && pet.kind === "voidwalker") m *= 1 - 0.03*T("wl_master"); if(P.form === "bear") m = 0.7 * (1 - 0.05*T("thickHide")); if(P.form === "cat") m = 0.9; if(T("shadowform")) m *= 0.85;
-  if(P.buffs.bark) m *= 0.75; m *= 1 - teff("def"); m *= 1 - Math.min(0.25, gearStat("def") / 100); if(P.buffs.ironskin) m *= 0.85; if(P.buffs.stoneform) m *= 0.8; return m; }
+  if(P.buffs.bark) m *= 0.75; m *= 1 - teff("def"); m *= 1 - Math.min(0.25, gearStat("def") / 100); if(P.buffs.ironskin) m *= 0.85; if(P.buffs.stoneform) m *= 0.8;
+  if(P.buffs.shieldwall) m *= 0.5; if(P.buffs.painsupp) m *= 0.6; if(T("pal_ardent") && P.hp < P.maxHp * 0.35) m *= 0.7;   // Shield Wall, Pain Suppression, Ardent Defender
+  return m; }
 const DESTRO = new Set(["shadowbolt", "immolate", "soulfire", "rainfire", "shadowburn", "conflagrate"]);   // Cataclysm
 const manaScale = () => (100 + C().level * 22) / 122 * MANA_COST_MULT;
-export function costOf(id){ const a = AB[id]; let c = a.cost || 0; if(C().cls === "hunter") c *= 1 - 0.1*T("efficiency"); if(id === "sinister") c -= 3*T("r_impss"); if(DESTRO.has(id)) c *= 1 - 0.03*T("wl_cata"); if((a.res || CLASSES[C().cls].res) === "mana") c *= manaScale(); return Math.round(c); }
+export function costOf(id){ const a = AB[id]; let c = a.cost || 0;
+  const mana = (a.res || CLASSES[C().cls].res) === "mana";
+  if(mana && c > 0){ if(freeBuff(id)) return 0; if(P.buffs.arcanepower) c *= 1.3; if(!a.cast) c *= 1 - 0.04*T("p_agility"); if(P.efocusN > 0) c *= 1 - 0.15*T("s_efocus"); }
+  if(P.buffs.berserk && (a.res === "rage" || a.res === "energy")) c *= 0.7;
+  if(mana && a.school === "frost") c *= 1 - 0.05*T("m_frostchan"); if(C().cls === "hunter") c *= 1 - 0.1*T("efficiency"); if(id === "sinister") c -= 3*T("r_impss"); if(DESTRO.has(id)) c *= 1 - 0.03*T("wl_cata"); if((a.res || CLASSES[C().cls].res) === "mana") c *= manaScale(); return Math.round(c); }
 export function castTime(id){ let c = AB[id].cast || 0; if(!c) return 0;
   if(["fireball", "frostbolt", "pyroblast"].includes(id)) c -= 0.25*T("quickCast");
   if(["wrath", "starfire"].includes(id)) c -= 0.15*T("naturesGrace");
-  if(id === "aimed" && T("trueshot")) c -= 1;
   if(id === "palheal") c -= 0.3*T("palQuick");
   if(id === "shadowbolt" || id === "soulfire") c -= 0.1*T("wl_bane");
   if(id === "lightning" || id === "chain") c -= 0.1*T("s_lmastery");
-  if(id === "pyroblast" && P.buffs.hotstreak) c = 0;
   if((id === "summonimp" || id === "summonvoid") && T("wl_dom")) c -= 1.5*T("wl_dom");
-  if(id === "shadowbolt" && P.buffs.nightfall) c = 0;
-  if((id === "shadowbolt" || id === "soulfire") && P.buffs.backlash) c = 0;
+  if(id === "heal") c -= 0.1*T("p_empower");
+  if(P.buffs.borrowed) c *= 1 - 0.1*T("p_borrowed"); if(P.buffs.powerinf) c *= 0.8;
+  if(instantBuff(id)) c = 0;                                                      // Hot Streak, Nightfall, Presence of Mind …
   return Math.max(0, c); }
-export function playerSpeed(){ return 7 * (P.form === "cat" ? 1.3 : P.form === "leopard" ? 1.6 : 1) * (P.mount ? 1.6 : 1) * (P.buffs.dash ? 1.7 : 1) * (P.buffs.sprint ? 1.4 : 1) * (P.ghost ? 1.25 : 1) * (P.devSpeed || 1) * (P.buffs.chill ? 0.6 : 1) * (P.envSpeed || 1) * (P.buffs.stealth ? 0.7 : 1); }
+export function cdOf(id){ let c = AB[id].cd || 0;
+  if(id === "disengage") c -= 5*T("h_idis"); if(id === "vanish" || id === "evasion") c -= 30*T("r_elusive"); if(id === "bloom") c -= 5*T("d_ilb"); if(id === "shieldbash") c -= 3*T("w_bash");
+  return Math.max(0, c); }
+// ---------------------------------------------------------------- talent procs: "your next X is instant", "your next spell is free"
+const INSTANT = {hotstreak: ["pyroblast"], nightfall: ["shadowbolt"], backlash: ["shadowbolt", "soulfire"], steadyaim: ["aimed"], surge: ["smite"], owlkin: ["starfire"], lunar: ["starfire"],
+  artofwar: ["palheal"], maelstrom: ["lightning", "healwave"], presence: "*", emastery: "*", archmage: "*", nswift: ["wrath", "starfire", "touch", "roots"], ancswift: ["lightning", "healwave", "chain"]};
+const FREE = {clearcast: "*", surge: ["smite"], innerfocus: "*", archmage: "*"};
+const fits = (list, id) => list === "*" || list.includes(id);
+function instantBuff(id){ if(!AB[id].cast || /^summon|^call|^dismiss|resurrection|revive|redemption/.test(id)) return null;   // (never summons or resurrections)
+  for(const k in INSTANT) if(P.buffs[k] && fits(INSTANT[k], id)) return k; return null; }
+function freeBuff(id){ for(const k in FREE) if(P.buffs[k] && fits(FREE[k], id)) return k; return null; }
+const chance = p => Math.random() < p;
+function proc(key, dur, msg, color = "#ffd36b"){ const had = P.buffs[key]; buff(key, dur); if(!had && msg) H.log(msg, color); }
+// a buff like Arcane Concentration or Hot Streak is used up by the ability it works on
+function useProcs(id){ const a = AB[id];
+  const inst = a.cast ? instantBuff(id) : null; if(inst) delete P.buffs[inst];
+  const fr = a.cost > 0 && (a.res || CLASSES[C().cls].res) === "mana" ? freeBuff(id) : null; if(fr && fr !== inst){ delete P.buffs[fr]; if(fr === "innerfocus") P.ifCrit = true; }
+  if(inst === "archmage" && fr === "archmage"){ /* both at once */ }
+  if(a.cast && P.buffs.borrowed) delete P.buffs.borrowed;
+  if(P.efocusN > 0 && a.cost > 0 && (a.res || CLASSES[C().cls].res) === "mana" && --P.efocusN <= 0) delete P.buffs.efocus;
+  // after the ability: new procs
+  if(T("m_arch") && a.cost > 0 && C().cls === "mage" && !fr){ P.archN = (P.archN || 0) + 1; if(P.archN >= 3){ P.archN = 0; proc("archmage", 30, "Archmage: your next spell is instant and costs no mana.", "#c8a8ff"); } }
+  if(id === "pws" && T("p_borrowed")) proc("borrowed", 15);
+  if(id === "healwave" && T("s_earthliving")) hot("earthliving", P.maxHp * 0.38 * healMult() * 0.1 * T("s_earthliving"), 6);
+}
+// talents that react when you hit something
+let EXTRA = false;                                  // (a second strike from Sweeping Strikes or Lightning Overload doesn't trigger more of them)
+function afterHit(m, base, amt, crit, school, ab){ if(EXTRA) return; const cls = C().cls, a = AB[ab], spell = a && school !== "phys" && (a.res || CLASSES[cls].res) === "mana", melee = ab === "auto" || (a && a.range <= 70 && a.tgt === "enemy");
+  if(cls === "mage"){ if(spell && chance(0.03*T("m_conc"))) proc("clearcast", 15, "Clearcasting: your next spell costs no mana.", "#c8a8ff");
+    if(school === "fire" && a && chance(0.03*T("m_impact"))) stun(m, 2);
+    if(ab === "frostbolt" && chance(0.05*T("m_frostbite"))) root(m, 3, true); }
+  if(cls === "warrior"){ if(ab === "auto" && chance(0.08*T("w_unbridled"))) addRes("rage", 5);
+    if(melee && chance(0.03*T("w_sudden"))) proc("sudden", 10, "Sudden Death: Stroke of Mercy can be used on any target.");
+    if(crit && T("w_enrage")) buff("enrage", 8); if(crit && T("w_flurry")){ P.flurryN = 3; P.flurryK = 0.1*T("w_flurry"); buff("flurry", 15); } }
+  if(cls === "hunter"){ if(crit && T("h_thrill")) addRes("focus", 5*T("h_thrill")); if(crit && ab === "aimed" && T("trueshot")) delete P.cds.aimed;
+    if(ab === "steady" && chance(0.05*T("h_isteady"))) proc("steadyaim", 10, "Your next Aimed Shot is instant.");
+    if(ab === "multishot" && T("h_barrage")) slow(m, 0.25*T("h_barrage"), 4); }
+  if(cls === "priest"){ if(crit && chance(0.2*T("p_surge"))) proc("surge", 15, "Surge of Light: your next Smite is instant and free.", "#fff2b0");
+    if(school === "shadow" && T("p_vamp")) healP(amt * 0.05*T("p_vamp")); }
+  if(cls === "paladin"){ if(crit && school === "holy" && T("pal_illum")) addRes("mana", P.maxMana * 0.03);
+    if(crit && T("pal_veng")) buff("vengeance", 10);
+    if(melee && chance(0.1*T("pal_vindic")) && !CO.guestMob(m)) m.weakT = Math.max(m.weakT || 0, 10);
+    if(crit && melee && chance(0.2*T("pal_aow"))) proc("artofwar", 15, "The Art of War: your next Light's Mending is instant."); }
+  if(cls === "druid"){ if(spell && !P.form && chance(0.03*T("d_omen"))) proc("clearcast", 15, "Omen of Clarity: your next spell costs no mana.", "#9cf07a");
+    if(crit && T("d_eclipse")){ if(ab === "wrath") proc("lunar", 15, "Lunar Eclipse: your next Starfall is instant.", "#c8a8ff"); if(ab === "starfire") proc("solar", 10, "Solar Eclipse: Nature's Wrath deals 30% more damage.", "#ffd36b"); }
+    if(crit && P.form === "cat" && chance(0.5*T("d_primal"))) addCP(m); if(crit && P.form === "bear" && T("d_primal")) addRes("rage", 5*T("d_primal"));
+    if(crit && P.form && T("d_leader") && !P.buffs.leaderCd){ healP(P.maxHp * 0.04); P.buffs.leaderCd = 6; }
+    if((ab === "maul" || ab === "claw") && T("d_infected")) slow(m, 0.25*T("d_infected"), 8); }
+  if(cls === "rogue"){ if(crit && CP_BUILD.has(ab) && chance([0, 0.33, 0.66, 1][T("r_seal")])) addCP(m); }
+  if(cls === "shaman"){ if(crit && spell && T("s_efocus")){ P.efocusN = 2; buff("efocus", 15); }
+    if(melee && chance(0.06*T("s_maelstrom"))) proc("maelstrom", 30, "Maelstrom Weapon: your next Lightning Bolt or Healing Wave is instant.", "#cfe8ff");
+    if(crit && T("s_flurry")){ P.flurryN = 3; P.flurryK = 0.3; buff("flurry", 15); }
+    if((ab === "lightning" || ab === "chain") && T("s_overload") && chance(0.2)){ EXTRA = true; try{ hit(m, base * 0.5, school, ab); } finally{ EXTRA = false; } } }
+  // Sweeping Strikes and Blade Flurry: the attack also strikes a nearby enemy
+  if(melee && ((P.sweepN > 0 && P.buffs.sweep) || P.buffs.bladeflurry)){ let o = null, bd = 3.5; for(const x of mobs){ if(x === m || x.dead || x.state !== "chase" || x.polyT > 0) continue; const d = distU(x, m); if(d < bd){ bd = d; o = x; } }
+    if(o){ EXTRA = true; try{ damageMob(o, amt, crit, school); } finally{ EXTRA = false; } if(P.buffs.sweep && --P.sweepN <= 0) delete P.buffs.sweep; } }
+}
+const CP_BUILD = new Set(["sinister", "backstab", "gouge", "ambush", "fanknives", "claw", "rake", "pounce"]);
+// Last Stand: more maximum health for a while (you get the extra health too)
+export function lastStand(){ const before = P.maxHp; buff("laststand", 20); recompute(false); P.hp = Math.min(P.maxHp, P.hp + (P.maxHp - before)); }
+export function playerSpeed(){ return 7 * (P.form === "cat" ? 1.3 : P.form === "leopard" ? 1.6 : 1) * (P.mount ? 1.6 : 1) * (P.buffs.dash ? 1.7 : 1) * (P.buffs.sprint ? 1.4 : 1) * (P.ghost ? 1.25 : 1) * (P.devSpeed || 1) * (P.buffs.chill ? 0.6 : 1) * (P.envSpeed || 1) * (P.buffs.stealth ? 0.7 + 0.1*T("r_camo") : 1); }
 export function recompute(full){
   const c = CLASSES[C().cls]; let hp = (80 + C().level * 22) * c.hp + gearStat("hp") + gearStat("sta") * 10;
   if(C().race === "dwarf") hp *= 1.08;
   hp *= 1 + 0.06*T("toughness") + 0.06*T("endurance") + 0.05*T("naturalist") + teff("hp");
-  if(P.form === "bear") hp *= 1.6 * (1 + 0.1*T("heartWild"));
+  if(P.form === "bear") hp *= 1.6;
+  if(P.buffs && P.buffs.laststand) hp *= 1.3;
   const pct = P.maxHp ? P.hp / P.maxHp : 1;
   hp *= sickM();
   P.maxHp = Math.round(hp); P.hp = full ? P.maxHp : Math.max(1, P.maxHp * pct);
@@ -153,10 +223,16 @@ export function hit(m, base, school, ab){
   const ld = m.lvl - C().level;
   if(ld > 0 && Math.random() < Math.min(0.35, 0.06 * ld)){ H.floatText(m, "Miss", "#cfd8dc"); engage(m); return null; }
   let amt = base * genMult() * tmul(ab, school) * rand(0.92, 1.08) * lvlPenalty(m);
-  const crit = Math.random() < critChance(m, school); if(crit) amt *= 2 * (1 + 0.1*(T("r_lethal") + T("wl_ruin")) + 0.05*T("mortal"));
+  let cc = critChance(m, school); const real = ab && ab !== "auto" && AB[ab] && !EXTRA;
+  if(real && P.ifCrit){ cc += 0.25; P.ifCrit = false; }                                   // Inner Focus
+  let crit = Math.random() < cc;
+  if(real && P.buffs.surecrit){ crit = true; delete P.buffs.surecrit; }                   // Cold Blood, Divine Favor, Elemental Mastery
+  if(real && school === "fire" && P.combustN > 0){ crit = true; if(--P.combustN <= 0) delete P.buffs.combust; }   // Combustion
+  if(crit) amt *= 2 * (1 + 0.1*(T("r_lethal") + T("wl_ruin")));
   if(crit && pet && !pet.dead && T("h_throat")) pet.res = Math.min(100, pet.res + 10 * T("h_throat"));   // Go for the Throat
   amt = Math.max(1, Math.round(amt));
   damageMob(m, amt, crit, school);
+  afterHit(m, base, amt, crit, school, ab);
   if(crit){
     if(school === "holy" && T("lightbringer")) healP(amt * 0.3);
     if(school === "fire" && T("ignite")) dot(m, "ignite", amt * 0.15 * T("ignite"), 4, "fire", true);
@@ -224,7 +300,7 @@ function levelUp(){
 export function dot(m, key, total, dur, school, raw, final){
   if(!m || m.dead || m.state === "return") return;
   if(!final){ if(!raw) total *= genMult(); total *= lvlPenalty(m); }
-  if(!final && C().cls === "warlock"){ P.myDots = (P.myDots || []).filter(o => !(o.m === m && o.key === key)); P.myDots.push({m, key, per: total / dur, left: dur}); }   // (Nightfall, Soul Siphon)
+  if(!final && (C().cls === "warlock" || C().cls === "priest")){ P.myDots = (P.myDots || []).filter(o => !(o.m === m && o.key === key)); P.myDots.push({m, key, per: total / dur, left: dur}); }   // (Nightfall, Soul Siphon)
   if(CO.guestMob(m)){ P.combatT = 6; return CO.op("dot", m, [key, total, dur, school]); }
   m.dots = m.dots.filter(d => d.key !== key); m.dots.push({key, per: total / dur, left: dur, tick: 1, school, owner: CO.attacker()}); engage(m);
 }
@@ -247,7 +323,7 @@ export function healP(n){ if(HEALING) n *= healMult(); if(CO.cap()) return CO.ca
 export function hot(key, total, dur){ if(HEALING) total *= healMult(); if(CO.cap()) return CO.cap().fx.push(["hot", key, total * CO.cap().scale, dur]); P.hots = P.hots.filter(h => h.key !== key); P.hots.push({key, per: total / dur, left: dur, tick: 1}); }
 // combo points belong to one target and only last while you are in combat (each enemy keeps its own)
 export function addCP(t){ if(t && t !== P.target) return; P.cp = Math.min(5, P.cp + 1); }
-export function finisher(t){ const cp = P.cp; P.cp = 0; if(T("r_relentless")) addRes("energy", 20); return cp; }
+export function finisher(t){ const cp = P.cp; P.cp = 0; if(T("r_relentless")) addRes("energy", 20); if(cp > 0 && chance(0.2*T("r_ruth"))) P.cp = 1; return cp; }
 export function clearCP(){ if(P.cpMap) P.cpMap.clear(); }
 // warlock curses: only one per target (Curse of Agony or Curse of Weakness)
 export function curse(m, key){ if(!m || m.dead) return; if(CO.guestMob(m)){ P.combatT = 6; return CO.op("curse", m, [key]); } engage(m);
@@ -280,11 +356,17 @@ export function playerDamage(raw, src, kind = "melee"){
   if(kind === "melee" && src && !src.dead && P.buffs.lshield && P.lsCharges > 0){ hit(src, spow() * 0.6, "nature", "lshield"); burst(src.px, src.py, "#cfe8ff", 8); if(--P.lsCharges <= 0) delete P.buffs.lshield; }   // Lightning Shield
   if(kind !== "env"){ const av = avoidChances(), r = Math.random(), mm = mobMiss(src); let txt = null;   /* (dungeon traps can't be dodged) */
     if(r < mm) txt = "Miss"; else if(r < mm + av.dodge) txt = "Dodge"; else if(kind === "melee" && r < mm + av.dodge + av.parry) txt = "Parry";
+    if(txt === "Dodge" && T("h_counter")) buff("counter", 5);                                   // Counterattack
+    if(txt === "Parry"){ if(T("w_shield")) addRes("rage", 5*T("w_shield")); if(T("pal_redoubt")) healP(P.maxHp * 0.02*T("pal_redoubt")); }   // Shield Specialization, Redoubt
     if(txt){ H.floatText(P, txt, "#cfe0e6"); P.combatT = 6; if(src && (!P.target || P.target.dead) && !P.ftarget) P.target = src; return; } }
   if(src && src.lvl > C().level) raw *= 1 + 0.1 * (src.lvl - C().level);
   let amt = Math.max(1, Math.round(raw * rand(0.9, 1.1) * takenMult()));
   if(T("wl_soul") && pet && !pet.dead && kind !== "env"){ const sh = Math.round(amt * 0.2); amt -= sh; pet.hp -= sh; pet.flash = 0.15; if(pet.hp <= 0){ pet.hp = 0; pet.dead = true; pet.deadT = 0; H.log(`Your ${pet.name.toLowerCase()} has died.`, "#ff8a7a"); } }   // Soul Link
   if(T("wl_backlash") && src && kind !== "env" && Math.random() < 0.03*T("wl_backlash") && !P.buffs.backlash){ buff("backlash", 8); H.log("Backlash: your next Shadow Bolt or Soul Fire is instant.", "#ffb347"); }
+  if(src && kind !== "env"){                                                     // talents that react when you are hit
+    if(T("w_craze") && chance(0.1)) hot("craze", P.maxHp * 0.03*T("w_craze"), 6);
+    if(chance(0.05*T("d_owlkin"))) proc("owlkin", 15, "Owlkin Frenzy: your next Starfall is instant.", "#c8a8ff");
+    if(chance(0.05*T("pal_reckon")) && P.cds.palstrike > 0){ delete P.cds.palstrike; H.log("Reckoning: Holy Strike is ready.", "#ffe37a"); } }
   if(P.shield > 0){ const ab = Math.min(P.shield, amt); P.shield -= ab; amt -= ab; if(ab > 0) H.floatText(P, "Absorbed", "#fff6d0"); }
   if(amt > 0){ P.hp -= amt; H.floatText(P, "-" + amt, "#ff6b5e");
     // spell pushback: each hit sets the cast back 0.5 sec, at most 3 times per cast
@@ -293,6 +375,7 @@ export function playerDamage(raw, src, kind = "melee"){
   P.combatT = 6;
   if(resType() === "rage") addRes("rage", 2 + amt / P.maxHp * 60);
   if(src && (!P.target || P.target.dead) && !P.ftarget) P.target = src;
+  if(P.hp <= 0 && P.buffs.guardian){ delete P.buffs.guardian; P.hp = Math.round(P.maxHp * 0.4); H.floatText(P, "Guardian Spirit", "#fff2b0", true); burst(P.px, P.py, "#fff2b0", 20); }   // Guardian Spirit
   if(P.hp <= 0){ P.hp = 0; die(); }
 }
 function die(){
@@ -315,7 +398,7 @@ export function tryUse(id){
   if(P.sitting) standUp();
   if(P.form === "leopard" && !a.form && !a.racial) return H.err("You cannot attack or cast spells in Travel Form");
   if(C().cls === "druid"){ if(a.res === "rage" && P.form !== "bear") return H.err("Requires Bear Form"); if(a.res === "energy" && P.form !== "cat") return H.err("Requires Wolf Form");
-    if(P.form && !a.form && !a.res && !a.racial) return H.err("Return to your normal form first"); }
+    if(P.form && !a.form && !a.res && !a.racial && !a.anyForm) return H.err("Return to your normal form first"); }
   if(!a.offGcd && P.gcd > 0) return;
   if((P.cds[id] || 0) > 0) return H.err("Not ready yet");
   let t = null;
@@ -341,13 +424,12 @@ export function breakStealth(){ if(!P.buffs.stealth) return; delete P.buffs.stea
 function faceTo(t){ P.rot = Math.atan2(t.x - P.x, t.z - P.z); }
 function finishAbility(id, t){ if(id !== "meld") delete P.buffs.meld; const stealthy = P.buffs.stealth;
   const a = AB[id];
-  if(a.cd && id !== "stealth") P.cds[id] = a.cd;                                 // (Stealth's cooldown starts when it ends)
-  if(id === "pyroblast" && P.buffs.hotstreak) delete P.buffs.hotstreak;
-  if(id === "shadowbolt" && P.buffs.nightfall) delete P.buffs.nightfall;                         // (Nightfall goes first, so Backlash is kept for the next one)
-  else if((id === "shadowbolt" || id === "soulfire") && P.buffs.backlash) delete P.buffs.backlash;
+  if(a.cd && id !== "stealth") P.cds[id] = cdOf(id);                            // (Stealth's cooldown starts when it ends)
+  useProcs(id);
   HEALING = HEAL_AB.has(id);
-  try{ const ft = CO.friendTarget(id), pt = petHealTarget(id); if(ft) CO.castOn(ft, a, t); else if(pt) castOnPet(a, t); else a.run(t); } finally{ HEALING = false; }   // a heal on a selected friend (or your pet) goes to them
-  if(stealthy && id !== "stealth" && id !== "vanish" && !a.racial) breakStealth();          // acting breaks Stealth
+  CUR_AB = id;
+  try{ const ft = CO.friendTarget(id), pt = petHealTarget(id); if(ft) CO.castOn(ft, a, t); else if(pt) castOnPet(a, t); else a.run(t); } finally{ HEALING = false; CUR_AB = null; }   // a heal on a selected friend (or your pet) goes to them
+  if(stealthy && id !== "stealth" && id !== "vanish" && !a.racial && !a.keepStealth) breakStealth();          // acting breaks Stealth
   if(!a.form && !P.form){ const melee = a.tgt === "enemy" && a.range <= 70; P.attackAnim = 1; P.attackKind = melee ? "melee" : (C().cls === "hunter" && a.tgt === "enemy") ? "bow" : "cast"; }
   else if(P.form) P.attackAnim = 1;
   // a monster notices a melee attack at once; a spell or arrow from range only when it lands
@@ -381,13 +463,13 @@ function autoAttack(dt){
   const ai = autoInfo(); P.autoT = Math.max(0, P.autoT - dt);
   const t = P.target;
   if(ai.off){ P.offT = Math.max(0, (P.offT || 0) - dt);                                       // rogues: a second weapon in the off hand
-    if(P.auto && t && !t.dead && t.state !== "return" && !P.casting && P.offT <= 0 && P.autoT > 0 && rangePx(t) <= ai.range && sees(P, t)){ P.offT = ai.spd; P.attackAnim = 1; P.attackKind = "melee"; hit(t, pow() * ai.mult * ai.off, "phys", "auto"); } }
+    if(P.auto && t && !t.dead && t.state !== "return" && !P.casting && P.offT <= 0 && P.autoT > 0 && rangePx(t) <= ai.range && sees(P, t)){ P.offT = ai.spd; P.attackAnim = 1; P.attackKind = "melee"; hit(t, pow() * ai.mult * ai.off, "phys", "auto"); if(chance(0.2) && T("r_potency")) addRes("energy", 5*T("r_potency")); } }
   if(!P.auto || !t || t.dead || t.state === "return" || P.form === "leopard" || P.casting || P.dash || P.autoT > 0) return;
   const d = rangePx(t); if(d > ai.range) return;
   if(!sees(P, t)) return;
   const close = !!(ai.minRange && d < ai.minRange), mel = close && d <= 52;   // too close to shoot: within melee reach hunters strike with a knife (weaker than the bow), a little further out they can't do either
   if(close && !mel) return;
-  P.autoT = ai.spd; P.attackAnim = 1; P.attackKind = ai.ranged && !mel ? "bow" : "melee"; faceTo(t);
+  P.autoT = ai.spd * (P.flurryN > 0 && P.buffs.flurry ? 1 - P.flurryK : 1) * (ai.ranged && P.buffs.rapidfire ? 1 / 1.4 : 1); if(P.flurryN > 0) P.flurryN--;   // Flurry, Rapid Fire P.attackAnim = 1; P.attackKind = ai.ranged && !mel ? "bow" : "melee"; faceTo(t);
   if(mel) hit(t, pow() * 0.5, "phys", "auto");
   else if(ai.ranged) proj(t, "#e9e2c8", 3, () => hit(t, pow() * ai.mult, "phys", "auto"), "arrow");
   else { hit(t, pow() * ai.mult, "phys", "auto"); if(ai.rage) addRes("rage", ai.rage); }
@@ -403,7 +485,8 @@ export function updPlayer(dt, moving){
   if(P.dead) return;
   P.gcd = Math.max(0, P.gcd - dt); P.potCd = Math.max(0, (P.potCd || 0) - dt);
   for(const k in P.cds){ P.cds[k] -= dt; if(P.cds[k] <= 0) delete P.cds[k]; }
-  for(const k in P.buffs){ P.buffs[k] -= dt; if(P.buffs[k] <= 0) delete P.buffs[k]; }
+  for(const k in P.buffs){ P.buffs[k] -= dt; if(P.buffs[k] <= 0){ delete P.buffs[k]; if(k === "laststand") recompute(false); } }
+  if(P.buffs.manatide) addRes("mana", P.maxMana * 0.025 * dt);                    // Mana Tide: 30% over 12 sec
   if(P.sickOn && !P.buffs.ressick){ P.sickOn = false; recompute(false); H.log("Resurrection Sickness has faded.", "#7be08a"); }
   if(P.shield > 0){ P.shieldT -= dt; if(P.shieldT <= 0) P.shield = 0; }
   if(P.casting && moving) cancelCast("Interrupted – you moved");
@@ -422,7 +505,7 @@ export function updPlayer(dt, moving){
   // health and mana come in a tick every 3 sec: out of combat slowly (about 1.5 min from empty to full); sitting down (Rest) fills you up in about 15 sec
   const sit = P.sitting, REGEN_TICK = 3, tick = (P.regenT = (P.regenT || 0) + dt) >= REGEN_TICK;
   if(tick){ P.regenT -= REGEN_TICK;
-    P.mana = Math.min(P.maxMana, P.mana + P.maxMana * (inC ? 0.005 : (sit ? 0.07 : 0.012) * rg) * REGEN_TICK);   // in combat: 1.5% per tick
+    P.mana = Math.min(P.maxMana, P.mana + P.maxMana * (inC ? 0.005 * (1 + 0.5*(T("m_medit") + T("d_intensity"))) : (sit ? 0.07 : 0.012) * rg) * REGEN_TICK);   // in combat: 1.5% per tick (more with Arcane Meditation / Intensity)
     if(!inC && (P.combatT < -1 || sit)) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * (sit ? 0.07 : 0.01) * rg * REGEN_TICK); }
   P.focus = Math.min(100, P.focus + (inC ? 4 : 9) * dt);
   P.energy = Math.min(100, P.energy + 12 * (P.buffs.adren ? 2 : 1) * dt);
@@ -435,7 +518,8 @@ export function updPlayer(dt, moving){
     P.myDots = P.myDots.filter(o => (o.left -= 1) >= 0 && !o.m.dead && o.m.dots.some(d => d.key === o.key));
     for(const o of P.myDots){
       if(T("wl_night") && (o.key === "corruption" || o.key === "agony") && !P.buffs.nightfall && Math.random() < 0.04){ buff("nightfall", 15); H.log("Nightfall: your next Shadow Bolt is instant.", "#b79bff"); }
-      if(T("wl_siphon")) healP(o.per * 0.05 * T("wl_siphon")); } }
+      if(T("wl_siphon")) healP(o.per * 0.05 * T("wl_siphon"));
+      if(o.key === "swp" && T("p_affinity")) addRes("mana", P.maxMana * 0.003 * T("p_affinity")); } }                 // Shadow Affinity
   P.hots = P.hots.filter(h => h.left > 0);
 }
 // damage over time, slows, roots and stuns on a monster; returns false while it is stunned
@@ -756,4 +840,4 @@ export function mobTarget(m){
 }
 
 // the helper table the Rimfrost 1 ability code calls
-Object.assign(E, {rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});
+Object.assign(E, {rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, lastStand, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});

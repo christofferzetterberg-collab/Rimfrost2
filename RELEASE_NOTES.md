@@ -3,6 +3,16 @@
 ## v0.32.0
 
 ### New
+- **Talents reworked for every class:** most plain "+X% damage" talents are replaced by effects and new abilities. Talent points are refunded for every class except the Warlock, so you can choose again.
+  - **Mage:** Arcane Concentration, Presence of Mind, Arcane Power, Archmage · Impact, Combustion · Frost Channeling, Frostbite, Cold Snap, Deep Freeze.
+  - **Warrior:** Sweeping Strikes, Sudden Death, Mortal Strike · Unbridled Wrath, Blood Craze, Enrage, Flurry, Recklessness · Shield Specialization, Last Stand, Improved Shield Bash, Shield Wall.
+  - **Hunter:** Beast Mastery unchanged · Improved Steady Shot, Concussive Barrage, Master Marksman, Rapid Fire, Chimera Shot · Improved Disengage, Counterattack, Thrill of the Hunt, Explosive Shot.
+  - **Priest:** Borrowed Time, Mental Agility, Inner Focus, Power Infusion, Pain Suppression · Surge of Light, Desperate Prayer, Empowered Healing, Guardian Spirit · Vampiric Embrace, Shadow Affinity, Void Eruption.
+  - **Druid:** Omen of Clarity, Starsurge, Owlkin Frenzy, Eclipse · Primal Fury, Leader of the Pack, Infected Wounds, Berserk · Intensity, Nature's Swiftness, Improved Lifebloom, Tranquility.
+  - **Paladin:** Illumination, Divine Favor, Holy Shock · Redoubt, Ardent Defender, Reckoning, Avenger's Shield · Vengeance, Vindication, The Art of War, Divine Storm.
+  - **Rogue:** Ruthlessness, Seal Fate, Cold Blood · Blade Flurry, Combat Potency · Camouflage, Elusiveness, Premeditation, Initiative, Shadow Dance.
+  - **Shaman:** Elemental Focus, Elemental Mastery, Lightning Overload · Flurry, Maelstrom Weapon · Ancestral Swiftness, Earthliving, Mana Tide.
+  - Paladin and Shaman deal a little more damage, to keep up with the other classes.
 - **Warlock talents reworked:** fewer plain damage bonuses, more effects that change how you play. Your Warlock talent points are refunded so you can choose again.
   - **Affliction:** Improved Life Tap, Fel Concentration (less casting time lost when hit), Nightfall (Corruption and Curse of Agony can make your next Shadow Bolt instant), Soul Siphon (your damage over time heals you) and Unstable Affliction (a new damage-over-time spell that spreads to a nearby enemy when the target dies).
   - **Demonology:** Fel Domination (faster summoning), Soul Link (your demon takes 20% of the damage you take) and Master Demonologist (more damage with the Imp, less damage taken with the Voidwalker).

@@ -86,17 +86,17 @@ function equipSet(c, q, il, seed){ c.eq = {}; for(const slot of SLOT_ORDER){ if(
 const lowHp = f => () => P.hp / P.maxHp < f, near = d => m => G.distU(P, m) - m.r < d, far = d => m => G.distU(P, m) > d;
 const noDot = id => m => !m.dots.some(d => d.key === id), noBuff = k => () => !P.buffs[k];
 const ROT = {
-  warrior: [["charge", far(7)], ["secondwind", lowHp(0.3)], ["shout", noBuff("shout")], ["execute"], ["shieldbash"], ["whirlwind", near(2.6)], ["quake", near(2.6)], ["rend", noDot("rend")], ["heroic"]],
-  paladin: [["bubble", lowHp(0.2)], ["palheal", lowHp(0.4)], ["avenging"], ["holyshield", () => !P.shield], ["judge"], ["hammer"], ["crusader"], ["consecrate", near(2.6)], ["palstrike"]],
-  hunter: [["mendpet", () => G.getPet() && !G.getPet().dead && G.getPet().hp / G.getPet().maxHp < 0.5], ["raptor"], ["wingclip"], ["poison", noDot("poison")], ["stormarrow"], ["aimed"], ["multishot"], ["firearrow"], ["icearrow"], ["steady"]],
-  mage: [["icearmor", noBuff("icearmor")], ["frostnova", near(3)], ["meteor"], ["pyroblast"], ["fireblast"], ["blizzard"], ["sparkrain"], ["frostbolt"], ["fireball"]],
-  priest: [["pws", () => !P.shield && P.hp / P.maxHp < 0.85], ["heal", lowHp(0.45)], ["renew", () => P.hp / P.maxHp < 0.7 && !P.hots.some(h => h.key === "renew")], ["swp", noDot("swp")], ["mindblast"], ["judgment"], ["holynova", near(3)], ["darkpulse", near(3)], ["smite"]],
-  druid: [["touch", lowHp(0.4)], ["rejuv", () => P.hp / P.maxHp < 0.7 && !P.hots.some(h => h.key === "rejuv")], ["bark", lowHp(0.6)], ["moonfire", noDot("moonfire")], ["starfire"], ["hurricane"], ["wrath"]],
-  druid_bear: [["frenzy"], ["roar", near(2.6)], ["bash"], ["swipe", near(2.6)], ["maul"]],
-  druid_cat: [["bite", () => P.cp >= 4], ["pounce"], ["rake", noDot("rake")], ["claw"]],
+  warrior: [["recklessness"], ["laststand", lowHp(0.3)], ["shieldwall", lowHp(0.4)], ["sweeping", () => mobs.filter(o => !o.dead && o.state === "chase").length > 1], ["charge", far(7)], ["mortalstrike"], ["secondwind", lowHp(0.3)], ["shout", noBuff("shout")], ["execute"], ["shieldbash"], ["whirlwind", near(2.6)], ["quake", near(2.6)], ["rend", noDot("rend")], ["heroic"]],
+  paladin: [["divinefavor"], ["holyshock", lowHp(0.7)], ["divinestorm", near(2.6)], ["avengershield"], ["bubble", lowHp(0.2)], ["palheal", lowHp(0.4)], ["avenging"], ["holyshield", () => !P.shield], ["judge"], ["hammer"], ["crusader"], ["consecrate", near(2.6)], ["palstrike"]],
+  hunter: [["rapidfire"], ["counter"], ["explosive"], ["chimera"], ["mendpet", () => G.getPet() && !G.getPet().dead && G.getPet().hp / G.getPet().maxHp < 0.5], ["raptor"], ["wingclip"], ["poison", noDot("poison")], ["stormarrow"], ["aimed"], ["multishot"], ["firearrow"], ["icearrow"], ["steady"]],
+  mage: [["presence"], ["arcanepower"], ["combustion"], ["coldsnap", () => (P.cds.frostnova || 0) > 5], ["icearmor", noBuff("icearmor")], ["deepfreeze"], ["frostnova", near(3)], ["meteor"], ["pyroblast"], ["fireblast"], ["blizzard"], ["sparkrain"], ["frostbolt"], ["fireball"]],
+  priest: [["guardian", lowHp(0.25)], ["desperate", lowHp(0.35)], ["painsupp", lowHp(0.5)], ["powerinf"], ["innerfocus"], ["voideruption"], ["pws", () => !P.shield && P.hp / P.maxHp < 0.85], ["heal", lowHp(0.45)], ["renew", () => P.hp / P.maxHp < 0.7 && !P.hots.some(h => h.key === "renew")], ["swp", noDot("swp")], ["mindblast"], ["judgment"], ["holynova", near(3)], ["darkpulse", near(3)], ["smite"]],
+  druid: [["tranquility", lowHp(0.4)], ["nswift"], ["starsurge"], ["touch", lowHp(0.4)], ["rejuv", () => P.hp / P.maxHp < 0.7 && !P.hots.some(h => h.key === "rejuv")], ["bark", lowHp(0.6)], ["moonfire", noDot("moonfire")], ["starfire"], ["hurricane"], ["wrath"]],
+  druid_bear: [["berserk"], ["frenzy"], ["roar", near(2.6)], ["bash"], ["swipe", near(2.6)], ["maul"]],
+  druid_cat: [["berserk"], ["bite", () => P.cp >= 4], ["pounce"], ["rake", noDot("rake")], ["claw"]],
   warlock: [["lifetap", () => P.mana / P.maxMana < 0.25 && P.hp / P.maxHp > 0.5], ["drainlife", lowHp(0.5)], ["deathcoil"], ["shadowburn", m => m.hp / m.maxHp < 0.25], ["corruption", noDot("corruption")], ["agony", noDot("agony")], ["unstable", noDot("unstable")], ["immolate", noDot("immolate")], ["conflagrate"], ["soulfire"], ["shadowburn"], ["shadowbolt"]],
-  rogue: [["evasion", lowHp(0.5)], ["slicedice", () => P.cp >= 2 && !P.buffs.slice], ["eviscerate", () => P.cp >= 4], ["kidney", () => P.cp >= 5], ["gouge", () => P.cp < 3], ["backstab"], ["sinister"]],
-  shaman: [["healwave", lowHp(0.4)], ["lshield", noBuff("lshield")], ["searing", () => !G.totemList().some(o => o.kind === "searing" || o.kind === "magma")], ["stoneskin", () => !G.totemList().some(o => o.kind === "stoneskin" || o.kind === "strength")], ["flameshock", noDot("flameshock")], ["earthshock"], ["chain"], ["lightning"]]
+  rogue: [["coldblood"], ["bladeflurry", () => mobs.filter(o => !o.dead && o.state === "chase").length > 1], ["shadowdance"], ["ambush"], ["evasion", lowHp(0.5)], ["slicedice", () => P.cp >= 2 && !P.buffs.slice], ["eviscerate", () => P.cp >= 4], ["kidney", () => P.cp >= 5], ["gouge", () => P.cp < 3], ["backstab"], ["sinister"]],
+  shaman: [["elemmastery"], ["ancswift"], ["manatide", () => P.mana / P.maxMana < 0.4], ["healwave", lowHp(0.4)], ["lshield", noBuff("lshield")], ["searing", () => !G.totemList().some(o => o.kind === "searing" || o.kind === "magma")], ["stoneskin", () => !G.totemList().some(o => o.kind === "stoneskin" || o.kind === "strength")], ["flameshock", noDot("flameshock")], ["earthshock"], ["chain"], ["lightning"]]
 };
 const MELEE = new Set(["warrior", "paladin", "druid_bear", "druid_cat", "rogue"]);
 const VARIANTS = lvl => [["warrior", "Warrior"], ["paladin", "Paladin"], ["hunter", "Hunter + bear", {pet: "bear"}], ...(lvl >= 10 ? [["hunter", "Hunter + wolf", {pet: "wolf"}]] : []),
@@ -126,6 +126,7 @@ function fight(v, sc, lvl, q, spec, seed){
   equipSet(c, q, lvl, seed);
   if(spec && lvl >= 10){ const tree = TREES[cls][spec - 1].id; let pts = lvl - 9; const list = TALENTS[cls].filter(t => t.tree === tree).sort((a, b) => a.tier - b.tier);
     for(let pass = 0; pass < 4 && pts > 0; pass++) for(const t of list){ while(pts > 0 && (c.talents[t.id] || 0) < t.max){ S.cur = c; if(!G.canLearnTalent(t)) break; c.talents[t.id] = (c.talents[t.id] || 0) + 1; pts--; } } }
+  for(const t of TALENTS[cls]) if(c.talents[t.id] && t.grants && !c.learned.includes(t.grants)) c.learned.push(t.grants);   // abilities the talents teach
   S.cur = c; const A = H.arena(); G.resetPlayer(A.x, A.z); G.petStash(); P.god = false; P.devSpeed = 1;
   if(opt.pet){ G.petCall(opt.pet); }
   if(opt.form) G.setForm(opt.form);
