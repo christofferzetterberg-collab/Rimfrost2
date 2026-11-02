@@ -99,6 +99,11 @@ export function makeBeast(o){
   g.userData.height = o.legH + o.h + 0.5;
   return g;
 }
+// Polymorph: a woolly sheep with a dark face
+export function makeSheep(){ const g = makeBeast({w: 0.6, h: 0.55, l: 0.9, legH: 0.32, head: 0.3, color: 0xf2eee4, snout: 0x2e2a28, leg: 0x2e2a28, ears: true, tail: 0.12});
+  const body = g.children[0]; body.children[1].material = flat(0x2e2a28);
+  for(const [x, y, z] of [[0.18, 0.9, 0.2], [-0.18, 0.9, -0.15], [0, 0.95, -0.02], [0.2, 0.84, -0.28], [-0.2, 0.85, 0.25]]) body.add(part(new THREE.SphereGeometry(0.2, 6, 5), 0xf7f4ec, x, y, z));
+  return g; }
 export const makeWolf = () => makeAnimal("petWolf") || makeBeast({w: 0.5, h: 0.5, l: 1.2, legH: 0.5, head: 0.42, color: 0x8a8f96, snout: 0x6f747a, leg: 0x6f747a, ears: true, tail: 0.6});
 export const makeBoar = () => makeBeast({w: 0.75, h: 0.7, l: 1.3, legH: 0.38, head: 0.55, color: 0x6b4a32, snout: 0xc49a82, leg: 0x4a3222, tusks: true, tail: 0.25});
 export const makeBandit = () => makeHumanoid({shirt: 0x5a4632, pants: 0x3a3028, hair: 0x2a2a2a, cape: null, mask: 0x2a2020, weapon: 0x9aa0a6});

@@ -66,7 +66,9 @@ export const spow = () => (6 + C().level * 2.6 + gearStat("sp") + intSP() + (HEA
 // how much stronger your heals are: spell healing and spell power on gear, Intellect, and healing talents
 export const healMult = () => sickM() * (1 + teff("heal") + (gearStat("sh") + gearStat("sp") * 0.5 + intSP()) / (40 + 8 * C().level));
 function genMult(){ let m = (1 + teff("dmg")) * (CLASS_DMG[C().cls] || 1) * PLAYER_DMG; if(C().race === "orc") m *= 1.03; if(P.buffs.bloodrage) m *= 1.2; if(P.buffs.shout) m *= 1.15; if(P.buffs.elixir) m *= 1.2;
-  if(P.buffs.avenging) m *= 1.2; if(P.buffs.heroism) m *= 1.2; if(P.buffs.earthstr) m *= 1.1; if(T("trueshot")) m *= 1.1; if(T("heartWild")) m *= 1.1; return m * sickM(); }
+  if(P.buffs.avenging) m *= 1.2; if(P.buffs.heroism) m *= 1.2; if(P.buffs.earthstr) m *= 1.1; if(T("trueshot")) m *= 1.1; if(T("heartWild")) m *= 1.1;
+  if(T("wl_master") && pet && !pet.dead && pet.kind === "imp") m *= 1 + 0.03*T("wl_master");   // Master Demonologist with the Imp
+  return m * sickM(); }
 export function tmul(ab, school){
   let m = 1; const cls = C().cls;
   if(cls === "mage"){ if(school === "fire") m *= 1 + 0.08*T("impFire"); if(school === "frost") m *= 1 + 0.08*T("iceShards"); }
@@ -89,10 +91,11 @@ export function critChance(m, school){
   if(C().cls === "mage" && m && m.freezeT > 0) c += 0.12*T("shatter");
   return c;
 }
-export function takenMult(){ let m = CLASSES[C().cls].armor; if(P.buffs.stskin) m *= 0.9; if(T("wl_soul") && pet && !pet.dead) m *= 0.9; if(P.form === "bear") m = 0.7 * (1 - 0.05*T("thickHide")); if(P.form === "cat") m = 0.9; if(T("shadowform")) m *= 0.85;
+export function takenMult(){ let m = CLASSES[C().cls].armor; if(P.buffs.stskin) m *= 0.9; if(T("wl_master") && pet && !pet.dead && pet.kind === "voidwalker") m *= 1 - 0.03*T("wl_master"); if(P.form === "bear") m = 0.7 * (1 - 0.05*T("thickHide")); if(P.form === "cat") m = 0.9; if(T("shadowform")) m *= 0.85;
   if(P.buffs.bark) m *= 0.75; m *= 1 - teff("def"); m *= 1 - Math.min(0.25, gearStat("def") / 100); if(P.buffs.ironskin) m *= 0.85; if(P.buffs.stoneform) m *= 0.8; return m; }
+const DESTRO = new Set(["shadowbolt", "immolate", "soulfire", "rainfire", "shadowburn", "conflagrate"]);   // Cataclysm
 const manaScale = () => (100 + C().level * 22) / 122 * MANA_COST_MULT;
-export function costOf(id){ const a = AB[id]; let c = a.cost || 0; if(C().cls === "hunter") c *= 1 - 0.1*T("efficiency"); if(id === "sinister") c -= 3*T("r_impss"); if((a.res || CLASSES[C().cls].res) === "mana") c *= manaScale(); return Math.round(c); }
+export function costOf(id){ const a = AB[id]; let c = a.cost || 0; if(C().cls === "hunter") c *= 1 - 0.1*T("efficiency"); if(id === "sinister") c -= 3*T("r_impss"); if(DESTRO.has(id)) c *= 1 - 0.03*T("wl_cata"); if((a.res || CLASSES[C().cls].res) === "mana") c *= manaScale(); return Math.round(c); }
 export function castTime(id){ let c = AB[id].cast || 0; if(!c) return 0;
   if(["fireball", "frostbolt", "pyroblast"].includes(id)) c -= 0.25*T("quickCast");
   if(["wrath", "starfire"].includes(id)) c -= 0.15*T("naturesGrace");
@@ -101,6 +104,9 @@ export function castTime(id){ let c = AB[id].cast || 0; if(!c) return 0;
   if(id === "shadowbolt" || id === "soulfire") c -= 0.1*T("wl_bane");
   if(id === "lightning" || id === "chain") c -= 0.1*T("s_lmastery");
   if(id === "pyroblast" && P.buffs.hotstreak) c = 0;
+  if((id === "summonimp" || id === "summonvoid") && T("wl_dom")) c -= 1.5*T("wl_dom");
+  if(id === "shadowbolt" && P.buffs.nightfall) c = 0;
+  if((id === "shadowbolt" || id === "soulfire") && P.buffs.backlash) c = 0;
   return Math.max(0, c); }
 export function playerSpeed(){ return 7 * (P.form === "cat" ? 1.3 : P.form === "leopard" ? 1.6 : 1) * (P.mount ? 1.6 : 1) * (P.buffs.dash ? 1.7 : 1) * (P.buffs.sprint ? 1.4 : 1) * (P.ghost ? 1.25 : 1) * (P.devSpeed || 1) * (P.buffs.chill ? 0.6 : 1) * (P.envSpeed || 1) * (P.buffs.stealth ? 0.7 : 1); }
 export function recompute(full){
@@ -147,7 +153,7 @@ export function hit(m, base, school, ab){
   const ld = m.lvl - C().level;
   if(ld > 0 && Math.random() < Math.min(0.35, 0.06 * ld)){ H.floatText(m, "Miss", "#cfd8dc"); engage(m); return null; }
   let amt = base * genMult() * tmul(ab, school) * rand(0.92, 1.08) * lvlPenalty(m);
-  const crit = Math.random() < critChance(m, school); if(crit) amt *= 2 * (1 + 0.1*(T("mortal") + T("r_lethal") + T("wl_ruin")));
+  const crit = Math.random() < critChance(m, school); if(crit) amt *= 2 * (1 + 0.1*(T("r_lethal") + T("wl_ruin")) + 0.05*T("mortal"));
   if(crit && pet && !pet.dead && T("h_throat")) pet.res = Math.min(100, pet.res + 10 * T("h_throat"));   // Go for the Throat
   amt = Math.max(1, Math.round(amt));
   damageMob(m, amt, crit, school);
@@ -163,6 +169,7 @@ export function damageMob(m, amt, crit, school){
   if(m.dead) return;
   if(CO.guestMob(m)){ H.floatText(m, crit ? amt + "!" : "" + amt, crit ? "#ffd36b" : (SCHOOL_COLOR[school] || "#fff"), crit); m.flash = 0.15; P.combatT = 6; CO.op("dmg", m, [amt, crit, school, PET_ATK ? 1 : 0, TH_MULT]); return; }   // a friend hosts this monster
   m.hp -= amt; m.flash = 0.15; m.lastHit = H.now();
+  if(m.polyT > 0) m.polyT = 0;                                                            // any damage breaks Polymorph
   if(CO.coopMob(m)) CO.threat(m, amt, PET_ATK, TH_MULT);
   else { if(PET_ATK && pet) m.thPet = (m.thPet || 0) + amt * PETS[pet.kind].threat * TH_MULT; else m.thMe = (m.thMe || 0) + amt * (!pet || pet.dead ? 1 : PETS[pet.kind].ownerThreat); }
   if(CO.isMe()) H.floatText(m, crit ? amt + "!" : "" + amt, crit ? "#ffd36b" : (SCHOOL_COLOR[school] || "#fff"), crit);
@@ -170,7 +177,10 @@ export function damageMob(m, amt, crit, school){
   if(m.hp <= 0) killMob(m);
 }
 export function killMob(m){
-  m.hp = 0; m.dead = true; m.state = "dead"; m.deadT = 0; m.dots = []; m.slowT = m.rootT = m.stunT = 0;
+  const ua = m.dots.find(d => d.key === "unstable" && d.left > 1);                       // Unstable Affliction jumps to the nearest enemy
+  if(ua){ let best = null, bd = 12; for(const o of mobs){ if(o === m || o.dead || o.state === "return" || o.polyT > 0) continue; const d = Math.hypot(o.x - m.x, o.z - m.z); if(d < bd){ bd = d; best = o; } }
+    if(best){ const left = ua.left; CO.asAttacker(ua.owner, () => dot(best, "unstable", ua.per * left, left, "shadow", true, true)); burst(best.px, best.py, "#9a5ae0", 12); } }
+  m.hp = 0; m.dead = true; m.state = "dead"; m.deadT = 0; m.dots = []; m.slowT = m.rootT = m.stunT = m.fearT = m.polyT = 0;
   if(P.target === m){ P.auto = false; }
   m.thMe = m.thPet = 0; m.tauntT = 0; m.threat = null;
   const share = CO.killShare(m);                // in co-op everyone near shares the XP (loot is personal)
@@ -214,12 +224,20 @@ function levelUp(){
 export function dot(m, key, total, dur, school, raw, final){
   if(!m || m.dead || m.state === "return") return;
   if(!final){ if(!raw) total *= genMult(); total *= lvlPenalty(m); }
+  if(!final && C().cls === "warlock"){ P.myDots = (P.myDots || []).filter(o => !(o.m === m && o.key === key)); P.myDots.push({m, key, per: total / dur, left: dur}); }   // (Nightfall, Soul Siphon)
   if(CO.guestMob(m)){ P.combatT = 6; return CO.op("dot", m, [key, total, dur, school]); }
   m.dots = m.dots.filter(d => d.key !== key); m.dots.push({key, per: total / dur, left: dur, tick: 1, school, owner: CO.attacker()}); engage(m);
 }
 export function slow(m, pct, dur){ if(!m || m.dead) return; if(CO.guestMob(m)){ P.combatT = 6; return CO.op("slow", m, [pct, dur]); } engage(m); m.slowPct = Math.max(pct, m.slowT > 0 ? m.slowPct : 0); m.slowT = Math.max(m.slowT, dur); }
 export function root(m, dur, freeze){ if(!m || m.dead || m.boss) return; if(CO.guestMob(m)){ P.combatT = 6; return CO.op("root", m, [dur, freeze ? 1 : 0]); } engage(m); m.rootT = Math.max(m.rootT, dur); if(freeze) m.freezeT = Math.max(m.freezeT || 0, dur); }   // freeze: frozen in place (Frost Ring); Shatter only counts frozen targets
 export function stun(m, dur){ if(!m || m.dead) return; if(CO.guestMob(m)){ P.combatT = 6; return CO.op("stun", m, [dur]); } engage(m); m.stunT = Math.max(m.stunT, m.boss ? dur * 0.4 : dur); }
+// Fear: the monster runs away in terror, first away from the caster, then in random directions (bosses are immune)
+export function fear(m, dur, fx = P.x, fz = P.z){ if(!m || m.dead || m.boss) return; if(CO.guestMob(m)){ P.combatT = 6; return CO.op("fear", m, [dur, fx, fz]); }
+  engage(m); m.fearT = Math.max(m.fearT || 0, dur); m.fearA = null; m.fearFrom = {x: fx, z: fz}; }
+// Polymorph: the monster becomes a harmless sheep until the time runs out or it takes damage; each mage keeps one sheep at a time (bosses are immune)
+export function polymorph(m, dur){ if(!m || m.dead || m.boss) return; if(CO.guestMob(m)){ P.combatT = 6; return CO.op("poly", m, [dur]); }
+  const by = CO.attacker(); for(const o of mobs) if(o !== m && o.polyT > 0 && o.polyBy === by) o.polyT = 0;
+  engage(m); m.polyT = dur; m.polyBy = by; m.fearT = 0; }
 // everything within r pixels of (x, y) pixels that you can see from there
 export function aoe(x, y, r, fn){ const cx = x / PXU, cz = y / PXU, rr = r / PXU, cy = height(cx, cz) + 1.2;
   mobs.filter(m => !m.dead && m.state !== "return" && Math.hypot(m.x - cx, m.z - cz) < rr + m.r && los(cx, cy, cz, m.x, height(m.x, m.z) + 1, m.z)).forEach(fn); }
@@ -265,10 +283,13 @@ export function playerDamage(raw, src, kind = "melee"){
     if(txt){ H.floatText(P, txt, "#cfe0e6"); P.combatT = 6; if(src && (!P.target || P.target.dead) && !P.ftarget) P.target = src; return; } }
   if(src && src.lvl > C().level) raw *= 1 + 0.1 * (src.lvl - C().level);
   let amt = Math.max(1, Math.round(raw * rand(0.9, 1.1) * takenMult()));
+  if(T("wl_soul") && pet && !pet.dead && kind !== "env"){ const sh = Math.round(amt * 0.2); amt -= sh; pet.hp -= sh; pet.flash = 0.15; if(pet.hp <= 0){ pet.hp = 0; pet.dead = true; pet.deadT = 0; H.log(`Your ${pet.name.toLowerCase()} has died.`, "#ff8a7a"); } }   // Soul Link
+  if(T("wl_backlash") && src && kind !== "env" && Math.random() < 0.03*T("wl_backlash") && !P.buffs.backlash){ buff("backlash", 8); H.log("Backlash: your next Shadow Bolt or Soul Fire is instant.", "#ffb347"); }
   if(P.shield > 0){ const ab = Math.min(P.shield, amt); P.shield -= ab; amt -= ab; if(ab > 0) H.floatText(P, "Absorbed", "#fff6d0"); }
   if(amt > 0){ P.hp -= amt; H.floatText(P, "-" + amt, "#ff6b5e");
     // spell pushback: each hit sets the cast back 0.5 sec, at most 3 times per cast
-    const c = P.casting; if(c && c.kind !== "gather" && (c.pushes || 0) < 3){ c.pushes = (c.pushes || 0) + 1; c.el = Math.max(0, c.el - 0.5); } }
+    const c = P.casting, pb = 0.5 * (1 - [0, 0.33, 0.66, 1][T("wl_conc")]);   // (Fel Concentration: less pushback)
+    if(c && c.kind !== "gather" && (c.pushes || 0) < 3 && pb > 0){ c.pushes = (c.pushes || 0) + 1; c.el = Math.max(0, c.el - pb); } }
   P.combatT = 6;
   if(resType() === "rage") addRes("rage", 2 + amt / P.maxHp * 60);
   if(src && (!P.target || P.target.dead) && !P.ftarget) P.target = src;
@@ -322,6 +343,8 @@ function finishAbility(id, t){ if(id !== "meld") delete P.buffs.meld; const stea
   const a = AB[id];
   if(a.cd && id !== "stealth") P.cds[id] = a.cd;                                 // (Stealth's cooldown starts when it ends)
   if(id === "pyroblast" && P.buffs.hotstreak) delete P.buffs.hotstreak;
+  if(id === "shadowbolt" && P.buffs.nightfall) delete P.buffs.nightfall;                         // (Nightfall goes first, so Backlash is kept for the next one)
+  else if((id === "shadowbolt" || id === "soulfire") && P.buffs.backlash) delete P.buffs.backlash;
   HEALING = HEAL_AB.has(id);
   try{ const ft = CO.friendTarget(id), pt = petHealTarget(id); if(ft) CO.castOn(ft, a, t); else if(pt) castOnPet(a, t); else a.run(t); } finally{ HEALING = false; }   // a heal on a selected friend (or your pet) goes to them
   if(stealthy && id !== "stealth" && id !== "vanish" && !a.racial) breakStealth();          // acting breaks Stealth
@@ -396,15 +419,23 @@ export function updPlayer(dt, moving){
   P.combatT -= dt; const inC = P.combatT > 0, rg = C().race === "undead" ? 1.5 : 1;
   if(P.sitting && (moving || P.casting || P.auto || P.dash || P.leap || inC)) standUp();
   if(P.sitting && P.hp >= P.maxHp && P.mana >= P.maxMana && !P.sitFull){ P.sitFull = true; H.log("You are fully rested.", "#7be08a"); }
-  const rest = P.sitting ? 2.5 : 1;
-  P.mana = Math.min(P.maxMana, P.mana + P.maxMana * (inC ? 0.012 : 0.05 * rg * rest) * dt);
+  // health and mana come in a tick every 3 sec: out of combat slowly (about 1.5 min from empty to full); sitting down (Rest) fills you up in about 15 sec
+  const sit = P.sitting, REGEN_TICK = 3, tick = (P.regenT = (P.regenT || 0) + dt) >= REGEN_TICK;
+  if(tick){ P.regenT -= REGEN_TICK;
+    P.mana = Math.min(P.maxMana, P.mana + P.maxMana * (inC ? 0.005 : (sit ? 0.07 : 0.012) * rg) * REGEN_TICK);   // in combat: 1.5% per tick
+    if(!inC && (P.combatT < -1 || sit)) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * (sit ? 0.07 : 0.01) * rg * REGEN_TICK); }
   P.focus = Math.min(100, P.focus + (inC ? 4 : 9) * dt);
   P.energy = Math.min(100, P.energy + 12 * (P.buffs.adren ? 2 : 1) * dt);
   if(!inC && P.cpMap && P.cpMap.size) clearCP();
   updTotems(dt);
   if(!inC) P.rage = Math.max(0, P.rage - 3 * dt);
-  if(!inC && (P.combatT < -1 || P.sitting)) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.04 * rg * rest * dt);
   for(const h of P.hots){ h.tick -= dt; if(h.tick <= 0){ h.tick += 1; h.left -= 1; healP(h.per); } }
+  // your damage over time ticking on enemies (once a second): Nightfall and Soul Siphon
+  if(P.myDots && P.myDots.length && (P.myDotT = (P.myDotT || 0) + dt) >= 1){ P.myDotT -= 1;
+    P.myDots = P.myDots.filter(o => (o.left -= 1) >= 0 && !o.m.dead && o.m.dots.some(d => d.key === o.key));
+    for(const o of P.myDots){
+      if(T("wl_night") && (o.key === "corruption" || o.key === "agony") && !P.buffs.nightfall && Math.random() < 0.04){ buff("nightfall", 15); H.log("Nightfall: your next Shadow Bolt is instant.", "#b79bff"); }
+      if(T("wl_siphon")) healP(o.per * 0.05 * T("wl_siphon")); } }
   P.hots = P.hots.filter(h => h.left > 0);
 }
 // damage over time, slows, roots and stuns on a monster; returns false while it is stunned
@@ -412,6 +443,7 @@ export function updMobStatus(m, dt){
   for(const d of m.dots){ d.tick -= dt; if(d.tick <= 0){ d.tick += 1; d.left -= 1; CO.asAttacker(d.owner, () => damageMob(m, Math.max(1, Math.round(d.per)), false, d.school)); if(m.dead) return false; } }
   m.dots = m.dots.filter(d => d.left > 0);
   m.slowT = Math.max(0, m.slowT - dt); m.rootT = Math.max(0, m.rootT - dt); m.freezeT = Math.max(0, (m.freezeT || 0) - dt); m.stunT = Math.max(0, m.stunT - dt); m.tauntT = Math.max(0, (m.tauntT || 0) - dt); m.weakT = Math.max(0, (m.weakT || 0) - dt);
+  m.fearT = Math.max(0, (m.fearT || 0) - dt); m.polyT = Math.max(0, (m.polyT || 0) - dt);
   return m.stunT <= 0;
 }
 
@@ -476,7 +508,7 @@ export function updFx(dt){
   }
   for(let i = fx.length - 1; i >= 0; i--) if(fx[i].done) fx.splice(i, 1);
   for(const z of zones){ z.left -= dt; z.tick -= dt;
-    if(z.tick <= 0 && !z.visual){ z.tick += 1; aoe(z.x, z.y, z.r, m => { hit(m, z.dmg, z.school, z.ab); if(z.slows) slow(m, 0.5, 2); }); }
+    if(z.tick <= 0 && !z.visual){ z.tick += 1; aoe(z.x, z.y, z.r, m => { hit(m, z.dmg, z.school, z.ab); if(z.slows) slow(m, z.slows === true ? 0.5 : z.slows, 2); }); }
     z.m.material.opacity = 0.22 * Math.min(1, z.left * 2) + Math.sin(H.now() * 6) * 0.03;
     if(z.left <= 0){ scene.remove(z.m); z.m.geometry.dispose(); z.m.material.dispose(); } }
   for(let i = zones.length - 1; i >= 0; i--) if(zones[i].left <= 0) zones.splice(i, 1);
@@ -648,8 +680,8 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
   if(pet.mode === "attack"){ const c = pet.cmdT; if(c && !c.dead && c.state !== "return" && distU(c, P) < 45) t = c; else { pet.mode = "assist"; pet.cmdT = null; } }
   if(pet.mode === "follow" && !fight) pet.mode = "assist";
   if(pet.mode === "assist"){
-    t = (P.target && !P.target.dead && P.target.state !== "return" && P.combatT > 0 && distU(P.target, P) < 26) ? P.target : null;
-    if(!t){ let bd = 18; for(const m of mobs){ if(m.dead || m.state !== "chase") continue; const dd = distU(m, P); if(dd < bd){ bd = dd; t = m; } } } }
+    t = (P.target && !P.target.dead && P.target.state !== "return" && P.combatT > 0 && distU(P.target, P) < 26 && !(P.target.polyT > 0 && !P.auto)) ? P.target : null;   // (it leaves a sheep alone unless you attack it)
+    if(!t){ let bd = 18; for(const m of mobs){ if(m.dead || m.state !== "chase" || m.polyT > 0) continue; const dd = distU(m, P); if(dd < bd){ bd = dd; t = m; } } } }
   pet.curT = t;
   if(tank && petSkillOn(SK.taunt) && pet.growl <= 0 && t && distU(pet, t) < pet.r + t.r + 1.7){   // Growl: free, forces the enemy onto the bear for a few seconds
     pet.growl = GROWL_CD; if(CO.coopMob(t)) CO.taunt(t); else { t.tauntT = GROWL_TAUNT; t.thPet = Math.max(t.thPet || 0, (t.thMe || 0) * 1.3 + 40); }
@@ -704,7 +736,7 @@ function updTotems(dt){ if(!totems.length) return;
     const near = Math.hypot(P.x - o.x, P.z - o.z) < TOTEM_R, d = TOTEMS[o.kind];
     if(o.kind === "stoneskin" && near) P.buffs.stskin = 1; if(o.kind === "strength" && near) P.buffs.earthstr = 1;
     if(o.t > 0) continue; o.t += d.tick;
-    if(o.kind === "searing"){ let best = null, bd = 9; for(const m of mobs){ if(m.dead || m.state === "return") continue; const dd = Math.hypot(m.x - o.x, m.z - o.z) - m.r; if(dd < bd && los(o.x, height(o.x, o.z) + 1.2, o.z, m.x, height(m.x, m.z) + 1, m.z)){ bd = dd; best = m; } }
+    if(o.kind === "searing"){ let best = null, bd = 9; for(const m of mobs){ if(m.dead || m.state === "return" || m.polyT > 0) continue; const dd = Math.hypot(m.x - o.x, m.z - o.z) - m.r; if(dd < bd && los(o.x, height(o.x, o.z) + 1.2, o.z, m.x, height(m.x, m.z) + 1, m.z)){ bd = dd; best = m; } }
       if(best){ const m = best; proj(m, "#ff7a2a", 4, () => hit(m, spow() * 0.55, "fire", "searing"), null, 520, {x: o.x, z: o.z, y: 1.1}); } }
     else if(o.kind === "magma"){ ring(o.x * PXU, o.z * PXU, 92, "#ff6a1a"); aoe(o.x * PXU, o.z * PXU, 92, m => hit(m, spow() * 0.6, "fire", "magma")); }
     else if(o.kind === "hstream"){ if(near) healP(P.maxHp * 0.03); CO.groupFx(TOTEM_R * PXU, [["healPct", 0.03]], d.name); }
@@ -724,4 +756,4 @@ export function mobTarget(m){
 }
 
 // the helper table the Rimfrost 1 ability code calls
-Object.assign(E, {rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});
+Object.assign(E, {rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});

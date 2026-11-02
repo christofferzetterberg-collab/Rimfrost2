@@ -1,7 +1,7 @@
 // Dev tools (open the game with ?dev in the address, then press F8).
 // Cheats for testing, teleports, and a class balance test that fights the same monsters with every class.
 import {P, S, mobs, PXU} from "./state.js";
-import {AB, CLASSES, HEAL_AB, TALENTS, TREES, TALENT_VERSION} from "./rimdata.js";
+import {AB, CLASSES, HEAL_AB, TALENTS, TREES, TALENT_VERSION, HUNTER_MIN} from "./rimdata.js";
 import {makeGear, SLOT_ORDER, CLASS_OFF, mulberry, hashStr, QUAL} from "./items.js";
 import {HUBS, DG_DOORS, ZONES} from "./worlddata.js";
 import * as G from "./engine.js";
@@ -94,7 +94,7 @@ const ROT = {
   druid: [["touch", lowHp(0.4)], ["rejuv", () => P.hp / P.maxHp < 0.7 && !P.hots.some(h => h.key === "rejuv")], ["bark", lowHp(0.6)], ["moonfire", noDot("moonfire")], ["starfire"], ["hurricane"], ["wrath"]],
   druid_bear: [["frenzy"], ["roar", near(2.6)], ["bash"], ["swipe", near(2.6)], ["maul"]],
   druid_cat: [["bite", () => P.cp >= 4], ["pounce"], ["rake", noDot("rake")], ["claw"]],
-  warlock: [["lifetap", () => P.mana / P.maxMana < 0.25 && P.hp / P.maxHp > 0.5], ["drainlife", lowHp(0.5)], ["deathcoil"], ["corruption", noDot("corruption")], ["agony", noDot("agony")], ["immolate", noDot("immolate")], ["soulfire"], ["shadowbolt"]],
+  warlock: [["lifetap", () => P.mana / P.maxMana < 0.25 && P.hp / P.maxHp > 0.5], ["drainlife", lowHp(0.5)], ["deathcoil"], ["shadowburn", m => m.hp / m.maxHp < 0.25], ["corruption", noDot("corruption")], ["agony", noDot("agony")], ["unstable", noDot("unstable")], ["immolate", noDot("immolate")], ["conflagrate"], ["soulfire"], ["shadowburn"], ["shadowbolt"]],
   rogue: [["evasion", lowHp(0.5)], ["slicedice", () => P.cp >= 2 && !P.buffs.slice], ["eviscerate", () => P.cp >= 4], ["kidney", () => P.cp >= 5], ["gouge", () => P.cp < 3], ["backstab"], ["sinister"]],
   shaman: [["healwave", lowHp(0.4)], ["lshield", noBuff("lshield")], ["searing", () => !G.totemList().some(o => o.kind === "searing" || o.kind === "magma")], ["stoneskin", () => !G.totemList().some(o => o.kind === "stoneskin" || o.kind === "strength")], ["flameshock", noDot("flameshock")], ["earthshock"], ["chain"], ["lightning"]]
 };
@@ -112,6 +112,9 @@ function think(key, m){
   P.target = m;
   const melee = MELEE.has(key), dU = G.distU(P, m) - m.r - P.r;
   if(melee || (key === "hunter" && dU > 15)) P.dest = dU > 1.2 ? {x: m.x, z: m.z} : null; else P.dest = null;
+  // a hunter whose pet holds the monster steps back out of the bow's minimum range (as a player would)
+  if(key === "hunter" && m.tgtPet && (G.distU(P, m) - m.r) * PXU < HUNTER_MIN + 10){ const d = G.distU(P, m) || 1, want = HUNTER_MIN / PXU + m.r + 2.5;
+    P.dest = {x: m.x + (P.x - m.x) / d * want, z: m.z + (P.z - m.z) / d * want}; }
   if(melee || key === "hunter"){ if(!P.auto) P.auto = true; }
   if(P.dest && P.casting) return;
   for(const [id, when] of ROT[key]){ if(!canUse(id, m)) continue; if(when && !when(m)) continue; G.tryUse(id); if(P.casting || P.gcd > 0 || AB[id].offGcd) break; }
@@ -129,16 +132,16 @@ function fight(v, sc, lvl, q, spec, seed){
   // the monsters: a plain level-matched fighter (Bandit), 11 units away
   const test = []; for(let i = 0; i < sc.n; i++){ const p = {x: A.mx + i * 1.6, z: A.mz + i * 0.8}; const m = H.makeMob("bandit", p, lvl);
     if(sc.elite){ m.maxHp = m.hp = Math.round(m.maxHp * 3); m.dmg *= 1.25; m.elite = true; } test.push(m); }
-  let t = 0, taken = 0, hp0 = P.hp; const DT = 0.05, MAX = 150;
+  let t = 0, taken = 0, hp0 = P.hp, dryT = 0; const DT = 0.05, MAX = 150, usesMana = G.resType() === "mana";
   const startHp = test.reduce((a, m) => a + m.maxHp, 0);
   while(t < MAX){
     const alive = test.filter(m => !m.dead); if(!alive.length || P.dead) break;
     const m = alive.find(o => o.state === "chase") || alive[0];
     if(P.hp < hp0) taken += hp0 - P.hp;
-    think(key, m); H.update(DT); t += DT; hp0 = P.hp;
+    think(key, m); H.update(DT); t += DT; hp0 = P.hp; if(usesMana && P.mana < P.maxMana * 0.1) dryT += DT;
   }
   const left = test.reduce((a, m) => a + (m.dead ? 0 : m.hp), 0), done = startHp - left, win = test.every(m => m.dead) && !P.dead;
-  const res = {win, timeout: !win && !P.dead, t, hp: P.dead ? 0 : P.hp / P.maxHp, dps: done / Math.max(1, t), taken};
+  const res = {win, timeout: !win && !P.dead, t, hp: P.dead ? 0 : P.hp / P.maxHp, dps: done / Math.max(1, t), taken, mana: usesMana ? P.mana / P.maxMana : null, dry: usesMana ? dryT / Math.max(1, t) : null};
   for(const m of test) H.removeMob(m);
   G.petStash();
   return res;
@@ -153,18 +156,19 @@ async function runBalance(){
       for(const sc of SCEN){ const runs = [];
         for(let i = 0; i < trials; i++){ runs.push(fight(v, sc, lvl, q, spec, 1000 + i)); k++; BT.prog = `${k}/${total}`; render(); await new Promise(r => setTimeout(r, 0)); }
         const avg = f => runs.reduce((a, r) => a + f(r), 0) / runs.length, wins = runs.filter(r => r.win).length;
-        row.cells.push({wins, n: runs.length, t: avg(r => r.t), hp: avg(r => r.hp), dps: avg(r => r.dps), to: runs.filter(r => r.timeout).length}); }
+        row.cells.push({wins, n: runs.length, t: avg(r => r.t), hp: avg(r => r.hp), dps: avg(r => r.dps), to: runs.filter(r => r.timeout).length, mana: runs[0].mana == null ? null : avg(r => r.mana), dry: runs[0].dry == null ? null : avg(r => r.dry)}); }
       out.push(row); }
   } catch(e){ console.error(e); H.log("Balance test failed: " + e.message, "#ff6b5e"); }
   DEV.sim = false; BT.busy = false; BT.res = {lvl, q, spec, trials, rows: out}; P.x = home.x; P.z = home.z;   // (so you come back where you were)
   H.restore(orig); P.god = DEV.god; P.devSpeed = DEV.speed; render();
 }
-const cellTxt = c => `${c.wins}/${c.n} won${c.to ? ` (${c.to} too slow)` : ""} · ${Math.round(c.t)}s · ${Math.round(c.hp * 100)}% hp · ${Math.round(c.dps)} dps`;
+const manaTxt = c => c.mana == null ? "" : ` · ${Math.round(c.mana * 100)}% mana${c.dry > 0.05 ? ` (out of mana ${Math.round(c.dry * 100)}% of the fight)` : ""}`;
+const cellTxt = c => `${c.wins}/${c.n} won${c.to ? ` (${c.to} too slow)` : ""} · ${Math.round(c.t)}s · ${Math.round(c.hp * 100)}% hp · ${Math.round(c.dps)} dps${manaTxt(c)}`;
 function resultsHTML(R){
   const cls = c => c.wins === c.n ? "w" : c.wins === 0 ? "l" : "d";
-  return `<div class="m" style="margin-top:6px">Level ${R.lvl} · ${QUAL[R.q].name} gear · talents: ${R.spec ? "tree " + R.spec : "none"} · ${R.trials} run(s). Time = how long the fight took, hp = health left at the end.</div>
+  return `<div class="m" style="margin-top:6px">Level ${R.lvl} · ${QUAL[R.q].name} gear · talents: ${R.spec ? "tree " + R.spec : "none"} · ${R.trials} run(s). Time = how long the fight took, hp = health left at the end, mana = mana left at the end (dry = share of the fight spent below 10% mana).</div>
     <table><tr><th>Class</th>${SCEN.map(s => `<th>${s.name}</th>`).join("")}</tr>
-    ${R.rows.map(r => `<tr><td><b>${esc(r.name)}</b></td>${r.cells.map(c => `<td class="${cls(c)}">${c.wins}/${c.n} won${c.to ? ` (${c.to} too slow)` : ""}<br>${Math.round(c.t)}s · ${Math.round(c.hp * 100)}% hp<br>${Math.round(c.dps)} dps</td>`).join("")}</tr>`).join("")}</table>`;
+    ${R.rows.map(r => `<tr><td><b>${esc(r.name)}</b></td>${r.cells.map(c => `<td class="${cls(c)}">${c.wins}/${c.n} won${c.to ? ` (${c.to} too slow)` : ""}<br>${Math.round(c.t)}s · ${Math.round(c.hp * 100)}% hp<br>${Math.round(c.dps)} dps${c.mana == null ? "" : `<br>${Math.round(c.mana * 100)}% mana${c.dry > 0.05 ? ` · dry ${Math.round(c.dry * 100)}%` : ""}`}</td>`).join("")}</tr>`).join("")}</table>`;
 }
 function copyResults(){ const R = BT.res; if(!R) return;
   const txt = [`Rimfrost 2 balance test – level ${R.lvl}, ${QUAL[R.q].name} gear, talents ${R.spec ? "tree " + R.spec : "none"}, ${R.trials} run(s)`,

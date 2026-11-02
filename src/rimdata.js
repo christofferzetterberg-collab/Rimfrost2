@@ -20,6 +20,7 @@ const zone = (...a) => E.zone(...a);
 const tmul = (...a) => E.tmul(...a);
 const setForm = (...a) => E.setForm(...a);
 const root = (...a) => E.root(...a);
+const fear = (...a) => E.fear(...a), polymorph = (...a) => E.polymorph(...a);
 const hot = (...a) => E.hot(...a);
 const addCP = (...a) => E.addCP(...a);
 const addRes = (...a) => E.addRes(...a);
@@ -63,8 +64,8 @@ export const CLASSES = {
 };
 // Balance: damage multiplier per class (applies to direct hits and damage-over-time). 1 = unchanged. Tune these after running the dev balance test.
 // Balance: PLAYER_DMG scales ALL player damage (every class). MANA_COST_MULT scales every mana cost, so you can cast more before running dry.
-export const PLAYER_DMG = 0.8, MANA_COST_MULT = 0.7;
-export const CLASS_DMG = {mage:1.15, warrior:1.15, hunter:1, priest:1, druid:1.10, paladin:0.70, warlock:1.05, rogue:1.0, shaman:1.1};
+export const PLAYER_DMG = 0.8, MANA_COST_MULT = 0.45;
+export const CLASS_DMG = {mage:1.0, warrior:0.95, hunter:0.9, priest:0.9, druid:0.95, paladin:0.70, warlock:1.05, rogue:0.9, shaman:1.1};
 export const RES_COLOR = {mana:"var(--mana)", rage:"var(--rage)", focus:"var(--focus)", energy:"var(--energy)"};
 export const RES_NAME = {mana:"Mana", rage:"Rage", focus:"Focus", energy:"Energy"};
 export const SCHOOL_COLOR = {fire:"#ff8a3a", frost:"#8fd8ff", arcane:"#d38cff", nature:"#7fdc5a", holy:"#ffe37a", shadow:"#a77bff", phys:"#f2f2f2"};
@@ -102,6 +103,9 @@ export const AB = {
   frostnova:{name:"Frost Ring", lvl:6, cost:25, cd:25, range:0, school:"frost", icon:"nova", tgt:"self",
     desc:()=>`Freezes enemies within 4 m in place for 8 sec and deals ${fmt(spow()*0.5)} Frost damage.`,
     run:()=>{ring(P.px,P.py,100,"#bfe9ff");aoe(P.px,P.py,100,m=>{hit(m,spow()*0.5,"frost","frostnova");root(m,8,true);});}},
+  polymorph:{name:"Polymorph", lvl:8, cost:30, cast:1.5, range:300, school:"arcane", icon:"sheep", tgt:"enemy",
+    desc:()=>`Transforms the enemy into a sheep for 1 min. A sheep cannot attack and regenerates health quickly. Any damage breaks the effect. Only one target can be polymorphed at a time.`,
+    run:t=>{burst(t.px,t.py,"#e8d8ff",14);polymorph(t,60);}},
   blizzard:{name:"Blizzard", lvl:10, cost:45, cd:12, range:300, school:"frost", icon:"storm", tgt:"enemy",
     desc:()=>`Calls down a blizzard at the target area for 4 sec, dealing ${fmt(spow()*0.7)} Frost damage per second and slowing enemies.`,
     run:t=>zone(t.px,t.py,90,4,spow()*0.7,"frost","blizzard",true)},
@@ -354,13 +358,16 @@ Object.assign(AB, {
   corruption:{name:"Corruption", lvl:4, cost:18, range:300, school:"shadow", icon:"drop", tgt:"enemy",
     desc:()=>`Corrupts the target, causing ${fmt(spow()*2.4)} Shadow damage over 15 sec.`,
     run:t=>{burst(t.px,t.py,"#7a4ad0",8);dot(t,"corruption",spow()*2.4*tmul("corruption","shadow"),15,"shadow");}},
+  fear:{name:"Fear", lvl:8, cost:25, cd:25, cast:1.5, range:290, school:"shadow", icon:"fear", tgt:"enemy",
+    desc:()=>`Strikes fear into the enemy, causing it to run away in terror for 8 sec.`,
+    run:t=>{burst(t.px,t.py,"#7a4ad0",12);fear(t,8);}},
   agony:{name:"Curse of Agony", lvl:6, cost:18, range:300, school:"shadow", icon:"skull", tgt:"enemy",
     desc:()=>`Curses the target with agony, causing ${fmt(spow()*2.8)} Shadow damage over 21 sec. Only one curse per target.`,
     run:t=>{burst(t.px,t.py,"#8a5ad0",8);curse(t,"agony");dot(t,"agony",spow()*2.8*tmul("agony","shadow"),21,"shadow");}},
   lifetap:{name:"Life Tap", lvl:8, cost:0, range:0, school:"shadow", icon:"heart", tgt:"self",
     check:()=>P.hp/P.maxHp > 0.2 || "Not enough health",
-    desc:()=>`Converts ${fmt(P.maxHp*0.15)} health into ${fmt(P.maxHp*0.15*1.5)} mana.`,
-    run:()=>{const h=P.maxHp*0.15;P.hp=Math.max(1,P.hp-h);addRes("mana",h*1.5);burst(P.px,P.py,"#8a5ad0",10);}},
+    desc:()=>`Converts ${fmt(P.maxHp*0.15)} health into ${fmt(P.maxHp*0.15*1.5*(1+0.1*T("wl_tap")))} mana.`,
+    run:()=>{const h=P.maxHp*0.15;P.hp=Math.max(1,P.hp-h);addRes("mana",h*1.5*(1+0.1*T("wl_tap")));burst(P.px,P.py,"#8a5ad0",10);}},
   drainlife:{name:"Drain Life", lvl:10, cost:28, cast:2.0, cd:8, range:300, school:"shadow", icon:"drop", tgt:"enemy",
     desc:()=>`Drains ${fmt(spow()*1.6)} health from the target and heals you for the damage dealt.`,
     run:t=>{burst(t.px,t.py,"#5ad06a",10);drain(t,spow()*1.6,"drainlife",1+0.2*T("wl_drain"));}},
@@ -379,13 +386,23 @@ Object.assign(AB, {
     run:t=>{burst(t.px,t.py,"#6a6a7a",8);curse(t,"weak");}},
   rainfire:{name:"Rain of Fire", lvl:18, cost:45, cd:12, range:300, school:"fire", icon:"meteor", tgt:"enemy",
     desc:()=>`Calls down fire on the target area for 6 sec, dealing ${fmt(spow()*0.65)} Fire damage per second.`,
-    run:t=>zone(t.px,t.py,95,6,spow()*0.65,"fire","rainfire",false)},
+    run:t=>zone(t.px,t.py,95,6,spow()*0.65,"fire","rainfire",T("wl_after")?0.25*T("wl_after"):false)},
   soulfire:{name:"Soul Fire", lvl:22, cost:55, cd:20, cast:4.0, range:300, school:"fire", icon:"flame", tgt:"enemy",
     desc:()=>`Burns the target's soul for ${fmt(spow()*5.0)} Fire damage.`,
     run:t=>proj(t,"#ff4a1a",10,()=>hit(t,spow()*5.0,"fire","soulfire"))},
   deathcoil:{name:"Death Coil", lvl:26, cost:35, cd:30, range:280, school:"shadow", icon:"skull", tgt:"enemy",
     desc:()=>`Deals ${fmt(spow()*2.5)} Shadow damage, heals you for the damage dealt and stuns the target for 3 sec.`,
     run:t=>proj(t,"#5a3a8a",8,()=>{drain(t,spow()*2.5,"deathcoil",1);stun(t,3);})},
+  unstable:{name:"Unstable Affliction", lvl:10, talent:"wl_unstable", cost:25, cast:1.5, range:300, school:"shadow", icon:"poison", tgt:"enemy",
+    desc:()=>`Deals ${fmt(spow()*3.0)} Shadow damage over 15 sec. If the target dies while afflicted, the affliction spreads to the nearest enemy.`,
+    run:t=>{burst(t.px,t.py,"#9a5ae0",12);dot(t,"unstable",spow()*3.0*tmul("unstable","shadow"),15,"shadow");}},
+  shadowburn:{name:"Shadowburn", lvl:10, talent:"wl_burn", cost:20, cd:15, range:300, school:"shadow", icon:"burst", tgt:"enemy",
+    desc:()=>`Instantly blasts the target for ${fmt(spow()*2.0)} Shadow damage. Deals double damage to enemies below 25% health.`,
+    run:t=>{burst(t.px,t.py,"#7a4ad0",14);hit(t,spow()*2.0*(t.hp/t.maxHp<0.25?2:1),"shadow","shadowburn");}},
+  conflagrate:{name:"Conflagrate", lvl:10, talent:"wl_conflag", cost:30, cd:10, range:300, school:"fire", icon:"nova", tgt:"enemy",
+    check:t=>(t.dots||[]).some(d=>d.key==="immolate")||"The target must be burning with Immolate",
+    desc:()=>`Deals ${fmt(spow()*3.5)} Fire damage to a target burning with your Immolate.`,
+    run:t=>{burst(t.px,t.py,"#ff6a1a",16);hit(t,spow()*3.5,"fire","conflagrate");}},
   demonfrenzy:{name:"Demonic Frenzy", lvl:10, talent:"wl_frenzy", cost:0, cd:60, range:0, school:"shadow", icon:"fang", tgt:"self", offGcd:true,
     desc:()=>`Your demon deals 50% more damage and attacks 30% faster. Lasts 10 sec.`,
     check:()=>(E.pet && !E.pet.dead) ? true : "You have no demon", run:()=>E.petWrath()},
@@ -477,7 +494,7 @@ Object.assign(AB, {
 });
 
 export const BARS = {
-  mage:["fireball","frostbolt","fireblast","frostnova","blizzard","pyroblast","sparkrain","icearmor","meteor","icebarrier"],
+  mage:["fireball","frostbolt","fireblast","frostnova","polymorph","blizzard","pyroblast","sparkrain","icearmor","meteor","icebarrier"],
   warrior:["heroic","charge","shout","rend","whirlwind","execute","shieldbash","secondwind","quake"],
   hunter:["steady","raptor","wingclip","firearrow","icearrow","disengage","multishot","aimed","poison","snare","stormarrow","callbear","dismisspet","mendpet","callwolf","intimidate","bestialwrath"],
   priest:["smite","heal","swp","pws","mindblast","holynova","renew","darkpulse","judgment","resurrection"],
@@ -486,7 +503,7 @@ export const BARS = {
   druid_cat:["claw","rake","bite","dash","pounce","bear","cat","leopard"],
   druid_leopard:["leopard","bear","cat"],
   paladin:["palstrike","palheal","hammer","holyshield","crusader","consecrate","avenging","bubble","judge","redemption"],
-  warlock:["shadowbolt","summonimp","immolate","corruption","agony","lifetap","drainlife","summonvoid","healthfunnel","weakness","rainfire","soulfire","deathcoil","dismissdemon","demonfrenzy"],
+  warlock:["shadowbolt","summonimp","immolate","corruption","fear","agony","lifetap","drainlife","summonvoid","healthfunnel","weakness","rainfire","soulfire","deathcoil","dismissdemon","demonfrenzy","unstable","shadowburn","conflagrate"],
   rogue:["sinister","eviscerate","stealth","gouge","backstab","slicedice","rupture","evasion","ambush","fanknives","kidney","vanish","adrenaline"],
   shaman:["lightning","healwave","earthshock","searing","flameshock","stoneskin","hstream","lshield","chain","frostshock","strengthtotem","magma","heroism","stormstrike"]
 };
@@ -501,7 +518,7 @@ for(const c of ["mage", "hunter", "priest", "druid", "warlock", "shaman"]) for(c
 // petdmg / pethp (hunter pets), and a school name (fire, frost, arcane, nature, holy, shadow, phys) for more damage with that school.
 export const TIER_NEED = {1:0, 2:3, 3:6, 4:8, 5:10};
 export const TALENT_VERSION = 2;
-export const TALENT_CLASS_VER = {hunter: 3};           // a class whose talents changed again gets its points back once more
+export const TALENT_CLASS_VER = {hunter: 3, warlock: 3};           // a class whose talents changed again gets its points back once more
 export const TREES = {
   mage:[{id:"arcane",name:"Arcane",d:"Mana, critical strikes and arcane power."},{id:"fire",name:"Fire",d:"Fire damage and Hot Streak."},{id:"frost",name:"Frost",d:"Control, Shatter and survivability."}],
   warrior:[{id:"arms",name:"Arms",d:"Powerful strikes and bleeds."},{id:"fury",name:"Fury",d:"Sustained damage and critical strikes."},{id:"prot",name:"Protection",d:"Tanking, health and damage reduction."}],
@@ -568,7 +585,7 @@ export const TALENTS = {
     {id:"h_bestial",tree:"beast",tier:5,max:1,name:"Bestial Wrath",grants:"bestialwrath",d:()=>`Teaches Bestial Wrath: your pet deals 50% more damage and attacks 30% faster for 10 sec. 1 min cooldown.`},
     {id:"lethal",tree:"marks",tier:1,max:3,name:"Lethal Shots",d:r=>`Increases critical strike chance by ${3*r}%.`},
     {id:"efficiency",tree:"marks",tier:1,max:2,name:"Efficiency",d:r=>`Reduces the focus cost of your shots by ${10*r}%.`},
-    {id:"mortal",tree:"marks",tier:2,max:3,name:"Mortal Shots",d:r=>`Increases critical strike damage by ${10*r}%.`},
+    {id:"mortal",tree:"marks",tier:2,max:3,name:"Mortal Shots",d:r=>`Increases critical strike damage by ${5*r}%.`},
     {id:"h_eye",tree:"marks",tier:2,max:3,name:"Eagle Eye",eff:{crit:0.02},d:r=>`Increases critical strike chance by ${2*r}%.`},
     {id:"trueshot",tree:"marks",tier:3,max:1,name:"Master Marksman",d:()=>`Increases all damage dealt by 10% and reduces the cast time of Aimed Shot by 1 sec.`},
     {id:"h_inst",tree:"marks",tier:4,max:3,name:"Hunter's Instinct",eff:{dmg:0.04},d:r=>`Increases all damage dealt by ${4*r}%.`},
@@ -647,27 +664,27 @@ export const TALENTS = {
     {id:"pal_sanct",tree:"ret",tier:4,max:3,name:"Sanctified Wrath",eff:{holy:0.03,dmg:0.02},d:r=>`Increases Holy damage by ${3*r}% and all damage dealt by ${2*r}%.`},
     {id:"pal_champ",tree:"ret",tier:5,max:1,name:"Champion of the Light",eff:{dmg:0.08,hp:0.08},d:()=>`Increases all damage dealt by 8% and maximum health by 8%.`}]
   ,warlock:[
-    {id:"wl_corr",tree:"affl",tier:1,max:3,name:"Improved Corruption",eff:{shadow:0.04},d:r=>`Increases Shadow damage by ${4*r}%.`},
     {id:"wl_agony",tree:"affl",tier:1,max:3,name:"Improved Curse of Agony",d:r=>`Increases the damage of Curse of Agony and Corruption by ${10*r}%.`},
-    {id:"wl_focus",tree:"affl",tier:2,max:3,name:"Fel Concentration",eff:{crit:0.02},d:r=>`Increases critical strike chance by ${2*r}%.`},
+    {id:"wl_tap",tree:"affl",tier:1,max:3,name:"Improved Life Tap",d:r=>`Increases the mana gained from Life Tap by ${10*r}%.`},
+    {id:"wl_conc",tree:"affl",tier:2,max:3,name:"Fel Concentration",d:r=>`Reduces the casting time lost when you take damage while casting by ${[0,33,66,100][r]}%.`},
     {id:"wl_drain",tree:"affl",tier:2,max:3,name:"Improved Drain Life",d:r=>`Increases the healing of Drain Life by ${20*r}%.`},
-    {id:"wl_night",tree:"affl",tier:3,max:1,name:"Nightfall",eff:{dmg:0.05},d:()=>`Increases all damage dealt by 5%.`},
-    {id:"wl_shadowm",tree:"affl",tier:4,max:3,name:"Shadow Mastery",eff:{shadow:0.04},d:r=>`Increases Shadow damage by ${4*r}%.`},
-    {id:"wl_unstable",tree:"affl",tier:5,max:1,name:"Unstable Affliction",eff:{shadow:0.1,dmg:0.03},d:()=>`Increases Shadow damage by 10% and all damage dealt by 3%.`},
+    {id:"wl_night",tree:"affl",tier:3,max:1,name:"Nightfall",d:()=>`Your Corruption and Curse of Agony have a 4% chance each time they deal damage to make your next Shadow Bolt instant.`},
+    {id:"wl_siphon",tree:"affl",tier:4,max:3,name:"Soul Siphon",d:r=>`Your damage-over-time effects heal you for ${5*r}% of the damage they deal.`},
+    {id:"wl_unstable",tree:"affl",tier:5,max:1,name:"Unstable Affliction",grants:"unstable",d:()=>`Teaches Unstable Affliction: Shadow damage over 15 sec. If the target dies while afflicted, the affliction spreads to a nearby enemy.`},
     {id:"wl_pethp",tree:"demo",tier:1,max:3,name:"Fel Vitality",eff:{pethp:0.08},d:r=>`Increases your demon's health by ${8*r}%.`},
     {id:"wl_embrace",tree:"demo",tier:1,max:3,name:"Demonic Embrace",eff:{hp:0.03},d:r=>`Increases maximum health by ${3*r}%.`},
+    {id:"wl_dom",tree:"demo",tier:2,max:3,name:"Fel Domination",d:r=>`Reduces the cast time of your summoning spells by ${(1.5*r).toFixed(1)} sec.`},
     {id:"wl_unholy",tree:"demo",tier:2,max:3,name:"Unholy Power",eff:{petdmg:0.08},d:r=>`Increases your demon's damage by ${8*r}%.`},
-    {id:"wl_aegis",tree:"demo",tier:2,max:3,name:"Demonic Aegis",eff:{def:0.02},d:r=>`Reduces damage taken by ${2*r}%.`},
-    {id:"wl_soul",tree:"demo",tier:3,max:1,name:"Soul Link",d:()=>`Reduces damage taken by 10% while your demon is active.`},
-    {id:"wl_master",tree:"demo",tier:4,max:3,name:"Master Demonologist",eff:{petdmg:0.05,dmg:0.02},d:r=>`Increases your demon's damage by ${5*r}% and all damage dealt by ${2*r}%.`},
+    {id:"wl_soul",tree:"demo",tier:3,max:1,name:"Soul Link",d:()=>`20% of the damage you take is taken by your demon instead.`},
+    {id:"wl_master",tree:"demo",tier:4,max:3,name:"Master Demonologist",d:r=>`Grants you a bonus that depends on your demon. Imp: increases your damage by ${3*r}%. Voidwalker: reduces damage taken by ${3*r}%.`},
     {id:"wl_frenzy",tree:"demo",tier:5,max:1,name:"Demonic Frenzy",grants:"demonfrenzy",d:()=>`Teaches Demonic Frenzy: your demon deals 50% more damage and attacks 30% faster for 10 sec. 1 min cooldown.`},
     {id:"wl_bane",tree:"destr",tier:1,max:3,name:"Bane",d:r=>`Reduces the cast time of Shadow Bolt and Soul Fire by ${(0.1*r).toFixed(1)} sec.`},
-    {id:"wl_cata",tree:"destr",tier:1,max:3,name:"Cataclysm",eff:{fire:0.04},d:r=>`Increases Fire damage by ${4*r}%.`},
+    {id:"wl_cata",tree:"destr",tier:1,max:3,name:"Cataclysm",d:r=>`Reduces the mana cost of your Destruction spells by ${3*r}%.`},
     {id:"wl_devast",tree:"destr",tier:2,max:3,name:"Devastation",eff:{crit:0.02},d:r=>`Increases critical strike chance by ${2*r}%.`},
-    {id:"wl_ruin",tree:"destr",tier:2,max:3,name:"Ruin",d:r=>`Increases critical strike damage by ${10*r}%.`},
-    {id:"wl_burn",tree:"destr",tier:3,max:1,name:"Shadowburn",eff:{dmg:0.05},d:()=>`Increases all damage dealt by 5%.`},
-    {id:"wl_ember",tree:"destr",tier:4,max:3,name:"Emberstorm",eff:{fire:0.05},d:r=>`Increases Fire damage by ${5*r}%.`},
-    {id:"wl_conflag",tree:"destr",tier:5,max:1,name:"Conflagration",eff:{fire:0.1,shadow:0.1},d:()=>`Increases Fire and Shadow damage by 10%.`}],
+    {id:"wl_backlash",tree:"destr",tier:2,max:3,name:"Backlash",d:r=>`When an enemy hits you, you have a ${3*r}% chance to make your next Shadow Bolt or Soul Fire instant.`},
+    {id:"wl_burn",tree:"destr",tier:3,max:1,name:"Shadowburn",grants:"shadowburn",d:()=>`Teaches Shadowburn: instantly blasts the target with Shadow damage, doubled against enemies below 25% health. 15 sec cooldown.`},
+    {id:"wl_after",tree:"destr",tier:4,max:2,name:"Aftermath",d:r=>`Rain of Fire slows enemies by ${25*r}%.`},
+    {id:"wl_conflag",tree:"destr",tier:5,max:1,name:"Conflagrate",grants:"conflagrate",d:()=>`Teaches Conflagrate: deals heavy Fire damage to a target burning with your Immolate. 10 sec cooldown.`}],
   rogue:[
     {id:"r_malice",tree:"assa",tier:1,max:3,name:"Malice",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${r}%.`},
     {id:"r_evisc",tree:"assa",tier:1,max:3,name:"Improved Eviscerate",d:r=>`Increases the damage of Eviscerate and Rupture by ${10*r}%.`},
@@ -818,6 +835,8 @@ export function drawIcon(cv, icon, color){
     case "void": C(0,0,14); g.beginPath(); for(let a=0;a<10;a+=0.2){ const r=1+a*1.3; const x=Math.cos(a)*r, y=Math.sin(a)*r; a?g.lineTo(x,y):g.moveTo(x,y);} g.stroke(); break;
     case "dagger": P_([[-12,12],[6,-6],[12,-14],[4,-8]], true); P_([[-12,12],[6,-6]]); P_([[-10,2],[2,14]]); break;
     case "totem": g.fillRect(-6,-16,12,32); g.fillStyle="#222"; g.fillRect(-4,-11,3,3); g.fillRect(1,-11,3,3); g.fillRect(-3,-4,6,2); P_([[-12,-14],[-6,-10]]); P_([[12,-14],[6,-10]]); break;
+    case "sheep": for(const [x,y] of [[-5,-3],[3,-5],[9,0],[-1,3],[6,5],[-8,4]]) C(x,y,6.5,true); g.fillStyle="#2e2a28"; g.beginPath(); g.ellipse(-14,-3,4.5,5.5,0,0,7); g.fill(); g.fillRect(-6,9,3,7); g.fillRect(4,9,3,7); break;
+    case "fear": C(0,0,13,true); g.fillStyle="#2a1030"; g.beginPath(); g.ellipse(-5,-4,2.6,3.6,0,0,7); g.fill(); g.beginPath(); g.ellipse(5,-4,2.6,3.6,0,0,7); g.fill(); g.beginPath(); g.ellipse(0,6,3.8,5.2,0,0,7); g.fill(); P_([[-12,-16],[-8,-11]]); P_([[12,-16],[8,-11]]); break;
     case "wave": for(const y of [-7,1,9]){ g.beginPath(); g.moveTo(-16,y); g.quadraticCurveTo(-8,y-8,0,y); g.quadraticCurveTo(8,y+8,16,y); g.stroke(); } break;
     default: g.font = "800 20px sans-serif"; g.textAlign = "center"; g.fillText("?",0,7);
   }

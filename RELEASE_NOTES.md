@@ -3,11 +3,23 @@
 ## v0.32.0
 
 ### New
+- **Warlock talents reworked:** fewer plain damage bonuses, more effects that change how you play. Your Warlock talent points are refunded so you can choose again.
+  - **Affliction:** Improved Life Tap, Fel Concentration (less casting time lost when hit), Nightfall (Corruption and Curse of Agony can make your next Shadow Bolt instant), Soul Siphon (your damage over time heals you) and Unstable Affliction (a new damage-over-time spell that spreads to a nearby enemy when the target dies).
+  - **Demonology:** Fel Domination (faster summoning), Soul Link (your demon takes 20% of the damage you take) and Master Demonologist (more damage with the Imp, less damage taken with the Voidwalker).
+  - **Destruction:** Cataclysm (cheaper Destruction spells), Backlash (being hit can make your next Shadow Bolt or Soul Fire instant), Shadowburn (a new instant finisher), Aftermath (Rain of Fire slows) and Conflagrate (a new spell that hits hard on a target burning with Immolate).
+- **Mage – Polymorph** (level 8, from the class trainer): transforms an enemy into a sheep for 1 min. The sheep cannot attack and regenerates health quickly. Any damage breaks the effect. Only one target at a time, no cooldown.
+- **Warlock – Fear** (level 8, from the class trainer): the enemy runs away in terror in random directions for 8 sec. 25 sec cooldown.
+  - Bosses are immune to both.
 - **Accounts use e-mail:** create an account and log in with your e-mail and password.
   - **Forgot password?** on the login screen sends a link for choosing a new password.
   - Accounts made with only a name still log in with that name. Choose **Add e-mail** on the character screen and click the link in the mail. After that, you log in with the e-mail, and your characters stay the same.
 
 ### Changed
+- **Class balance** (from the balance test at level 30):
+  - All mana costs are lower, so casters no longer run out of mana in long fights.
+  - Less damage for Warrior, Rogue, Mage, Priest, Druid and Hunter, which were well ahead of the other classes.
+  - Hunter – Mortal Shots: critical strike damage increased by 5% per rank (was 10%).
+- **Balance test:** shows how much mana is left after each fight, and the test Hunter now steps back out of minimum range when the pet holds the monster.
 - **Turning with the mouse:** holding the right mouse button and moving the mouse now turns your character as well as the camera, as in WoW. Your arrow on the world map turns with it.
   - While turning this way, A and D strafe sideways with a side-step run, W with A or D runs diagonally, and S backs off facing forward.
 - **Minimap:** N, E, S and W round the edge show the directions and turn with the camera.
@@ -15,10 +27,13 @@
 - **Warlock – Imp:** Scorch is gone. The Imp's ability on the pet bar is now **Firebolt**, which you can switch on or off.
   - Firebolt has a 1.5 sec cast (was 1.6) and deals the same damage as before. Its damage grows with your Intellect.
 - **Pet bar:** pet abilities that are switched on have a glowing ring. The "OFF" label and the "is now on/off" message are gone.
+- **Health and mana out of combat:** regeneration is much slower while standing (about 1.5 min from empty to full). Sitting down with **Rest** fills you up in about 15 sec. Health and mana now come in a tick every 3 sec. Mana regeneration in combat is lower than before (1.5% every 3 sec).
 - **Walking through things:** you can now walk through people, campfires, braziers, poles and small props like barrels and crates. Buildings, tents, walls, fountains, rocks and trees still block the way.
+- **Spellbook:** the list of abilities you have not learned yet is gone. The class trainer shows them.
 - **Tooltips:** shorter and cleaner. Pet abilities show their cost, cast time and cooldown on their own line, like other abilities, and instructions such as "Select the friend first" and "Use again to return to normal form" are removed.
 
 ### Fixed
+- Monsters no longer appear squeezed into narrow gaps between cliffs, where they got stuck and could not be defeated (such as a Sand Golem in Dust Canyon).
 - **Warlock – Imp:** the Imp no longer looks like it shoots twice. Its shooting animation now plays only when the Firebolt leaves.
 
 ## v0.31.0

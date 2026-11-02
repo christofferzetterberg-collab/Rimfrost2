@@ -12,7 +12,7 @@ import {preloadBuildings} from "./buildings.js";
 import {preloadKit} from "./dgkit.js";
 import * as ACC from "./account.js";
 import {preloadBeasts} from "./beasts.js";
-import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount} from "./models.js";
+import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount, makeSheep} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
 import {P, S, mobs, PXU} from "./state.js";
 import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, abIcon, drawIcon} from "./rimdata.js";
@@ -206,7 +206,15 @@ function lairSpot(l){ for(let k = 0; k < 24; k++){ const a = 1.57 + k * 0.52, rr
   if(!nearAny(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.3) && reachable(x, z)) return {x, z}; } return {x: l.x, z: l.z + 2.6}; }
 // dungeon monsters are tougher than those outside
 const DG_HP = 1.6, DG_DMG = 1.3, GROUP_HP = 0.7, GROUP_DMG = 0.1;
-function makeMob(kind, p, lvl, r){ const K = KINDS[kind];
+// a monster needs room around it: a spot squeezed between cliffs (a narrow crevice) leaves it stuck where nobody can fight it
+function roomy(x, z){ if(x > 500) return true; if(!reachable(x, z)) return false;
+  for(let k = 0; k < 8; k++){ const a = k * Math.PI / 4; if(!reachable(x + Math.cos(a) * 2.5, z + Math.sin(a) * 2.5)) return false; } return true; }
+// the nearest roomy spot in the same zone (searched in rings, so it is the same on every computer)
+function roomySpot(p){ const zone = zoneAt(p.x, p.z);
+  for(let rr = 1; rr <= 24; rr++) for(let k = 0; k < 16; k++){ const a = k * Math.PI / 8, x = p.x + Math.cos(a) * rr, z = p.z + Math.sin(a) * rr;
+    if(zoneAt(x, z) === zone && !hubAt(x, z) && roomy(x, z) && !blocked(x, z, x, z, 0.7)) return {x, z}; }
+  return p; }
+function makeMob(kind, p, lvl, r){ const K = KINDS[kind]; if(!roomy(p.x, p.z)) p = roomySpot(p);
   const m = withPx({kind, K, name: K.name, lvl, elite: K.elite, boss: K.boss, dg: K.dg, novaT: K.nova ? K.nova.every : 0, nova: null, x: p.x, z: p.z, hx: p.x, hz: p.z, rot: r() * 6.28, r: K.r, mesh: K.make(), walk: 0, moving: false,
     maxHp: Math.round((30 + lvl * 18 + lvl * lvl * 1.2) * K.hp * (K.dg ? DG_HP : 1)), dmg: (3 + lvl * 2.4) * K.dmg * (K.dg ? DG_DMG : 1), state: "idle", dead: false, wanderT: r() * 4, wx: null, wz: null, atkT: 1, attackAnim: 0, lastHit: 0, deadT: 0, flash: 0,
     dots: [], slowT: 0, slowPct: 0, rootT: 0, stunT: 0, path: null, inScene: false});
@@ -371,7 +379,7 @@ const SPECIALS = {
   attack:  {name: "Attack", icon: "sword", color: "#b0763a", desc: "Starts or stops attacking your target."},
   pothp:   {name: "Healing Potion", icon: "flask", color: "#d8404a", desc: "Drinks your best healing potion. Potions share a 20 sec cooldown."},
   potmana: {name: "Mana Potion", icon: "flask", color: "#3f7fe0", desc: "Drinks your best mana potion. Potions share a 20 sec cooldown."},
-  rest:    {name: "Rest", icon: "halo", color: "#7fa8b8", desc: "Sit down to regenerate health and mana 2.5× faster. Out of combat only."},
+  rest:    {name: "Rest", icon: "halo", color: "#7fa8b8", desc: "Sit down to regenerate health and mana quickly. Out of combat only."},
   mount:   {name: "Mount", icon: "paw", color: "#b08a5a", desc: "Summons your mount, increasing movement speed by 60%. Out of combat only. Cannot be used in dungeons."}
 };
 const formKey = () => S.cur.cls === "druid" && P.form ? P.form : "normal";
@@ -523,7 +531,6 @@ function renderPanel(){
       h += `</div>`; }
     { const rid = RACIAL[c.race]; if(rid) h += `<h3>Racial</h3><div class="book"><div class="bk" draggable="true" data-drag="${rid}" data-tipab="${rid}"><canvas width="36" height="36" data-icon="${rid}"></canvas><span>${AB[rid].name}</span></div></div>`; }
     h += `<h3>Other</h3><div class="book">`; for(const x in SPECIALS) if(x !== "mount" || c.riding) h += `<div class="bk" draggable="true" data-drag="${x}" data-tipab="${x}"><canvas width="36" height="36" data-icon="${x}"></canvas><span>${SPECIALS[x].name}</span></div>`; h += `</div>`;
-    const later = Q.trainable(); if(later.length) h += `<h3>Not learned yet</h3><div class="muted">${later.map(id => `${AB[id].name} (level ${AB[id].lvl})`).join(", ")} – learn them from your class trainer.</div>`;
   } else if(panelTab === "keys"){
     h += `<div class="row" style="justify-content:space-between;margin:4px 0"><span class="muted">Click a key, then press the new one. Backspace removes it, Esc cancels.</span><button class="sbtn" data-act="resetkeys">${sureId === "resetkeys" ? "Sure?" : "Reset all"}</button></div>`;
     for(const [group, list] of K.groupsFor(c.cls)){ h += `<h3>${group}</h3>`;
@@ -1006,8 +1013,10 @@ function updMob(m, dt){
     const c = CO.mobTarget(m); if(!c){ evade(m); return; }                                   // nobody left to fight
     const tg = c.e, toPet = !!c.pet; m.tgtPet = toPet; m.tgtId = c.id;                        // you, a friend, or a pet – whoever holds the monster's attention
     if(c.me || c.mine) P.combatT = Math.max(P.combatT, 2);
-    if(Math.hypot(m.x - m.hx, m.z - m.hz) > 40 || (now - m.lastHit > 10 && distU(m, tg) > 30)){ evade(m); if(c.me) log(`${m.name} is evading.`, "#93a4ad"); return; }
+    if(!(m.fearT > 0) && (Math.hypot(m.x - m.hx, m.z - m.hz) > 40 || (now - m.lastHit > 10 && distU(m, tg) > 30))){ evade(m); if(c.me) log(`${m.name} is evading.`, "#93a4ad"); return; }
     if(!free) return;                                                                         // stunned
+    if(m.polyT > 0){ sheepTick(m, dt); return; }                                              // Polymorph: a harmless sheep
+    if(m.fearT > 0){ fearRun(m, dt); return; }                                                // Fear: runs away in terror
     const dt2 = distU(m, tg), seen = sees(m, tg), rg = m.K.ranged, reach = rg && !m.nova ? rg.range : m.K.reach + tg.r;   // casters stay at range and throw bolts
     if(m.nova){ m.nova.t -= dt; m.nova.mesh.scale.setScalar(1 - Math.max(0, m.nova.t) / m.K.nova.warn * 0.85); if(m.nova.t <= 0) novaBlast(m); else if(!m.K.nova.atTarget) return; }   // Morvane holds still while his nova builds
     else if(m.K.nova){ m.novaT -= dt; if(m.novaT <= 0 && dt2 < 14){ m.novaT = m.K.nova.every; startNova(m, tg); if(!m.K.nova.atTarget) return; } }
@@ -1022,13 +1031,25 @@ function updMob(m, dt){
       if(rg && dt2 > m.K.reach + tg.r + 0.5) mobBolt(m, c, dm, rg.color);                     // a spell from range
       else CO.mobAttack(m, c, dm, "melee"); }
   } else if(m.state === "return"){
-    m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.5 * dt); m.slowT = m.rootT = m.freezeT = m.stunT = 0;
+    m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.5 * dt); m.slowT = m.rootT = m.freezeT = m.stunT = m.fearT = m.polyT = 0;
     const d = Math.hypot(m.hx - m.x, m.hz - m.z);
     if(d < 0.6){ m.state = "idle"; m.hp = m.maxHp; m.path = null; }
     else if(!moveMob(m, m.hx, m.hz, m.K.speed * 1.3, dt)){ m.x += (m.hx - m.x) / d * m.K.speed * dt; m.z += (m.hz - m.z) / d * m.K.speed * dt; m.moving = true; }   // stuck: slip through
   }
   m.walk = m.moving ? m.walk + dt * (m.state === "chase" ? 10 : 6) : m.walk * 0.85;
 }
+// Fear: the monster runs in a new direction every second or two (the first one away from whoever feared it)
+function fearRun(m, dt){
+  if(m.rootT <= 0){
+    if(m.fearA == null || (m.fearDirT -= dt) <= 0){ const f = m.fearFrom; m.fearA = m.fearA == null && f ? Math.atan2(m.z - f.z, m.x - f.x) + (Math.random() - 0.5) : Math.random() * Math.PI * 2; m.fearDirT = 1 + Math.random() * 1.2; }
+    const sp = m.K.speed * 0.8 * (m.slowT > 0 ? 1 - m.slowPct : 1) * dt, dx = Math.cos(m.fearA), dz = Math.sin(m.fearA);
+    if(tryMove(m, dx * sp, dz * sp)){ m.moving = true; turnTo(m, dx, dz, dt, 10); } else m.fearDirT = 0; }
+  m.walk = m.moving ? m.walk + dt * 10 : m.walk * 0.85; }
+// Polymorph: the sheep grazes, wanders a little and heals quickly
+function sheepTick(m, dt){ m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.1 * dt);
+  if((m.sheepT = (m.sheepT || 0) - dt) <= 0){ m.sheepT = 2 + Math.random() * 3; const a = Math.random() * 6.28; m.swx = m.x + Math.cos(a) * 1.5; m.swz = m.z + Math.sin(a) * 1.5; }
+  if(m.swx != null){ const dx = m.swx - m.x, dz = m.swz - m.z, d = Math.hypot(dx, dz); if(d < 0.2) m.swx = null; else if(tryMove(m, dx / d * 0.9 * dt, dz / d * 0.9 * dt)){ m.moving = true; turnTo(m, dx, dz, dt, 6); } else m.swx = null; }
+  m.walk = m.moving ? m.walk + dt * 6 : m.walk * 0.85; }
 // ranged monsters: a bolt that flies to its target
 const bolts = [], boltGeo = new THREE.SphereGeometry(0.18, 8, 6);
 function mobBolt(m, c, dmg, color){ const b = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({color: new THREE.Color(color)})); b.position.set(m.x, height(m.x, m.z) + 1.5, m.z); scene.add(b); bolts.push({b, m, c, tg: c.e, dmg}); }
@@ -1143,7 +1164,7 @@ const npcPlates = new Map(), signPlates = new Map();
 function npcPlate(n){ let p = npcPlates.get(n); if(!p){ p = document.createElement("div"); p.className = "plate npc"; p.innerHTML = `<div class="mk"></div><span>${n.name}</span><small>&lt;${n.title}&gt;</small>`; hud.appendChild(p); npcPlates.set(n, p); } return p; }
 // buffs and debuffs: small icons with the seconds left, under your frame and the target frame
 const AURA = {   // buff key → ability whose icon it uses
-  shout: "shout", bark: "bark", avenging: "avenging", bubble: "bubble", dash: "dash", hotstreak: "pyroblast",
+  shout: "shout", bark: "bark", avenging: "avenging", bubble: "bubble", dash: "dash", hotstreak: "pyroblast", nightfall: "shadowbolt", backlash: "soulfire",
   ignite: "fireball", deep: "rend", burn: "firearrow", pyro: "pyroblast", sprint: "sprint", bloodrage: "bloodrage", meld: "meld", stoneform: "stoneform",
   stskin: "stoneskin", earthstr: "strengthtotem", heroism: "heroism", lshield: "lshield", slice: "slicedice", evasion: "evasion", adren: "adrenaline", stealth: "stealth",
   immolate: "immolate", corruption: "corruption", agony: "agony", rupture: "rupture", flameshock: "flameshock"};
@@ -1151,7 +1172,7 @@ const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir
 function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good}; }
 function playerAuras(){ const L = [];
   for(const k in P.buffs){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], left: P.buffs[k], good: true});
-    else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : P.buffs[k], true, k === "hotstreak" ? "Hot Streak" : null)); }   // (Stealth has no time limit)
+    else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : P.buffs[k], true, ({hotstreak: "Hot Streak", nightfall: "Nightfall", backlash: "Backlash"})[k] || null)); }   // (Stealth has no time limit)
   for(const h of P.hots) L.push(AB[h.key] ? abAura(h.key, h.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", left: h.left, good: true});
   if(P.shield > 0) L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(P.shield)} left)`, left: P.shieldT, good: true});
   if(P.sitting) L.push({url: iconURL("halo", "#7fa8b8"), name: "Resting", left: null, good: true});
@@ -1161,6 +1182,8 @@ function playerAuras(){ const L = [];
   return L; }
 function targetAuras(m){ const L = [];
   for(const d of m.dots){ const id = AURA[d.key] || (AB[d.key] ? d.key : null); L.push(id ? abAura(id, d.left, false) : {url: iconURL("drop", "#d0453a"), name: d.key, left: d.left, good: false}); }
+  if(m.polyT > 0) L.push({url: iconURL("sheep", "#b89ae8"), name: "Polymorphed", left: m.polyT, good: false});
+  if(m.fearT > 0) L.push({url: iconURL("fear", "#8a5ad0"), name: "Feared", left: m.fearT, good: false});
   if(m.stunT > 0) L.push({url: iconURL("fist", "#e0b050"), name: "Stunned", left: m.stunT, good: false});
   if(m.freezeT > 0) L.push({url: iconURL("snowflake", "#bfe9ff"), name: "Frozen", left: m.freezeT, good: false});
   else if(m.rootT > 0) L.push({url: iconURL("roots", "#a0b860"), name: "Rooted", left: m.rootT, good: false});
@@ -1212,7 +1235,7 @@ function updHUD(dt){
     $("tstate").textContent = fr.gh ? "Spirit" : fr.dead ? "Dead" : ""; }
   else if(t && !t.dead){ tf.hidden = false; $("tname").textContent = t.name; $("tlvl").textContent = "Level " + t.lvl; $("tlvl").style.color = lvlColor(t.lvl);
     $("thpi").style.width = (t.hp / t.maxHp * 100) + "%"; $("thpt").textContent = `${Math.ceil(t.hp)} / ${t.maxHp}`;
-    $("tstate").textContent = t.stunT > 0 ? "Stunned" : t.rootT > 0 ? "Rooted" : t.slowT > 0 ? "Slowed" : t.state === "chase" ? (P.auto ? "Attacking" : "In combat") : t.state === "return" ? "Evading" : "Calm"; }
+    $("tstate").textContent = t.polyT > 0 ? "Polymorphed" : t.fearT > 0 ? "Feared" : t.stunT > 0 ? "Stunned" : t.rootT > 0 ? "Rooted" : t.slowT > 0 ? "Slowed" : t.state === "chase" ? (P.auto ? "Attacking" : "In combat") : t.state === "return" ? "Evading" : "Calm"; }
   else tf.hidden = true;
   // cast bar
   const cb = $("cast");
@@ -1397,7 +1420,7 @@ function update(dt){
   { const rs = CO.visible(), reg0 = curDungeon();
     for(const m of mobs){ const d = Math.hypot(m.x - P.x, m.z - P.z), dr = rs.length ? Math.min(...rs.map(r => Math.hypot(m.x - r.x, m.z - r.z))) : 1e9;
       m.far = Math.min(d, dr) > 110 && m.state === "idle"; const show = running && d < (P.ghost ? GHOST_SIGHT : GFX.view) && dungeonAt(m.x) === reg0;
-      if(show !== m.inScene){ m.inScene = show; if(show) scene.add(m.mesh); else scene.remove(m.mesh); } } }
+      if(show !== m.inScene){ m.inScene = show; if(show) scene.add(m.mesh); else scene.remove(m.mesh); if(m.sheep){ if(show) scene.add(m.sheep); else scene.remove(m.sheep); } } } }
   for(const m of mobs) updMob(m, dt); separate();
   if(running && !inCrypt() && (exploreT -= dt) <= 0){ exploreT = 0.4; Q.questExplore(P.x, P.z); }
   if(running) G.updPet(dt, blocked, tryMove, turnTo);
@@ -1435,7 +1458,13 @@ function update(dt){
   { const pt = G.getPet(); if(pt){ pt.mesh.visible = !(pt.dead && pt.deadT > 3); pt.mesh.position.set(pt.x, height(pt.x, pt.z), pt.z); pt.mesh.rotation.set(0, pt.rot, pt.dead ? Math.min(1.4, pt.deadT * 4) : 0);
     pt.mesh.userData.animate(pt.walk, pt.moving, pt.attackAnim); } }
   frameNo++;
-  for(const m of mobs){ if(!m.inScene || (m.dead && m.deadT > 4)) continue; m.mesh.position.set(m.x, height(m.x, m.z), m.z); m.mesh.rotation.y = m.rot;
+  for(const m of mobs){
+    // Polymorph: the monster is shown as a sheep (and back again when it breaks)
+    const sheep = m.polyT > 0 && !m.dead;
+    if(sheep && !m.sheep){ m.sheep = makeSheep(); m.sheep.traverse(o => { if(o.isMesh) o.userData.mob = m; }); if(m.inScene) scene.add(m.sheep); m.mesh.visible = false; G.burst(m.px, m.py, "#e8d8ff", 12); }
+    else if(!sheep && m.sheep){ scene.remove(m.sheep); m.sheep = null; if(!m.dead) m.mesh.visible = true; G.burst(m.px, m.py, "#e8d8ff", 12); }
+    if(m.sheep){ m.sheep.position.set(m.x, height(m.x, m.z), m.z); m.sheep.rotation.y = m.rot; m.sheep.userData.animate(m.walk, m.moving, 0); continue; }
+    if(!m.inScene || (m.dead && m.deadT > 4)) continue; m.mesh.position.set(m.x, height(m.x, m.z), m.z); m.mesh.rotation.y = m.rot;
     if(!m.dead && !m.moving && m.attackAnim <= 0 && Math.hypot(m.x - P.x, m.z - P.z) > 30 && (frameNo + m.mesh.id) % 2) continue;   // far, idle monsters animate every other frame
     m.mesh.userData.animate(m.walk, m.moving, m.attackAnim, null, {dead: m.dead, kind: m.mesh.userData.caster ? "cast" : "melee"});
     m.mesh.traverse(o => { if(o.isMesh){ if(m.flash > 0 && !o.userData.fl){ o.userData.fl = o.material; o.material = o.material.clone(); if(o.material.emissive) o.material.emissive.setHex(0x883322); } else if(m.flash <= 0 && o.userData.fl){ o.material = o.userData.fl; o.userData.fl = null; } } }); }

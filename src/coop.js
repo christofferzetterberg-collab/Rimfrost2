@@ -184,7 +184,7 @@ function hostOp(d){ const m = mobByNid(d.nid); if(!m || m.dead) return; const a 
     if(d.op === "dmg"){ hostPetAtk = !!a[3]; hostThMult = a[4] || 1; G.damageMob(m, a[0], a[1], a[2]); hostPetAtk = false; hostThMult = 1; }
     else if(d.op === "taunt") hostTaunt(m, d.from + ":pet");
     else if(d.op === "dot") G.dot(m, a[0], a[1], a[2], a[3], true, true);
-    else if(d.op === "slow") G.slow(m, a[0], a[1]); else if(d.op === "root") G.root(m, a[0], a[1]); else if(d.op === "stun") G.stun(m, a[0]); else if(d.op === "curse") G.curse(m, a[0]); }); }
+    else if(d.op === "slow") G.slow(m, a[0], a[1]); else if(d.op === "root") G.root(m, a[0], a[1]); else if(d.op === "stun") G.stun(m, a[0]); else if(d.op === "fear") G.fear(m, a[0], a[1], a[2]); else if(d.op === "poly") G.polymorph(m, a[0]); else if(d.op === "curse") G.curse(m, a[0]); }); }
 let hostPetAtk = false, hostThMult = 1;
 const PET_THREAT = {bear: [4, 0.8], wolf: [0.5, 1], imp: [0.4, 1], voidwalker: [4.5, 0.8]};
 export function threat(m, amt, petAtkLocal, mult = 1){
@@ -263,7 +263,7 @@ function hostMobs(){ const rs = Object.values(COOP.remotes); if(!rs.length) retu
     if(!rs.some(r => reg(r.x) === reg(m.x) && Math.hypot(r.x - m.x, r.z - m.z) < 90)) continue;
     out.push([m.nid, +m.x.toFixed(2), +m.z.toFixed(2), Math.round(m.hp), ST[m.state] || 0, m.dead ? 1 : 0, +m.rot.toFixed(2), m.moving ? 1 : 0, m.tgtId || 0,
       m.nova ? [+m.nova.t.toFixed(2), +m.nova.x.toFixed(1), +m.nova.z.toFixed(1)] : 0, +m.stunT.toFixed(1), +m.rootT.toFixed(1), +m.slowT.toFixed(1), m.dots.map(d => [d.key, d.left]), +(m.attackAnim || 0).toFixed(2), m.slowPct || 0, m.maxHp, m.state === "chase" && m.threat ? Object.entries(m.threat).map(([k, v]) => [k, Math.round(v)]) : 0, +(m.freezeT || 0).toFixed(1),
-      m.zones && m.zones.length ? m.zones.map(z => [+z.x.toFixed(1), +z.z.toFixed(1), +z.t.toFixed(2)]) : 0, (m.enraged ? 1 : 0) + (m.phase || 0) * 2]); }
+      m.zones && m.zones.length ? m.zones.map(z => [+z.x.toFixed(1), +z.z.toFixed(1), +z.t.toFixed(2)]) : 0, (m.enraged ? 1 : 0) + (m.phase || 0) * 2, +(m.fearT || 0).toFixed(1), +(m.polyT || 0).toFixed(1)]); }
   broadcast({t: "mobs", m: out}); }
 function applyMobs(list){
   for(const s of list){ const m = mobByNid(s[0]); if(!m) continue;
@@ -273,7 +273,7 @@ function applyMobs(list){
     if(s[5] && !wasDead){ m.dead = true; m.state = "dead"; m.deadT = 0; m.dots = []; if(P.target === m){ P.target = null; P.auto = false; } G.burst(m.px, m.py, "#d9c49a", 10); }
     else if(!s[5] && wasDead){ H.respawnVis(m); }
     if(!s[5]){ m.dead = false; m.state = ["idle", "chase", "return"][s[4]]; }
-    m.trot = s[6]; m.moving = !!s[7]; m.tgtId = s[8] || null; m.stunT = s[10]; m.rootT = s[11]; m.slowT = s[12]; m.slowPct = s[15];
+    m.trot = s[6]; m.moving = !!s[7]; m.tgtId = s[8] || null; m.stunT = s[10]; m.rootT = s[11]; m.slowT = s[12]; m.slowPct = s[15]; m.fearT = s[21] || 0; m.polyT = s[22] || 0;
     m.dots = (s[13] || []).map(([key, left]) => ({key, left, per: 0, tick: 1}));
     if(s[14] > (m.attackAnim || 0) + 0.3) m.attackAnim = s[14];
     H.novaVis(m, s[9]); if(m.K.mech){ H.zoneVis(m, s[19] || []); H.bossSync(m, s[20] || 0); }
