@@ -56,9 +56,9 @@ export const QUAL = [
 export const SLOTS = {
   head:{name:"Head", w:0.5}, shoulder:{name:"Shoulders", w:0.4}, chest:{name:"Chest", w:0.6}, hands:{name:"Hands", w:0.35},
   legs:{name:"Legs", w:0.55}, feet:{name:"Feet", w:0.35}, weapon:{name:"Weapon", w:1.0}, offhand:{name:"Off-hand", w:0.4},
-  neck:{name:"Neck", w:0.3}, ring:{name:"Ring", w:0.3}
+  neck:{name:"Neck", w:0.3}, ring:{name:"Ring", w:0.3}, ranged:{name:"Ranged", w:0.5}
 };
-export const SLOT_ORDER = ["head","neck","shoulder","chest","hands","legs","feet","ring","weapon","offhand"];
+export const SLOT_ORDER = ["head","neck","shoulder","chest","hands","legs","feet","ring","weapon","offhand","ranged"];
 // armor types and which classes may use them
 export const ARMOR = {
   cloth:{name:"Cloth", cls:["mage","priest","warlock"], def:0.10},
@@ -68,17 +68,29 @@ export const ARMOR = {
 export const CLASS_ARMOR = {mage:"cloth", priest:"cloth", warlock:"cloth", hunter:"leather", druid:"leather", rogue:"leather", shaman:"leather", warrior:"plate", paladin:"plate"};
 // weapon / offhand types
 export const WTYPES = {
-  sword:{name:"Sword", cls:["warrior","paladin","rogue"], icon:"sword", base:["Longsword","Broadsword","Blade"]},
-  axe:{name:"Axe", cls:["warrior","shaman"], icon:"axeDouble", base:["Battleaxe","Cleaver","Hatchet"]},
+  sword:{name:"Sword", cls:["warrior","paladin","rogue","hunter"], icon:"sword", base:["Longsword","Broadsword","Blade"]},
+  axe:{name:"Axe", cls:["warrior","shaman","hunter"], icon:"axeDouble", base:["Battleaxe","Cleaver","Hatchet"]},
   mace:{name:"Mace", cls:["paladin","shaman"], icon:"hammer", base:["Warhammer","Cudgel","Maul"]},
-  bow:{name:"Bow", cls:["hunter"], icon:"bow", base:["Longbow","Hunting Bow","War Bow"]},
+  bow:{name:"Bow", cls:["hunter","warrior","rogue"], icon:"bow", base:["Longbow","Hunting Bow","War Bow"], ranged:true},
+  rifle:{name:"Rifle", cls:["hunter","warrior","rogue"], icon:"bow", base:["Rifle","Musket","Blunderbuss"], ranged:true},
+  crossbow:{name:"Crossbow", cls:["hunter","warrior","rogue"], icon:"bow", base:["Crossbow","Arbalest","Repeater"], ranged:true},
+  idol:{name:"Idol", cls:["druid"], icon:"wand", base:["Idol","Effigy","Figurine"], ranged:true},
+  relic:{name:"Relic", cls:["paladin"], icon:"wand", base:["Libram","Relic","Reliquary"], ranged:true},
+  totemr:{name:"Totem", cls:["shaman"], icon:"wand", base:["Totem","Fetish","Totem Pole"], ranged:true},
   staff:{name:"Staff", cls:["mage","priest","druid","warlock","shaman"], icon:"upg_wand", base:["Staff","Walking Staff","Runestaff"]},
-  wand:{name:"Wand", cls:["mage","priest","warlock"], icon:"wand", base:["Wand","Scepter"]},
-  dagger:{name:"Dagger", cls:["rogue"], icon:"sword", base:["Dagger","Dirk","Kris"]},
+  wand:{name:"Wand", cls:["mage","priest","warlock"], icon:"wand", base:["Wand","Scepter"], ranged:true},
+  dagger:{name:"Dagger", cls:["rogue","hunter"], icon:"sword", base:["Dagger","Dirk","Kris"]},
   shield:{name:"Shield", cls:["warrior","paladin","shaman"], icon:"shield", base:["Shield","Buckler","Tower Shield"], off:true},
   tome:{name:"Tome", cls:["mage","priest","druid","warlock"], icon:"tome", base:["Tome","Spellbook","Grimoire"], off:true}
 };
-export const CLASS_WEAP = {warrior:["sword","axe"], paladin:["sword","mace"], hunter:["bow"], mage:["staff","wand"], priest:["staff","wand"], druid:["staff"], warlock:["staff","wand"], rogue:["dagger","sword"], shaman:["mace","axe","staff"]};
+export const CLASS_WEAP = {warrior:["sword","axe"], paladin:["sword","mace"], hunter:["sword","axe","dagger"], mage:["staff"], priest:["staff"], druid:["staff"], warlock:["staff"], rogue:["dagger","sword"], shaman:["mace","axe","staff"]};
+// the ranged slot: a bow, rifle or crossbow for fighters, a wand for casters, and an idol, relic or totem for druids, paladins and shamans
+export const CLASS_RANGED = {warrior:["bow","rifle","crossbow"], rogue:["bow","rifle","crossbow"], hunter:["bow","rifle","crossbow"], mage:["wand"], priest:["wand"], warlock:["wand"], druid:["idol"], paladin:["relic"], shaman:["totemr"]};
+// idols, relics and totems also make one of the class's abilities stronger: [ability, "dmg" or "heal"]
+export const RELIC_BONUS = {
+  druid:[["moonfire","dmg"],["wrath","dmg"],["starfire","dmg"],["rejuv","heal"],["touch","heal"],["maul","dmg"],["claw","dmg"]],
+  paladin:[["palstrike","dmg"],["crusader","dmg"],["judge","dmg"],["hammer","dmg"],["consecrate","dmg"],["palheal","heal"]],
+  shaman:[["lightning","dmg"],["chain","dmg"],["earthshock","dmg"],["flameshock","dmg"],["stormstrike","dmg"],["healwave","heal"]]};
 export const CLASS_OFF = {warrior:["shield"], paladin:["shield"], mage:["tome"], priest:["tome"], druid:["tome"], hunter:[], warlock:["tome"], rogue:["dagger","sword"], shaman:["shield"]};
 const ARMOR_BASE = {
   cloth:{head:"Hood", shoulder:"Mantle", chest:"Robe", hands:"Gloves", legs:"Trousers", feet:"Slippers"},
@@ -114,6 +126,7 @@ export function makeGear(opts){
   const it = {id:Math.random().toString(36).slice(2,10), slot, q, il, st:{}};
   if(slot==="weapon") it.wt = pickR(CLASS_WEAP[cls], r);
   else if(slot==="offhand") it.wt = pickR(CLASS_OFF[cls].length ? CLASS_OFF[cls] : ["shield"], r);
+  else if(slot==="ranged") it.wt = pickR(CLASS_RANGED[cls], r);
   else if(slot!=="neck" && slot!=="ring") it.arm = CLASS_ARMOR[cls];
   // stat budget
   let pts = (4 + il*1.15) * QUAL[q].mult * SLOTS[slot].w * 2;
@@ -123,6 +136,8 @@ export function makeGear(opts){
   add("def", pts*defShare); pts *= 1-defShare;
   // weapons: a big helping of the class's damage stat (Strength / Agility for fighters, Spell Power or Spell Damage for casters)
   if(slot==="weapon" || (slot==="offhand" && (it.wt==="dagger" || it.wt==="sword"))){ const fs = cls==="hunter" || cls==="rogue" ? "agi" : "str"; if(role==="phys") add(fs, pts*0.6 * 0.17/0.4*2); else if(role==="caster") add(cls==="priest" ? "sp" : r() < 0.5 ? "sp" : "sd", pts*0.6); else { add(cls==="druid" ? "agi" : "str", pts*0.3 * 0.17/0.4*2); add(cls==="paladin" ? "sh" : "sp", pts*0.3); } pts *= 0.4; }
+  else if(slot==="ranged" && (it.wt==="bow" || it.wt==="rifle" || it.wt==="crossbow")){ add(cls==="warrior" ? "str" : "agi", pts*0.5); pts *= 0.5; }
+  else if(it.wt==="wand"){ add(cls==="priest" ? "sp" : r() < 0.5 ? "sp" : "sd", pts*0.4); pts *= 0.6; }
   else if(it.wt==="tome"){ add(cls==="mage" ? "sd" : cls==="priest" ? "sh" : "sp", pts*0.4); pts *= 0.6; }
   // spread the rest over 1-3 stats (better items get more): always one of the class's main stats first, then others it can use
   const main = CLASS_MAIN[cls], extra = EXTRA[cls], pool = [...main, ...extra];
@@ -133,6 +148,7 @@ export function makeGear(opts){
   // points -> real numbers
   const conv = {str:0.4, agi:0.4, int:0.4, sta:0.3, pow:0.17, sp:0.17, sd:0.17, sh:0.2, hp:2.4, mana:3, crit:0.07, def:0.1};
   for(const k of Object.keys(it.st)){ let v = it.st[k]*conv[k]; v = (k==="crit"||k==="def") ? Math.round(v*10)/10 : Math.round(v); if(v <= 0) delete it.st[k]; else it.st[k] = v; }
+  if(RELIC_BONUS[cls] && slot==="ranged"){ const [ab, kind] = pickR(RELIC_BONUS[cls], r); it.bonus = {ab, kind, v: Math.round((0.06 + q*0.02)*100)/100}; }   // e.g. Moonfire deals 10% more damage
   it.n = gearName(it, r); it.en = 1; it.v = 3;
   addSta(it);
   return it;

@@ -3,6 +3,11 @@
 ## v0.32.0
 
 ### New
+- **Ranged slot:** a new equipment slot for every class. Ranged items drop from monsters, are sold by blacksmiths and can be quest rewards.
+  - **Warrior and Rogue:** bows, rifles and crossbows, with the new **Shoot** ability (30 m, 6 sec cooldown) for pulling monsters to you.
+  - **Hunter:** the bow (or rifle or crossbow) moves to the ranged slot, and the main hand now holds a sword, axe or dagger. Bows you already have move there automatically.
+  - **Mage, Priest and Warlock:** wands move to the ranged slot. **Shoot** fires the wand every 1.5 sec until you move, cast a spell or use Shoot again. Wands you already have move there automatically.
+  - **Druid, Paladin and Shaman:** idols, relics and totems. Besides their stats, each one makes one ability stronger, for example "Increases the damage of Moonfire by 12%".
 - **Two more action bars** along the right edge of the screen. Turn them on or off in the menu (Esc → Right bar 1 / Right bar 2). Fill them from the Spellbook, and give them keys in Key bindings (K).
 - **Placing area spells:** Rain of Fire, Blizzard, Tempest and Meteor Fall are now placed where you choose. Press the spell, move the circle with the mouse, and left-click to cast it there. Right-click or Esc cancels. The circle turns red when the spot is out of range.
 - **Warlock – Drain Life** is now channeled: it drains the target and heals you every second for 8 sec while you stand still. No cooldown. Each hit you take while channeling shortens it by 1 sec.
@@ -28,6 +33,8 @@
   - Accounts made with only a name still log in with that name. Choose **Add e-mail** on the character screen and click the link in the mail. After that, you log in with the e-mail, and your characters stay the same.
 
 ### Changed
+- **Hunter – Mend Pet** and **Warlock – Health Funnel** are now channeled: they heal your pet for 4% of its health every second for 10 sec (40% in all) while you stand still. No cooldown. Health Funnel costs 1.5% of your health each second.
+- **Warlock – Voidwalker:** less health, takes more damage, deals half as much damage and holds enemies a little less firmly. The Imp's Firebolt deals more damage, so the Imp is the choice for damage and the Voidwalker for safety.
 - **Class balance** (from the balance test at level 30):
   - All mana costs are lower, so casters no longer run out of mana in long fights.
   - Less damage for Warrior, Rogue, Mage, Priest, Druid and Hunter, which were well ahead of the other classes.
@@ -46,6 +53,9 @@
 - **Tooltips:** shorter and cleaner. Pet abilities show their cost, cast time and cooldown on their own line, like other abilities, and instructions such as "Select the friend first" and "Use again to return to normal form" are removed.
 
 ### Fixed
+- The threat meter showed the Imp and Voidwalker as "undefined".
+- Small rocks no longer block line of sight. Only rocks taller than the line between you and your target do.
+- Dying while mounted no longer leaves your spirit sitting down as it walks back to your corpse.
 - Monsters no longer appear squeezed into narrow gaps between cliffs, where they got stuck and could not be defeated (such as a Sand Golem in Dust Canyon).
 - **Warlock – Imp:** the Imp no longer looks like it shoots twice. Its shooting animation now plays only when the Firebolt leaves.
 

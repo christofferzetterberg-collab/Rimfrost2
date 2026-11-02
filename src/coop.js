@@ -410,7 +410,7 @@ export function tradeHTML(){
 }
 
 // ---------------------------------------------------------------- threat meter: everyone's threat on a monster, highest first
-const PETNAME = {bear: "Bear", wolf: "Wolf"};
+const PETNAME = {bear: "Bear", wolf: "Wolf", imp: "Imp", voidwalker: "Voidwalker"};
 function thName(id){ const pet = id.endsWith(":pet"), oid = pet ? id.slice(0, -4) : id, me = oid === myId();
   const r = COOP.remotes[oid], who = me ? S.cur.name : r ? r.name : "Unknown";
   if(!pet) return who; const k = me ? (G.getPet() && G.getPet().kind) : r && r.pet && r.pet.k; return `${who}'s ${PETNAME[k] || "Pet"}`; }

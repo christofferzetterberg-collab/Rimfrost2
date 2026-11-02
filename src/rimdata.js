@@ -1,7 +1,7 @@
 // Rimfrost's game data, copied from Rimfrost 1 (races, classes, abilities, action bars, talents and the ability icons).
 // Generated: positions inside the ability code use px/py (Rimfrost pixels), the engine converts to 3D units.
 /* eslint-disable */
-import {P, E, mobs} from "./state.js";
+import {P, E, S, mobs} from "./state.js";
 const pow = (...a) => E.pow(...a);
 const spow = (...a) => E.spow(...a);
 const hpow = () => (E.pow() + E.spow()) / 2;       // paladins: holy strikes grow with both Strength (attack power) and Intellect (spell power)
@@ -327,9 +327,9 @@ Object.assign(AB, {
   dismisspet:{name:"Dismiss Pet", lvl:5, cost:0, cast:5, free:true, needs:"callbear", range:0, school:"nature", icon:"dismiss", tgt:"self",
     desc:()=>`Dismisses your pet. Out of combat only.`,
     check:()=>!E.pet ? "You have no pet" : petFight() ? "You cannot dismiss your pet in combat" : true, run:()=>petDismiss()},
-  mendpet:{name:"Mend Pet", lvl:7, cost:20, cd:12, range:0, school:"nature", icon:"bloom", tgt:"self",
-    desc:()=>`Heals your pet for 40% of its health.`,
-    check:()=>(E.pet && !E.pet.dead) ? true : "You have no pet", run:()=>petMend()},
+  mendpet:{name:"Mend Pet", lvl:7, cost:20, channel:10, range:0, school:"nature", icon:"bloom", tgt:"self",
+    desc:()=>`Heals your pet for 4% of its health every second for 10 sec. You must stand still while channeling.`,
+    check:()=>(E.pet && !E.pet.dead) ? true : "You have no pet", tick:()=>E.petHealTick(0.04)},
   icebarrier:{name:"Ice Barrier", lvl:10, talent:"m_barrier", cost:30, cd:60, range:0, school:"frost", icon:"crystal", tgt:"self",
     desc:()=>`Surrounds you with a barrier of ice that absorbs ${fmt(P.maxHp*0.25+spow()*1.5)} damage. Lasts 1 min.`,
     run:()=>{P.shield=Math.max(P.shield||0,P.maxHp*0.25+spow()*1.5);P.shieldT=60;ring(P.px,P.py,40,"#bfe9ff");burst(P.px,P.py,"#dff6ff",16);}},
@@ -377,10 +377,10 @@ Object.assign(AB, {
   dismissdemon:{name:"Dismiss Demon", lvl:1, cost:0, cast:3, needs:"summonimp", range:0, school:"shadow", icon:"dismiss", tgt:"self",
     desc:()=>`Dismisses your demon. Out of combat only.`,
     check:()=>!E.pet ? "You have no demon" : petFight() ? "You cannot dismiss your demon in combat" : true, run:()=>petDismiss()},
-  healthfunnel:{name:"Health Funnel", lvl:12, cost:0, cd:10, range:0, school:"shadow", icon:"heart", tgt:"self",
+  healthfunnel:{name:"Health Funnel", lvl:12, cost:0, channel:10, range:0, school:"shadow", icon:"heart", tgt:"self",
     check:()=>(E.pet && !E.pet.dead) ? (P.hp/P.maxHp > 0.2 || "Not enough health") : "You have no demon",
-    desc:()=>`Gives ${fmt(P.maxHp*0.15)} of your health to your demon, healing it for 40% of its maximum health.`,
-    run:()=>{P.hp=Math.max(1,P.hp-P.maxHp*0.15);petMend();}},
+    desc:()=>`Gives ${fmt(P.maxHp*0.015)} of your health to your demon every second for 10 sec, healing it for 4% of its maximum health each second. You must stand still while channeling.`,
+    tick:()=>{if(P.hp/P.maxHp<=0.05)return false;P.hp=Math.max(1,P.hp-P.maxHp*0.015);return E.petHealTick(0.04);}},
   weakness:{name:"Curse of Weakness", lvl:14, cost:15, range:300, school:"shadow", icon:"skull", tgt:"enemy",
     desc:()=>`Curses the target, reducing the damage it deals by 20% for 2 min. Only one curse per target.`,
     run:t=>{burst(t.px,t.py,"#6a6a7a",8);curse(t,"weak");}},
@@ -491,6 +491,15 @@ Object.assign(AB, {
   stormstrike:{name:"Stormstrike", lvl:10, talent:"s_storm", cost:20, cd:10, range:52, school:"nature", icon:"bolt", tgt:"enemy",
     desc:()=>`Strikes the target with lightning-charged weapons for ${fmt(hpow()*2.2)} Nature damage.`,
     run:t=>{slash(t);burst(t.px,t.py,"#cfe8ff",14);hit(t,hpow()*2.2,"nature","stormstrike");}},
+  // ---------------- the ranged slot: Shoot (bows, rifles and crossbows for warriors and rogues; wands for mages, priests and warlocks)
+  shoot:{name:"Shoot", lvl:1, cost:0, cd:6, range:690, school:"phys", icon:"arrow", tgt:"enemy",
+    check:()=>["bow","rifle","crossbow"].includes(S.cur&&S.cur.eq&&S.cur.eq.ranged&&S.cur.eq.ranged.wt)||"Requires a bow, rifle or crossbow",
+    desc:()=>`Shoots your ranged weapon at the target for ${fmt(pow()*0.8)} damage. Requires a bow, rifle or crossbow.`,
+    run:t=>proj(t,"#e9e2c8",4,()=>hit(t,pow()*0.8,"phys","shoot"),"arrow")},
+  wand:{name:"Shoot", lvl:1, cost:0, range:690, school:"arcane", icon:"spark", tgt:"enemy",
+    check:()=>(S.cur&&S.cur.eq&&S.cur.eq.ranged&&S.cur.eq.ranged.wt==="wand")||"Requires a wand",
+    desc:()=>`Fires your wand at the target every 1.5 sec, dealing ${fmt(spow()*0.45)} damage per shot, until you move or cast a spell. Use again to stop.`,
+    run:()=>E.wandToggle()},
   // ---------------- abilities taught by talents (talent reworks)
   presence:{name:"Presence of Mind", lvl:10, talent:"m_presence", cost:0, cd:90, range:0, school:"arcane", icon:"eye", tgt:"self", offGcd:true,
     desc:()=>`Your next spell with a cast time is instant.`, run:()=>{buff("presence",30);ring(P.px,P.py,40,"#c8a8ff");}},
@@ -575,17 +584,17 @@ Object.assign(AB, {
 });
 
 export const BARS = {
-  mage:["fireball","frostbolt","fireblast","frostnova","polymorph","blizzard","pyroblast","sparkrain","icearmor","meteor","icebarrier","presence","arcanepower","combustion","coldsnap","deepfreeze"],
-  warrior:["heroic","charge","shout","rend","whirlwind","execute","shieldbash","secondwind","quake","sweeping","mortalstrike","recklessness","laststand","shieldwall"],
+  mage:["fireball","frostbolt","fireblast","frostnova","polymorph","blizzard","pyroblast","sparkrain","icearmor","meteor","icebarrier","presence","arcanepower","combustion","coldsnap","deepfreeze","wand"],
+  warrior:["heroic","charge","shout","rend","whirlwind","execute","shieldbash","secondwind","quake","sweeping","mortalstrike","recklessness","laststand","shieldwall","shoot"],
   hunter:["steady","raptor","wingclip","firearrow","icearrow","disengage","multishot","aimed","poison","snare","stormarrow","callbear","dismisspet","mendpet","callwolf","intimidate","bestialwrath","rapidfire","chimera","counter","explosive"],
-  priest:["smite","heal","swp","pws","mindblast","holynova","renew","darkpulse","judgment","resurrection","innerfocus","powerinf","painsupp","desperate","guardian","voideruption"],
+  priest:["smite","heal","swp","pws","mindblast","holynova","renew","darkpulse","judgment","resurrection","innerfocus","powerinf","painsupp","desperate","guardian","voideruption","wand"],
   druid:["wrath","touch","moonfire","rejuv","roots","starfire","hurricane","bark","bloom","bear","cat","leopard","revive","starsurge","nswift","tranquility"],
   druid_bear:["maul","swipe","frenzy","bash","roar","bear","cat","leopard","berserk"],
   druid_cat:["claw","rake","bite","dash","pounce","bear","cat","leopard","berserk"],
   druid_leopard:["leopard","bear","cat"],
   paladin:["palstrike","palheal","hammer","holyshield","crusader","consecrate","avenging","bubble","judge","redemption","divinefavor","holyshock","avengershield","divinestorm"],
-  warlock:["shadowbolt","summonimp","immolate","corruption","fear","agony","lifetap","drainlife","summonvoid","healthfunnel","weakness","rainfire","soulfire","deathcoil","dismissdemon","demonfrenzy","unstable","shadowburn","conflagrate"],
-  rogue:["sinister","eviscerate","stealth","gouge","backstab","slicedice","rupture","evasion","ambush","fanknives","kidney","vanish","adrenaline","coldblood","bladeflurry","premed","shadowdance"],
+  warlock:["shadowbolt","summonimp","immolate","corruption","fear","agony","lifetap","drainlife","summonvoid","healthfunnel","weakness","rainfire","soulfire","deathcoil","dismissdemon","demonfrenzy","unstable","shadowburn","conflagrate","wand"],
+  rogue:["sinister","eviscerate","stealth","gouge","backstab","slicedice","rupture","evasion","ambush","fanknives","kidney","vanish","adrenaline","coldblood","bladeflurry","premed","shadowdance","shoot"],
   shaman:["lightning","healwave","earthshock","searing","flameshock","stoneskin","hstream","lshield","chain","frostshock","strengthtotem","magma","heroism","stormstrike","elemmastery","ancswift","manatide"]
 };
 

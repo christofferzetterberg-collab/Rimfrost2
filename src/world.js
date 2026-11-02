@@ -173,7 +173,7 @@ let SCENE = null;
 // place a group at (x, z) on the ground, turned rot; local offsets turn with it
 function place(g, x, z, rot = 0, dy = 0){ g.position.set(x, height(x, z) + dy, z); g.rotation.y = rot; SCENE.add(g); return g; }
 const turn = (x, z, rot, dx, dz) => ({x: x + dx * Math.cos(rot) + dz * Math.sin(rot), z: z - dx * Math.sin(rot) + dz * Math.cos(rot)});
-function solid(x, z, r, los = false){ colliders.push({x, z, r, los}); }
+function solid(x, z, r, los = false, h = 0){ colliders.push({x, z, r, los, h}); }   // h: how tall it is (0 = blocks sight at any height)
 // small things you walk through (campfires, braziers, props, poles): kept only so nothing is placed on top of them
 export const decor = [];
 function soft(x, z, r){ decor.push({x, z, r}); }
@@ -391,7 +391,7 @@ function buildProps(){
         if(kind === "pine" || kind === "snowpine") T.cone.push([px, y, pz, sc, kind === "snowpine" ? 0xdfe8e4 : t === "rock" || t === "highland" ? 0x3a5a3a : 0x2a5a34]);
         else T.crown.push([px, y, pz, sc, kind === "birch" ? 0x9ac860 : kind === "violet" ? 0x7a5aa8 : 0x4f8f3a]); }
       solid(px, pz, 0.45 * sc); continue; }
-    if(r() < D[1] * area && ok(px, pz, 2.5)){ const sc = 0.6 + s; T.rock.push([px, height(px, pz) + 0.2, pz, sc, ROCK_COL[t] || 0x8a8d91]); solid(px, pz, 0.75 * sc, s > 0.55); continue; }
+    if(r() < D[1] * area && ok(px, pz, 2.5)){ const sc = 0.6 + s; T.rock.push([px, height(px, pz) + 0.2, pz, sc, ROCK_COL[t] || 0x8a8d91]); solid(px, pz, 0.75 * sc, s > 0.55, 1.05 * sc); continue; }   // (a rock only blocks sight where it is taller than the line of sight)
     if(D[2] && r() < D[2] * area && ok(px, pz, 2.5)){ const sc = 0.7 + s * 0.8; T.spike.push([px, height(px, pz), pz, sc, t === "ash" ? 0x1a1420 : 0xbfe6ff]); solid(px, pz, 0.45 * sc); continue; }
     if(t === "swamp"){ const h = height(px, pz); if(h > 0.05 && h < 0.7 && r() < 0.5) T.reed.push([px, h, pz, 0.7 + s * 0.8, 0x8a8a4a]); }
   }
@@ -440,5 +440,5 @@ export function los(ax, ay, az, bx, by, bz){
   const d = Math.hypot(bx - ax, bz - az), n = Math.max(2, Math.ceil(d / 0.6));
   for(let i = 1; i < n; i++){ const t = i / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t, y = ay + (by - ay) * t;
     if(height(x, z) > y) return false;
-    for(const c of nearColliders(x, z)){ if(!c.los) continue; const dx = x - c.x, dz = z - c.z; if(dx*dx + dz*dz < c.r * c.r * 0.8) return false; } }
+    for(const c of nearColliders(x, z)){ if(!c.los || (c.h && y > height(c.x, c.z) + c.h)) continue; const dx = x - c.x, dz = z - c.z; if(dx*dx + dz*dz < c.r * c.r * 0.8) return false; } }
   return true; }

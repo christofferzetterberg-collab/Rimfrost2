@@ -317,6 +317,10 @@ function play(c){
   let moved = false; if(c.world !== 2){ const sp = spawnFor(c.race); c.x = sp.x; c.z = sp.z; c.quests = {}; c.qbag = {}; delete c.pick; c.world = 2; moved = true; }   // a character from the old map: home town, fresh quest log
   for(const m of mobs) respawn(m);
   for(const it of [...Object.values(c.eq || {}), ...(c.gear || [])]) upgradeGear(it, c.cls);   // old gear gets the new stats
+  // the ranged slot: bows and wands move there from the main hand, and everyone who can shoot knows Shoot
+  for(const it of [...Object.values(c.eq || {}), ...(c.gear || [])]) if(it && it.slot === "weapon" && (it.wt === "bow" || it.wt === "wand")) it.slot = "ranged";
+  if(c.eq && c.eq.weapon && c.eq.weapon.slot === "ranged"){ const it = c.eq.weapon; delete c.eq.weapon; if(!c.eq.ranged) c.eq.ranged = it; else (c.gear || (c.gear = [])).push(it); }
+  for(const id of ["shoot", "wand"]) if(BARS[c.cls] && BARS[c.cls].includes(id) && c.learned && !c.learned.includes(id)) c.learned.push(id);
   for(const t of TALENTS[c.cls] || []) if(t.grants && c.talents && c.talents[t.id] && c.learned && !c.learned.includes(t.grants)) c.learned.push(t.grants);   // talents that now teach an ability (Ice Barrier)
   const talReset = G.migrateTalents();
   G.clearFx(); G.resetPlayer(c.x ?? SPAWN.x, c.z ?? SPAWN.z); setGhost(false); $("ghostbar").hidden = true; closeChat();
@@ -496,7 +500,7 @@ document.querySelectorAll("#gmenu [data-g]").forEach(b => b.onclick = () => { co
 document.querySelectorAll("#panel .tabs button[data-tab]").forEach(b => b.onclick = () => togglePanel(b.dataset.tab));
 document.querySelector("#panel .tabs .x").onclick = closePanel;
 // item pictures, drawn once per kind and quality
-const GEAR_GLYPH = {dagger: "dagger", sword: "sword", axe: "axe", mace: "hammer", bow: "arrow", staff: "star", wand: "spark", shield: "shield", tome: "mind",
+const GEAR_GLYPH = {dagger: "dagger", sword: "sword", axe: "axe", mace: "hammer", bow: "arrow", rifle: "aim", crossbow: "multi", staff: "star", wand: "spark", shield: "shield", tome: "mind", idol: "leaf", relic: "cross", totemr: "totem",
   head: "halo", shoulder: "shield", chest: "shield", hands: "fist", legs: "boot", feet: "boot", neck: "bubble", ring: "nova"};
 const icoCache = new Map();
 function iconURL(icon, color){ const k = icon + color; if(!icoCache.has(k)){ const cv = document.createElement("canvas"); cv.width = cv.height = 64; drawIcon(cv, icon, color); icoCache.set(k, cv.toDataURL()); } return icoCache.get(k); }
@@ -510,7 +514,7 @@ function statLines(it, cmp){
     return v ? `+${v}${unit} ${STAT_NAME[k]}${diff}` : `<span class="muted">${STAT_NAME[k]}${diff}</span>`; }).join("<br>");
 }
 function gearTip(it){ const c = S.cur, cur = c.eq[it.slot], cmp = cur && cur !== it ? cur : null, ok = canWear(it, c.cls);
-  return `<h4 style="color:${QUAL[it.q].color}">${it.n}</h4><div class="m">${QUAL[it.q].name} · ${SLOTS[it.slot].name} · ${gearTypeName(it)}</div>${statLines(it, cmp)}
+  return `<h4 style="color:${QUAL[it.q].color}">${it.n}</h4><div class="m">${QUAL[it.q].name} · ${SLOTS[it.slot].name} · ${gearTypeName(it)}</div>${statLines(it, cmp)}${it.bonus && AB[it.bonus.ab] ? `<div style="color:#7be08a;margin-top:4px">Equip: Increases the ${it.bonus.kind === "heal" ? "healing" : "damage"} of ${AB[it.bonus.ab].name} by ${Math.round(it.bonus.v * 100)}%.</div>` : ""}
     <div class="m" style="margin-top:4px">${ok ? "" : `<span style="color:#ff6b5e">Cannot be used by ${CLASSES[c.cls].name}s. </span>`}<span style="color:${c.level >= it.il ? "" : "#ff6b5e"}">Requires level ${it.il}</span>${cmp ? ` · compared to ${cmp.n}` : ""}</div>`; }
 function showTipAt(e, html){ const t = $("tip"); t.innerHTML = html; t.hidden = false; t.style.left = clamp(e.clientX - 300, 8, innerWidth - 290) + "px"; t.style.top = clamp(e.clientY - 20, 8, innerHeight - t.offsetHeight - 8) + "px"; }
 const pct = v => (Math.round(v * 1000) / 10) + "%";
@@ -897,7 +901,7 @@ Q.initQuests({shareExplore: CO.shareExplore, log, err, banner, save, refresh, bu
 const selRing = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.95, 28), new THREE.MeshBasicMaterial({color: 0xff4a3a, transparent: true, opacity: 0.85, depthWrite: false}));
 selRing.rotation.x = -Math.PI / 2; selRing.visible = false; scene.add(selRing);
 function cycleTarget(){ CO.select(null); const list = mobs.filter(m => !m.dead && distU(P, m) < 30 && sees(P, m)).sort((a, b) => distU(P, a) - distU(P, b)); if(!list.length){ P.target = null; return; } const i = list.indexOf(P.target); P.target = list[(i + 1) % list.length]; }
-function startAttack(m){ if(m || !P.target) CO.select(null); m = m || (P.target && !P.target.dead ? P.target : null) || G.nearestEnemy(25); if(!m) return err("No enemy nearby"); if(P.dead) return; dismount(); if(P.form === "leopard") return err("You cannot attack in Travel Form");
+function startAttack(m){ P.wandOn = false; if(m || !P.target) CO.select(null); m = m || (P.target && !P.target.dead ? P.target : null) || G.nearestEnemy(25); if(!m) return err("No enemy nearby"); if(P.dead) return; dismount(); if(P.form === "leopard") return err("You cannot attack in Travel Form");
   P.target = m; P.auto = true; P.dest = null; marker.visible = false; if(!G.inMeleeOrRange(m)) err("Too far away"); }
 
 // ---------------------------------------------------------------- input (keys can be changed in the Key bindings window)

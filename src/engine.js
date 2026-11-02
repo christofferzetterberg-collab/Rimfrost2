@@ -65,8 +65,10 @@ export const pow = () => 6 + C().level * 2.6 + gearStat("pow") + strAP() + agiAP
 export const spow = () => (6 + C().level * 2.6 + gearStat("sp") + intSP() + (HEALING ? 0 : gearStat("sd"))) * (P.buffs.sage ? 1.2 : 1);
 // how much stronger your heals are: spell healing and spell power on gear, Intellect, and healing talents
 export const healMult = () => sickM() * (1 + teff("heal") + (gearStat("sh") + gearStat("sp") * 0.5 + intSP()) / (40 + 8 * C().level))
-  * (P.buffs && P.buffs.powerinf ? 1.2 : 1) * ((CUR_AB === "heal" || CUR_AB === "renew") ? 1 + 0.05*T("p_empower") : 1);   // Power Infusion, Empowered Healing
+  * (P.buffs && P.buffs.powerinf ? 1.2 : 1) * ((CUR_AB === "heal" || CUR_AB === "renew") ? 1 + 0.05*T("p_empower") : 1) * (1 + relicBonus(CUR_AB));   // Power Infusion, Empowered Healing
 let CUR_AB = null;                           // the ability being used right now
+// an idol, relic or totem in the ranged slot that makes this ability stronger
+export function relicBonus(ab){ const r = ab && C() && C().eq && C().eq.ranged; return r && r.bonus && r.bonus.ab === ab ? r.bonus.v : 0; }
 function genMult(){ let m = (1 + teff("dmg")) * (CLASS_DMG[C().cls] || 1) * PLAYER_DMG; if(C().race === "orc") m *= 1.03; if(P.buffs.bloodrage) m *= 1.2; if(P.buffs.shout) m *= 1.15; if(P.buffs.elixir) m *= 1.2;
   if(P.buffs.avenging) m *= 1.2; if(P.buffs.heroism) m *= 1.2; if(P.buffs.earthstr) m *= 1.1; 
   if(T("wl_master") && pet && !pet.dead && pet.kind === "imp") m *= 1 + 0.03*T("wl_master");   // Master Demonologist with the Imp
@@ -85,6 +87,7 @@ export function tmul(ab, school){
   if(cls === "rogue"){ if(ab === "eviscerate" || ab === "rupture") m *= 1 + 0.1*T("r_evisc"); if(ab === "ambush" || ab === "backstab") m *= 1 + 0.1*T("r_opp"); }
   if(cls === "shaman" && (ab === "searing" || ab === "magma")) m *= 1 + 0.1*T("s_flame");
   if(school) m *= 1 + teff(school); if(P.form) m *= 1 + teff("form");                // specialization talents
+  m *= 1 + relicBonus(ab);                                                              // an idol, relic or totem
   return m;
 }
 export function critChance(m, school){
@@ -381,7 +384,7 @@ export function playerDamage(raw, src, kind = "melee"){
 }
 function die(){
   if(P.mount) H.dismount();
-  P.dead = true; P.casting = null; P.auto = false; P.dash = null; P.leap = null; P.dest = null; P.hots = []; P.sitting = false;
+  P.dead = true; P.casting = null; P.pose = null; P.auto = false; P.dash = null; P.leap = null; P.dest = null; P.hots = []; P.sitting = false;
   petLost();                                                                    // your pet or demon goes with you; call it again once you are back
   if(P.form) { P.form = null; recompute(false); H.onForm(); H.buildBar(); }
   for(const m of mobs) if(m.state === "chase") m.state = "return";
@@ -402,6 +405,7 @@ export function tryUse(id, at){
     if(P.form && !a.form && !a.res && !a.racial && !a.anyForm) return H.err("Return to your normal form first"); }
   if(!a.offGcd && P.gcd > 0) return;
   if((P.cds[id] || 0) > 0) return H.err("Not ready yet");
+  if(P.wandOn && id !== "wand"){ P.wandOn = false; P.auto = false; }                       // using another ability stops the wand
   let t = null;
   if(a.tgt === "enemy"){
     t = P.target;
@@ -457,7 +461,12 @@ function completeCast(){
 }
 
 // ---------------------------------------------------------------- auto-attack
+// the wand (Shoot): fires again and again like an auto attack, until you move, cast a spell or use Shoot again
+const WAND_SCHOOL = {mage: "arcane", priest: "holy", warlock: "shadow"};
+export function wandToggle(){ if(P.wandOn && P.auto){ P.wandOn = false; P.auto = false; return; } P.wandOn = true; P.auto = true; P.autoT = Math.min(P.autoT, 0.2); }
+const hasWand = () => C().eq && C().eq.ranged && C().eq.ranged.wt === "wand";
 export function autoInfo(){
+  if(P.wandOn && hasWand() && !P.form) return {range: 690, spd: 1.5, ranged: true, wand: true, school: WAND_SCHOOL[C().cls] || "arcane", base: () => spow() * 0.45};
   if(P.form === "bear") return {range: 55, spd: 2.0, mult: 1.0, rage: 8};
   if(P.form === "cat") return {range: 52, spd: 1.1, mult: 0.55};
   const cls = C().cls;
@@ -478,6 +487,8 @@ function autoAttack(dt){
   if(!sees(P, t)) return;
   const close = !!(ai.minRange && d < ai.minRange), mel = close && d <= 52;   // too close to shoot: within melee reach hunters strike with a knife (weaker than the bow), a little further out they can't do either
   if(close && !mel) return;
+  if(ai.wand){ P.autoT = ai.spd; P.attackAnim = 1; P.attackKind = "cast"; faceTo(t); const col = SCHOOL_COLOR[ai.school] || "#d38cff";
+    proj(t, col, 3, () => hit(t, ai.base(), ai.school, "auto"), "orb"); P.combatT = 6; breakStealth(); return; }
   P.autoT = ai.spd * (P.flurryN > 0 && P.buffs.flurry ? 1 - P.flurryK : 1) * (ai.ranged && P.buffs.rapidfire ? 1 / 1.4 : 1); if(P.flurryN > 0) P.flurryN--;   // Flurry, Rapid Fire P.attackAnim = 1; P.attackKind = ai.ranged && !mel ? "bow" : "melee"; faceTo(t);
   if(mel) hit(t, pow() * 0.5, "phys", "auto");
   else if(ai.ranged) proj(t, "#e9e2c8", 3, () => hit(t, pow() * ai.mult, "phys", "auto"), "arrow");
@@ -499,13 +510,14 @@ export function updPlayer(dt, moving){
   if(P.sickOn && !P.buffs.ressick){ P.sickOn = false; recompute(false); H.log("Resurrection Sickness has faded.", "#7be08a"); }
   if(P.shield > 0){ P.shieldT -= dt; if(P.shieldT <= 0) P.shield = 0; }
   if(P.casting && moving) cancelCast("Interrupted – you moved");
+  if(P.wandOn && moving){ P.wandOn = false; P.auto = false; }                              // moving stops the wand
   if(P.buffs.meld && (moving || P.auto || P.casting || P.dash)) delete P.buffs.meld;      // Shadowmeld ends when you move or act
   if(P.casting){ const a = AB[P.casting.id], t = P.casting.t; if(a && a.minRange && t && !t.dead && rangePx(t) < a.minRange) cancelCast("Too close"); }
   if(P.casting && P.casting.id && P.casting.t && P.casting.t.dead && AB[P.casting.id] && AB[P.casting.id].tgt === "enemy") cancelCast();   // the target died: the spell stops at once (heals go on)
   if(P.casting && (P.casting.kind === "gather" || P.casting.kind === "mount") && P.combatT > 0){ const k = P.casting.kind; P.casting = null; H.err(k === "mount" ? "You cannot mount in combat" : "You cannot pick that up in combat"); }
   if(P.casting && P.casting.channel){ const c = P.casting, a = AB[c.id], t = c.t; c.el += dt; c.tick += dt;     // a channel: works once a second
     if(t && rangePx(t) > a.range + 40) cancelCast("Too far away"); else if(t && !sees(P, t)) cancelCast("Target not in line of sight");
-    else { while(c.tick >= 1 && P.casting === c){ c.tick -= 1; a.tick(t); } if(P.casting === c && c.el >= c.total){ P.casting = null; P.castDone = {label: c.label, t: 0.3}; } } }
+    else { while(c.tick >= 1 && P.casting === c){ c.tick -= 1; if(a.tick(t) === false){ cancelCast(); break; } } if(P.casting === c && c.el >= c.total){ P.casting = null; P.castDone = {label: c.label, t: 0.3}; } } }
   else if(P.casting){ P.casting.el += dt; if(P.casting.el >= P.casting.total){ const c = P.casting;
     if(c.kind === "gather" || c.kind === "mount"){ P.casting = null; P.castDone = {label: c.label, t: 0.3}; if(c.kind === "gather") H.finishGather(c.node); else H.finishMount(c.mount); } else completeCast(); } }
   P.pose = P.mount ? "sit" : P.casting ? (P.casting.kind === "gather" || P.casting.kind === "mount" ? "cast" : C().cls === "hunter" ? "bow" : "cast") : null;
@@ -675,8 +687,8 @@ const GROWL_CD = 12, GROWL_TAUNT = 3;
 export const PETS = {
   bear: {name: "Bear", sp: 125, hp: 1.2, taken: 0.85, coef: 0.18, atk: 2.0, threat: 4, ownerThreat: 0.8, r: 0.6, role: "tank", res: "rage"},
   wolf: {name: "Wolf", sp: 135, hp: 0.8, taken: 1.0, coef: 0.20, atk: 1.1, threat: 0.5, ownerThreat: 1, r: 0.5, role: "dps", res: "energy"},
-  imp: {name: "Imp", sp: 120, hp: 0.55, taken: 1.1, coef: 0.30, atk: 2.2, threat: 0.4, ownerThreat: 1, r: 0.35, role: "caster", res: "mana", school: "fire", range: 13},
-  voidwalker: {name: "Voidwalker", sp: 115, hp: 1.3, taken: 0.8, coef: 0.16, atk: 2.0, threat: 4.5, ownerThreat: 0.8, r: 0.6, role: "tank", res: "mana", school: "shadow"}
+  imp: {name: "Imp", sp: 120, hp: 0.55, taken: 1.1, coef: 0.38, atk: 2.2, threat: 0.4, ownerThreat: 1, r: 0.35, role: "caster", res: "mana", school: "fire", range: 13},
+  voidwalker: {name: "Voidwalker", sp: 115, hp: 0.95, taken: 1.0, coef: 0.08, atk: 2.0, threat: 3, ownerThreat: 0.8, r: 0.6, role: "tank", res: "mana", school: "shadow"}
 };
 // a tank pet's three skills: the taunt, the hit-everything skill and the single-target threat strike
 const TANK_SK = {bear: {taunt: "growl", aoe: "sweep", one: "maul"}, voidwalker: {taunt: "torment", aoe: "suffering", one: "voidstrike"}};
@@ -716,6 +728,9 @@ export function petCallCheck(kind){ if(petFight()) return "You cannot call a pet
 export function petCall(kind){ if(petFight()) return H.err("You cannot call a pet right now");
   petRemove(); C().petType = kind; pet = petMake(kind); E.pet = pet; burst(pet.px, pet.py, "#e6bd5c", 14); H.floatText(pet, PETS[kind].name + " called", "#8fe39a", true); H.log(`You call your ${PETS[kind].name.toLowerCase()}.`, "#8fe39a"); H.save(); }
 export function petDismiss(){ if(!pet) return; H.log(`You dismiss your ${PETS[pet.kind].name.toLowerCase()}.`, "#9fd6e8"); burst(pet.px, pet.py, "#9fd6e8", 10); petRemove(); C().petType = null; H.save(); }
+// Mend Pet / Health Funnel: one second of healing while channeling (false when there is no pet to heal, which ends the channel)
+export function petHealTick(frac){ if(!pet || pet.dead) return false; const h = Math.round(pet.maxHp * frac * (1 + 0.25 * T("h_mend"))); if(T("h_mend")) healP(h * 0.15 * T("h_mend"));
+  pet.hp = Math.min(pet.maxHp, pet.hp + h); H.floatText(pet, "+" + h, "#62d36b"); return true; }
 export function petMend(){ if(!pet || pet.dead) return; const h = Math.round(pet.maxHp * 0.4 * (1 + 0.25 * T("h_mend"))); if(T("h_mend")) healP(h * 0.15 * T("h_mend")); pet.hp = Math.min(pet.maxHp, pet.hp + h); H.floatText(pet, "+" + h, "#62d36b"); burst(pet.px, pet.py, "#62d36b", 8); }
 export function petDamage(raw, src){ if(!pet || pet.dead) return; const amt = Math.max(1, Math.round(raw * rand(0.9, 1.1) * PETS[pet.kind].taken));
   let dmg = amt; if(pet.shield > 0){ const ab = Math.min(pet.shield, dmg); pet.shield -= ab; dmg -= ab; if(ab > 0) H.floatText(pet, "Absorbed", "#fff6d0"); if(dmg <= 0) return; }
@@ -852,4 +867,4 @@ export function mobTarget(m){
 }
 
 // the helper table the Rimfrost 1 ability code calls
-Object.assign(E, {rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, lastStand, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});
+Object.assign(E, {rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petHealTick, wandToggle, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, lastStand, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});
