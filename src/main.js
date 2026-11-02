@@ -255,17 +255,33 @@ async function afterLogin(){ const uid = ACC.accountId(); KEY = "rimfrost2-chars
     if(!claimed){ let old = [], ow = null; try{ old = JSON.parse(localStorage.getItem("rimfrost2-chars")) || []; ow = localStorage.getItem("rimfrost2-world"); localStorage.setItem("rimfrost2-claimed", uid); }catch(e){}
       if(old.length){ saveChars(old); try{ if(ow) localStorage.setItem(WKEY, ow); }catch(e){} } }
     ACC.saveCloud(cloudData()); }
-  $("acct").hidden = false; $("acct").innerHTML = `<span>Logged in as <b>${esc(ACC.accountName())}</b></span><button class="btn ghost" id="lout">Log out</button>`;
-  $("lout").onclick = async () => { save(); $("lout").disabled = true; await ACC.saveCloud(cloudData()); ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); };
-  showChars(); }
+  acctBar(); showChars(); }
+const MAILRE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// "Logged in as …" with Log out; an old account (name only) also gets "Add e-mail", so a lost password can be reset
+function acctBar(){ const old = ACC.needsEmail();
+  $("acct").hidden = false; $("acct").innerHTML = `<div class="arow"><span>Logged in as <b>${esc(ACC.accountName())}</b></span><span>${old ? `<button class="btn ghost" id="lmail">Add e-mail</button> ` : ""}<button class="btn ghost" id="lout">Log out</button></span></div>`
+    + (old ? `<div id="mailbox" hidden><div class="arow"><input id="amail" class="tin" placeholder="Your e-mail" autocomplete="email" inputmode="email"><button class="btn" id="asend">Send link</button></div><div id="amsg">Add an e-mail so you can reset your password if you forget it.</div></div>` : "");
+  if(old){ $("lmail").onclick = () => { $("mailbox").hidden = !$("mailbox").hidden; if(!$("mailbox").hidden) $("amail").focus(); };
+    $("amail").addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter") $("asend").click(); });
+    $("asend").onclick = async () => { const m = $("amail").value.trim(); if(!MAILRE.test(m)) return $("amsg").textContent = "That is not a valid e-mail address";
+      $("asend").disabled = true; $("amsg").textContent = "Sending…";
+      try{ await ACC.addEmail(m); $("amsg").textContent = `A link has been sent to ${m} (check the spam folder too). Click it, then log in with ${m} and your password from now on.`; }
+      catch(e){ $("amsg").textContent = e.message; } finally{ $("asend").disabled = false; } }; }
+  $("lout").onclick = async () => { save(); $("lout").disabled = true; await ACC.saveCloud(cloudData()); ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); }; }
 function showLogin(){ running = false; closePanel(); $("chars").hidden = false; $("login").hidden = false; $("clistWrap").hidden = true; $("cform").hidden = true; $("lerr").textContent = ""; $("lname").focus(); }
-async function tryLogin(make){ const name = $("lname").value.trim(), pw = $("lpass").value;
-  if(!/^[A-Za-z0-9_-]{3,16}$/.test(name)) return $("lerr").textContent = "The name must be 3–16 letters or digits";
+// log in with an e-mail (or the name of an old account); new accounts always use an e-mail
+async function tryLogin(make){ const name = $("lname").value.trim(), pw = $("lpass").value, isMail = MAILRE.test(name);
+  if(!isMail && (make || !/^[\p{L}\p{N}_-]{3,16}$/u.test(name))) return $("lerr").textContent = "Enter your e-mail address";
   if(pw.length < 6) return $("lerr").textContent = "The password must be at least 6 characters";
   $("lerr").textContent = make ? "Creating your account…" : "Logging in…"; $("llogin").disabled = $("lnew").disabled = true;
   try{ await (make ? ACC.signUp(name, pw) : ACC.logIn(name, pw)); $("lpass").value = ""; $("lerr").textContent = ""; $("login").hidden = true; await afterLogin(); }
   catch(e){ $("lerr").textContent = e.message; } finally{ $("llogin").disabled = $("lnew").disabled = false; } }
 $("llogin").onclick = () => tryLogin(false); $("lnew").onclick = () => tryLogin(true);
+$("lforgot").onclick = async () => { const m = $("lname").value.trim();
+  if(!MAILRE.test(m)) return $("lerr").textContent = m ? "Accounts without an e-mail can't reset the password. Log in and choose Add e-mail first." : "Enter your e-mail above, then choose Forgot password? again";
+  $("lerr").textContent = "Sending…";
+  try{ await ACC.resetPassword(m); $("lerr").textContent = `If ${m} has an account, a link for choosing a new password is on its way (check the spam folder too).`; }
+  catch(e){ $("lerr").textContent = e.message; } };
 $("lpass").addEventListener("keydown", e => { if(e.key === "Enter") tryLogin(false); });
 async function startScreen(){ if(!ACC.accountsOn()) return showChars();
   showLogin(); $("lerr").textContent = "Logging in…";

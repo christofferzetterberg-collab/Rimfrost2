@@ -1,5 +1,12 @@
 # Rimfrost 2 – Release notes
 
+## v0.32.0
+
+### New
+- **Accounts use e-mail:** create an account and log in with your e-mail and password.
+  - **Forgot password?** on the login screen sends a link for choosing a new password.
+  - Accounts made with only a name still log in with that name. Choose **Add e-mail** on the character screen and click the link in the mail. After that, you log in with the e-mail, and your characters stay the same.
+
 ## v0.31.0
 
 ### New
