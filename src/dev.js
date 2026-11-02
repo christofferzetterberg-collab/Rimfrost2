@@ -105,6 +105,7 @@ const SCEN = [{id: "one", name: "1 monster", n: 1}, {id: "two", name: "2 monster
 function canUse(id, m){ const a = AB[id]; if(!a || !S.cur.learned.includes(id)) return false;
   if((P.cds[id] || 0) > 0 || (!a.offGcd && P.gcd > 0) || P.casting) return false;
   const type = a.res || G.resType(); if(P[type] < G.costOf(id)) return false;
+  if(a.tgt === "ground" && (!m || m.dead || G.distU(P, m) * PXU > a.range)) return false;
   if(a.tgt === "enemy"){ if(!m || m.dead) return false; const d = (G.distU(P, m) - m.r) * PXU; if(d > a.range || (a.minRange && d < a.minRange) || !G.sees(P, m)) return false; }
   if(a.check){ try{ if(a.check(m) !== true) return false; }catch(e){ return false; } }
   return true; }
@@ -117,7 +118,7 @@ function think(key, m){
     P.dest = {x: m.x + (P.x - m.x) / d * want, z: m.z + (P.z - m.z) / d * want}; }
   if(melee || key === "hunter"){ if(!P.auto) P.auto = true; }
   if(P.dest && P.casting) return;
-  for(const [id, when] of ROT[key]){ if(!canUse(id, m)) continue; if(when && !when(m)) continue; G.tryUse(id); if(P.casting || P.gcd > 0 || AB[id].offGcd) break; }
+  for(const [id, when] of ROT[key]){ if(!canUse(id, m)) continue; if(when && !when(m)) continue; G.tryUse(id, AB[id].tgt === "ground" ? {x: m.x, z: m.z} : undefined); if(P.casting || P.gcd > 0 || AB[id].offGcd) break; }
 }
 // one fight: returns {win, t, hp, dps, taken}
 function fight(v, sc, lvl, q, spec, seed){

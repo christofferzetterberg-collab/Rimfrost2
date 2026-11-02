@@ -15,7 +15,7 @@ import {preloadBeasts} from "./beasts.js";
 import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount, makeSheep} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
 import {P, S, mobs, PXU} from "./state.js";
-import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, abIcon, drawIcon} from "./rimdata.js";
+import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, SCHOOL_COLOR, abIcon, drawIcon} from "./rimdata.js";
 import {ITEMS, QUAL, SLOTS, SLOT_ORDER, STAT_NAME, GEAR_MAX, CLASS_MAIN, canWear, gearTypeName, upgradeGear} from "./items.js";
 import * as G from "./engine.js";
 import * as Q from "./quests.js";
@@ -179,7 +179,7 @@ function learnRiding(){ const c = S.cur; if(c.riding || c.level < RIDING_LVL) re
   c.gold -= RIDING_COST; c.riding = true; G.burst(P.px, P.py, "#9fd6e8", 16); log("You have learned Riding.", "#9fd6e8"); save(); refresh(); }
 function buyMount(k){ const c = S.cur, M = MOUNTS[k]; if(!M || !c.riding) return; c.mounts = c.mounts || []; if(c.mounts.includes(k)) return; if(c.gold < M.price) return err("You don't have enough gold");
   c.gold -= M.price; c.mounts.push(k); c.mountSel = k; log(`You bought ${M.name}. Press ${K.keyOf("mount")} to mount.`, "#7be08a");
-  const bar = curBar(); if(!bar.includes("mount")){ const i = bar.indexOf(null); if(i >= 0){ bar[i] = "mount"; buildBar(); } } save(); refresh(); }
+  const bar = curBar(); if(!bar.includes("mount")){ const i = freeSlot(bar); if(i >= 0){ bar[i] = "mount"; buildBar(); } } save(); refresh(); }
 
 // ---------------------------------------------------------------- monsters (Rimfrost 1's, see mobs.js), spread over their zones
 const RESPAWN = 180, RESPAWN_ELITE = 360, ATK_SPEED = 2.0;   // seconds until a killed monster comes back (same as Rimfrost)
@@ -384,13 +384,16 @@ const SPECIALS = {
 };
 const formKey = () => S.cur.cls === "druid" && P.form ? P.form : "normal";
 const idsFor = form => [...BARS[form === "normal" ? S.cur.cls : "druid_" + form], RACIAL[S.cur.race]].filter(id => id && S.cur.learned.includes(id));
-function defaultBar(form){ const bar = Array(20).fill(null), ids = idsFor(form);
+function defaultBar(form){ const bar = Array(40).fill(null), ids = idsFor(form);
   ids.forEach((id, i) => { if(i < 16) bar[i] = id; }); if(form === "normal") ["attack", "pothp", "potmana", "rest"].forEach((x, i) => bar[16 + i] = x); return bar; }
+// the first empty slot on a bar you can see (the right bars only when they are turned on)
+const freeSlot = bar => bar.findIndex((x, i) => x == null && (i < 20 || (i < 30 ? RBARS[0] : RBARS[1])));
 function curBar(){ const c = S.cur, f = formKey(); if(!c.bars) c.bars = {}; if(!c.barSeen) c.barSeen = {};
   if(!c.bars[f]){ c.bars[f] = defaultBar(f); c.barSeen[f] = idsFor(f).slice(); }
   // newly learned abilities go into the first free slot (once – if you remove one, it stays removed)
   const bar = c.bars[f], seen = c.barSeen[f] || (c.barSeen[f] = []);
-  for(const id of idsFor(f)) if(!seen.includes(id)){ seen.push(id); if(!bar.includes(id)){ const i = bar.indexOf(null); if(i >= 0) bar[i] = id; } }
+  while(bar.length < 40) bar.push(null);                                              // (the two right bars: slots 21–40)
+  for(const id of idsFor(f)) if(!seen.includes(id)){ seen.push(id); if(!bar.includes(id)){ const i = freeSlot(bar); if(i >= 0) bar[i] = id; } }
   return bar; }
 let slots = [];
 const iconOf = x => SPECIALS[x] ? [SPECIALS[x].icon, SPECIALS[x].color] : abIcon(x);
@@ -400,8 +403,9 @@ function useSlot(x){ if(!x || !running) return;
 function slotTip(x){ if(SPECIALS[x]) return `<h4>${SPECIALS[x].name}</h4>${SPECIALS[x].desc}`; return tipFor(x); }
 function buildBar(){
   if(!S.cur) return; hideTip(); const bar = curBar(); slots = [];
-  for(const [row, el] of [[0, $("bar1")], [1, $("bar2")]]){ el.innerHTML = "";
-    for(let i = 0; i < 10; i++){ const idx = row * 10 + i, x = bar[idx], act = (row ? "s" : "b") + (i + 1);
+  applyRightBars();
+  for(const [row, el, pre] of [[0, $("bar1"), "b"], [1, $("bar2"), "s"], [2, $("bar3"), "r"], [3, $("bar4"), "q"]]){ el.innerHTML = "";
+    for(let i = 0; i < 10; i++){ const idx = row * 10 + i, x = bar[idx], act = pre + (i + 1);
       const s = document.createElement("div"); s.className = "slot" + (x ? "" : " empty"); s.dataset.idx = idx;
       if(x){ const cv = document.createElement("canvas"); cv.width = cv.height = 52; drawIcon(cv, ...iconOf(x)); s.append(cv); s.draggable = true; }
       s.insertAdjacentHTML("beforeend", `<span class="k">${K.short(K.binds[act][0])}</span><span class="cd"></span>${x === "pothp" || x === "potmana" ? `<span class="n"></span>` : ""}`);
@@ -443,7 +447,7 @@ function updPetBar(){ const key = classBarKey(); if(key !== petBarKind) buildPet
     else { const on = G.petSkillOn(x); p.el.classList.toggle("off", !on); p.el.classList.toggle("auto", on); const cd = x === "growl" ? pt.growl : x === "maul" ? pt.maulT || 0 : 0; p.cd.textContent = on && cd > 0 && !pt.dead ? Math.ceil(cd) : ""; } } }
 const petBusy = pt => !pt.dead && G.petFight();
 function tipFor(id){ const a = AB[id], type = a.res || G.resType(), cost = G.costOf(id), bits = [];
-  if(cost) bits.push(`${cost} ${RES_NAME[type].toLowerCase()}`); bits.push(a.cast ? `${a.cast} sec cast` : "Instant"); if(a.cd) bits.push(a.cd >= 60 && a.cd % 60 === 0 ? `${a.cd / 60} min cooldown` : `${a.cd} sec cooldown`);
+  if(cost) bits.push(`${cost} ${RES_NAME[type].toLowerCase()}`); bits.push(a.channel ? `${a.channel} sec channel` : a.cast ? `${a.cast} sec cast` : "Instant"); if(a.cd) bits.push(a.cd >= 60 && a.cd % 60 === 0 ? `${a.cd / 60} min cooldown` : `${a.cd} sec cooldown`);
   if(a.range) bits.push(a.minRange ? `${Math.round(a.minRange / PXU)}–${Math.round(a.range / PXU)} m range` : `${Math.round(a.range / PXU)} m range`);
   return `<h4>${a.name}</h4><div class="m">${bits.join(" · ")}</div>${a.desc()}`; }
 function showTip(e, html){ const t = $("tip"); t.innerHTML = html; t.hidden = false; const r = e.currentTarget.getBoundingClientRect();
@@ -476,12 +480,17 @@ function unstuck(dt, ok){
     for(let j = -r; j <= r; j++) for(let i = -r; i <= r; i++){ if(Math.max(Math.abs(i), Math.abs(j)) !== r) continue; const x = cx + i, z = cz + j;
       if(!reachable(x, z) || blocked(x, z, x, z, P.r)) continue; const d = Math.hypot(x - P.x, z - P.z); if(d < bd){ bd = d; best = {x, z}; } }
     if(best){ P.x = best.x; P.z = best.z; P.dest = null; marker.visible = false; return; } } }
+// the two extra action bars along the right edge (on/off in the Esc menu, remembered in this browser)
+const RBAR_KEY = "rimfrost2-rightbars"; let RBARS = [false, false];
+try{ const v = JSON.parse(localStorage.getItem(RBAR_KEY)); if(Array.isArray(v)) RBARS = [!!v[0], !!v[1]]; }catch(e){}
+function applyRightBars(){ $("bar3").hidden = !RBARS[0]; $("bar4").hidden = !RBARS[1]; document.documentElement.style.setProperty("--rbw", (RBARS.filter(Boolean).length * 50) + "px"); }
 // the Esc menu
-function openGameMenu(){ closePanel(); $("gmenu").hidden = false; updHelp(); $("gthr").textContent = THREAT_ON ? "On" : "Off"; $("ggfx").textContent = GFX.name; }
+function openGameMenu(){ closePanel(); $("gmenu").hidden = false; updHelp(); $("gthr").textContent = THREAT_ON ? "On" : "Off"; $("ggfx").textContent = GFX.name; $("grb1").textContent = RBARS[0] ? "On" : "Off"; $("grb2").textContent = RBARS[1] ? "On" : "Off"; }
 function closeGameMenu(){ $("gmenu").hidden = true; }
 document.querySelectorAll("#gmenu [data-g]").forEach(b => b.onclick = () => { const g = b.dataset.g; closeGameMenu();
   if(g === "map"){ toggleMap(); return; }
   if(g === "threat"){ THREAT_ON = !THREAT_ON; try{ localStorage.setItem(THREAT_KEY, THREAT_ON ? "1" : "0"); }catch(e){} log(`Threat meter ${THREAT_ON ? "enabled" : "disabled"}.`, "#9fd6e8"); return; }
+  if(g === "rbar1" || g === "rbar2"){ const i = g === "rbar1" ? 0 : 1; RBARS[i] = !RBARS[i]; try{ localStorage.setItem(RBAR_KEY, JSON.stringify(RBARS)); }catch(e){} applyRightBars(); openGameMenu(); return; }
   if(g === "gfx"){ const ids = Object.keys(GFX_LEVELS), next = ids[(ids.indexOf(GFX.id) + 1) % ids.length]; applyGfx(next); log(`Graphics quality: ${GFX.name}.`, "#9fd6e8"); openGameMenu(); return; }
   if(g === "logout"){ CO.leave(true); showChars(); } else if(g !== "resume") togglePanel(g); });
 document.querySelectorAll("#panel .tabs button[data-tab]").forEach(b => b.onclick = () => togglePanel(b.dataset.tab));
@@ -876,7 +885,7 @@ $("chatin").addEventListener("keydown", e => { e.stopPropagation();
 $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("chatbox").hidden = true; });
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
-G.initEngine(scene, {floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
+G.initEngine(scene, {startAim, floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
 CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? makeMount(MOUNTS[k]) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t), zoneVis: (m, l) => zoneVis(m, l), bossSync: (m, f) => bossSync(m, f),
@@ -908,7 +917,7 @@ function doAction(a, e){
   else if(a === "chat") openChat();
   else if(/^petSkill[123]$/.test(a) && G.PET_CLASSES.has(S.cur.cls)){ const pt = G.getPet(), sk = pt && G.PET_SKILLS[pt.kind][+a.slice(-1) - 1]; if(sk){ G.togglePetSkill(sk.id); buildPetBar(); } }
   else if(["quests", "char", "bag", "spells", "tal", "keys", "coop"].includes(a)) togglePanel(a);
-  else if(/^[bs]\d+$/.test(a)){ const idx = (a[0] === "s" ? 10 : 0) + (+a.slice(1)) - 1; useSlot(curBar()[idx]); }
+  else if(/^[bsrq]\d+$/.test(a)){ const row = {b: 0, s: 1, r: 2, q: 3}[a[0]]; if((row === 2 && !RBARS[0]) || (row === 3 && !RBARS[1])) return; useSlot(curBar()[row * 10 + (+a.slice(1)) - 1]); }
 }
 addEventListener("keydown", e => {
   if(e.target.tagName === "INPUT") return;
@@ -919,6 +928,7 @@ addEventListener("keydown", e => {
   if(!running) return;
   down.add(e.code);
   // Esc: close a window, then cancel a cast, then clear the target, then open the menu
+  if(e.code === "Escape" && aim){ endAim(); return; }
   if(e.code === "Escape"){ if(!$("bigmap").hidden) toggleMap(); else if(!$("gmenu").hidden) closeGameMenu(); else if(!$("panel").hidden) closePanel(); else if(P.casting) G.cancelCast(); else if(P.target || P.ftarget || P.selfT || P.petSel){ P.target = null; P.auto = false; P.selfT = false; P.petSel = false; CO.select(null); } else openGameMenu(); return; }
   if(!$("gmenu").hidden) return;
   const combo = K.comboOf(e); if(!combo) return;
@@ -926,7 +936,7 @@ addEventListener("keydown", e => {
   if(!a) return;
   if(a === "target" || combo.includes("Tab") || e.ctrlKey || e.altKey) e.preventDefault();
   if(K.isMoveAction(a)) return;                                  // movement is read every frame
-  if(e.repeat && /^[bs]\d+$/.test(a)) return;
+  if(e.repeat && /^[bsrq]\d+$/.test(a)) return;
   doAction(a, e);
 });
 addEventListener("keyup", e => down.delete(e.code));
@@ -962,12 +972,30 @@ function pick(e){ mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerH
   for(let k = 0; k < 12; k++){ const m = (a + b) / 2; if(under(m)) b = m; else a = m; }
   return {point: new THREE.Vector3(o.x + dv.x * b, o.y + dv.y * b, o.z + dv.z * b)}; }
 renderer.domElement.addEventListener("contextmenu", e => e.preventDefault());
+// placing an area spell (Blizzard, Rain of Fire …): a circle follows the mouse on the ground; left click casts it there, right click or Esc cancels
+let aim = null, aimMouse = null;
+function groundAt(cx, cy){ mouse.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(mouse, camera); const o = ray.ray.origin, dv = ray.ray.direction;
+  const under = t => { const x = o.x + dv.x * t, z = o.z + dv.z * t; return o.y + dv.y * t <= height(x, z); };
+  let a = 0, b = 0; for(let t = 1; t < 400; t += 1){ if(under(t)){ a = t - 1; b = t; break; } } if(!b) return null;
+  for(let k = 0; k < 12; k++){ const m = (a + b) / 2; if(under(m)) b = m; else a = m; } return {x: o.x + dv.x * b, z: o.z + dv.z * b}; }
+function startAim(id){ if(aim && aim.id === id) return endAim();
+  endAim(); const a = AB[id], r = (a.aoeR || 90) / PXU, g = new THREE.RingGeometry(r * 0.9, r, 48); g.rotateX(-Math.PI / 2);
+  const fill = new THREE.CircleGeometry(r * 0.9, 48); fill.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Group(), col = new THREE.Color(SCHOOL_COLOR[a.school] || "#ffffff");
+  mesh.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({color: col, transparent: true, opacity: 0.85, depthWrite: false})), new THREE.Mesh(fill, new THREE.MeshBasicMaterial({color: col, transparent: true, opacity: 0.18, depthWrite: false})));
+  mesh.renderOrder = 5; mesh.traverse(o => { o.raycast = () => {}; }); scene.add(mesh); aim = {id, mesh}; renderer.domElement.style.cursor = "crosshair"; if(aimMouse) moveAim(aimMouse.x, aimMouse.y); }
+function endAim(){ if(!aim) return; scene.remove(aim.mesh); aim.mesh.traverse(o => { if(o.geometry) o.geometry.dispose(); if(o.material) o.material.dispose(); }); aim = null; renderer.domElement.style.cursor = ""; }
+function moveAim(cx, cy){ if(!aim) return; const p = groundAt(cx, cy); if(!p){ aim.mesh.visible = false; return; } aim.mesh.visible = true; aim.p = p;
+  aim.mesh.position.set(p.x, height(p.x, p.z) + 0.15, p.z); const far = Math.hypot(p.x - P.x, p.z - P.z) * PXU > AB[aim.id].range;
+  aim.mesh.children.forEach(m => m.material.color.set(far ? "#ff5a4f" : (SCHOOL_COLOR[AB[aim.id].school] || "#ffffff"))); }
+renderer.domElement.addEventListener("pointermove", e => { aimMouse = {x: e.clientX, y: e.clientY}; moveAim(e.clientX, e.clientY); });
 // mouse: left click targets, right click attacks / talks / picks up, hold the right button and move the mouse to turn the camera and your character
 const rmb = {down: false, moved: 0, x: 0, y: 0};
 // while you turn with the right button, your character faces where the camera looks (as in WoW)
 const mouseTurn = () => rmb.down && rmb.moved > 4 && running && !(P.dead && !P.ghost) && !P.dash && !P.leap;
 renderer.domElement.addEventListener("pointerdown", e => {
   if(!running) return;
+  if(aim){ if(e.button === 0 && aim.p && !P.dead){ const id = aim.id, p = aim.p; endAim(); G.tryUse(id, p); } else endAim(); return; }
   if(e.button === 2){ rmb.down = true; rmb.moved = 0; rmb.x = e.clientX; rmb.y = e.clientY; renderer.domElement.setPointerCapture(e.pointerId); return; }
   if(e.button !== 0 || P.dead) return; const h = pick(e);
   if(h && h.mob){ P.target = h.mob; CO.select(null); }                                                 // left = select only
@@ -1247,7 +1275,7 @@ function updHUD(dt){
   else tf.hidden = true;
   // cast bar
   const cb = $("cast");
-  if(P.casting){ cb.style.visibility = "visible"; cb.firstElementChild.style.width = (P.casting.el / P.casting.total * 100) + "%"; cb.lastElementChild.textContent = P.casting.label; }
+  if(P.casting){ cb.style.visibility = "visible"; cb.firstElementChild.style.width = ((P.casting.channel ? 1 - P.casting.el / P.casting.total : P.casting.el / P.casting.total) * 100) + "%"; cb.lastElementChild.textContent = P.casting.label; }
   else if(P.castDone){ cb.style.visibility = "visible"; cb.firstElementChild.style.width = "100%"; cb.lastElementChild.textContent = P.castDone.label; }
   else cb.style.visibility = "hidden";
   // action bar: cooldowns, range, resources

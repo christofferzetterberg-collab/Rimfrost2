@@ -371,7 +371,8 @@ export function playerDamage(raw, src, kind = "melee"){
   if(amt > 0){ P.hp -= amt; H.floatText(P, "-" + amt, "#ff6b5e");
     // spell pushback: each hit sets the cast back 0.5 sec, at most 3 times per cast
     const c = P.casting, pb = 0.5 * (1 - [0, 0.33, 0.66, 1][T("wl_conc")]);   // (Fel Concentration: less pushback)
-    if(c && c.kind !== "gather" && (c.pushes || 0) < 3 && pb > 0){ c.pushes = (c.pushes || 0) + 1; c.el = Math.max(0, c.el - pb); } }
+    if(c && c.channel && pb > 0) c.el += pb * 2;                                    // a channel loses 1 sec of its time
+    else if(c && c.kind !== "gather" && (c.pushes || 0) < 3 && pb > 0){ c.pushes = (c.pushes || 0) + 1; c.el = Math.max(0, c.el - pb); } }
   P.combatT = 6;
   if(resType() === "rage") addRes("rage", 2 + amt / P.maxHp * 60);
   if(src && (!P.target || P.target.dead) && !P.ftarget) P.target = src;
@@ -390,7 +391,7 @@ function die(){
 // ---------------------------------------------------------------- using abilities
 export function nearestEnemy(range){ let best = null, bd = range; for(const m of mobs){ if(m.dead || m.state === "return") continue; const d = distU(P, m) - m.r; if(d < bd && sees(P, m)){ bd = d; best = m; } } return best; }
 const rangePx = t => (distU(P, t) - t.r) * PXU;
-export function tryUse(id){
+export function tryUse(id, at){
   if(!id) return;
   const a = AB[id]; if(!a || !C().learned.includes(id) || (P.dead && !a.whileDead)) return;
   if(P.casting){ if(P.casting.kind === "gather" || P.casting.kind === "mount") cancelCast(); else return; }
@@ -414,6 +415,13 @@ export function tryUse(id){
   { const fr = CO.friendRange(id); if(fr) return H.err(fr); }
   const type = a.res || resType(), cost = costOf(id);
   if(P[type] < cost) return H.err(`Not enough ${RES_NAME[type].toLowerCase()}`);
+  // area spells you place yourself: choose the spot first (the game shows a circle under the mouse), then they are cast there
+  if(a.tgt === "ground"){ if(!at) return H.startAim(id);
+    if(Math.hypot(at.x - P.x, at.z - P.z) * PXU > a.range) return H.err("Too far away");
+    t = withPx({x: at.x, z: at.z, ground: true}); }
+  // channeled spells (Drain Life): the cost is paid up front, then the spell works every second while you stand still
+  if(a.channel){ P[type] -= cost; if(!a.offGcd) P.gcd = 1.0; if(a.cd) P.cds[id] = cdOf(id);
+    P.casting = {id, t, total: a.channel, el: 0, tick: 0, label: a.name, channel: true}; P.dest = null; P.path = null; if(t){ faceTo(t); P.combatT = 6; P.target = t; engage(t); } return; }
   const ct = castTime(id);
   if(!a.offGcd) P.gcd = 1.0;
   if(ct > 0){ P.casting = {id, t, total: ct, el: 0, label: a.name}; P.dest = null; P.path = null; if(t) faceTo(t); }
@@ -433,7 +441,8 @@ function finishAbility(id, t){ if(id !== "meld") delete P.buffs.meld; const stea
   if(!a.form && !P.form){ const melee = a.tgt === "enemy" && a.range <= 70; P.attackAnim = 1; P.attackKind = melee ? "melee" : (C().cls === "hunter" && a.tgt === "enemy") ? "bow" : "cast"; }
   else if(P.form) P.attackAnim = 1;
   // a monster notices a melee attack at once; a spell or arrow from range only when it lands
-  if(t){ faceTo(t); P.combatT = 6; if(P.target !== t) P.target = t; if(a.tgt === "enemy" && t.state === "idle" && a.range <= 70) engage(t); }
+  if(t && t.ground) faceTo(t);                                                  // (an area spell placed on the ground)
+  else if(t){ faceTo(t); P.combatT = 6; if(P.target !== t) P.target = t; if(a.tgt === "enemy" && t.state === "idle" && a.range <= 70) engage(t); }
   // shots and weapon attacks (not spells) also start auto-attack
   if(t && a.tgt === "enemy" && (C().cls === "hunter" || a.school === "phys" || a.range <= 70 || a.res === "rage" || a.res === "energy")) P.auto = true;
 }
@@ -494,7 +503,10 @@ export function updPlayer(dt, moving){
   if(P.casting){ const a = AB[P.casting.id], t = P.casting.t; if(a && a.minRange && t && !t.dead && rangePx(t) < a.minRange) cancelCast("Too close"); }
   if(P.casting && P.casting.id && P.casting.t && P.casting.t.dead && AB[P.casting.id] && AB[P.casting.id].tgt === "enemy") cancelCast();   // the target died: the spell stops at once (heals go on)
   if(P.casting && (P.casting.kind === "gather" || P.casting.kind === "mount") && P.combatT > 0){ const k = P.casting.kind; P.casting = null; H.err(k === "mount" ? "You cannot mount in combat" : "You cannot pick that up in combat"); }
-  if(P.casting){ P.casting.el += dt; if(P.casting.el >= P.casting.total){ const c = P.casting;
+  if(P.casting && P.casting.channel){ const c = P.casting, a = AB[c.id], t = c.t; c.el += dt; c.tick += dt;     // a channel: works once a second
+    if(t && rangePx(t) > a.range + 40) cancelCast("Too far away"); else if(t && !sees(P, t)) cancelCast("Target not in line of sight");
+    else { while(c.tick >= 1 && P.casting === c){ c.tick -= 1; a.tick(t); } if(P.casting === c && c.el >= c.total){ P.casting = null; P.castDone = {label: c.label, t: 0.3}; } } }
+  else if(P.casting){ P.casting.el += dt; if(P.casting.el >= P.casting.total){ const c = P.casting;
     if(c.kind === "gather" || c.kind === "mount"){ P.casting = null; P.castDone = {label: c.label, t: 0.3}; if(c.kind === "gather") H.finishGather(c.node); else H.finishMount(c.mount); } else completeCast(); } }
   P.pose = P.mount ? "sit" : P.casting ? (P.casting.kind === "gather" || P.casting.kind === "mount" ? "cast" : C().cls === "hunter" ? "bow" : "cast") : null;
   autoAttack(dt);

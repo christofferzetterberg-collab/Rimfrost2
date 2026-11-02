@@ -122,11 +122,12 @@
   .qc{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:6px;background:#0f151a} .qt{font-size:13.5px;line-height:1.4;margin:4px 0;color:#d8e2e6} .qo{font-size:12.5px;margin:4px 0 6px;color:#ffd36b}
   .sbtn.pri{background:#9fd6e8;color:#0b1013;border-color:#9fd6e8}
   #pbody canvas{width:32px;height:32px;border-radius:4px;flex:none}
-  #tracker{position:absolute;right:12px;top:248px;width:250px;font-size:13px;text-shadow:0 1px 3px #000,0 0 2px #000} #tracker .tq{margin-bottom:8px} #tracker b{color:#ffd36b} #tracker .ok{color:#7be08a} #tracker .wh{color:#a8b4ba;font-style:italic} #tracker .wh.nt{color:#9fb4ff}
+  #tracker{position:absolute;right:calc(12px + var(--rbw, 0px));top:248px;width:250px;font-size:13px;text-shadow:0 1px 3px #000,0 0 2px #000} #tracker .tq{margin-bottom:8px} #tracker b{color:#ffd36b} #tracker .ok{color:#7be08a} #tracker .wh{color:#a8b4ba;font-style:italic} #tracker .wh.nt{color:#9fb4ff}
   #barwrap{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none}
   #barwrap #cast{position:relative;bottom:auto;left:auto;transform:none;width:280px;height:18px;margin-bottom:6px}
   .abar{display:flex;gap:4px;pointer-events:auto;background:rgba(10,14,17,.55);padding:3px;border-radius:8px}
-  .abar .slot{width:48px;height:48px} .slot.empty{background:rgba(20,28,34,.6);border-style:dashed;border-color:#34444e;cursor:default}
+  .abar .slot{width:48px;height:48px}
+  #rbars{position:absolute;right:8px;bottom:64px;display:flex;gap:4px;pointer-events:none;z-index:2} .vbar{flex-direction:column} .vbar .slot{width:38px;height:38px} .abar[hidden]{display:none} .slot.empty{background:rgba(20,28,34,.6);border-style:dashed;border-color:#34444e;cursor:default}
   .slot.drop{box-shadow:0 0 0 2px #9fd6e8 inset} .slot .n{position:absolute;right:3px;bottom:1px;z-index:2;font-size:12px;text-shadow:0 1px 2px #000}
   .book{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:5px}
   .bk{display:flex;align-items:center;gap:6px;padding:4px;border:1px solid var(--line);border-radius:6px;background:#0f151a;cursor:grab;font-size:12.5px;font-weight:700}
@@ -168,7 +169,7 @@
   #loadtxt{font:15px 'Alegreya Sans',sans-serif;color:var(--mute)}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261107t", "./src/dungeon.js": "./src/dungeon.js?v=20261107t", "./src/dev.js": "./src/dev.js?v=20261107t", "./src/clock.js": "./src/clock.js?v=20261107t", "./src/coop.js": "./src/coop.js?v=20261107t", "./src/content.js": "./src/content.js?v=20261107t", "./src/engine.js": "./src/engine.js?v=20261107t", "./src/items.js": "./src/items.js?v=20261107t", "./src/keys.js": "./src/keys.js?v=20261107t", "./src/main.js": "./src/main.js?v=20261107t", "./src/models.js": "./src/models.js?v=20261107t", "./src/nav.js": "./src/nav.js?v=20261107t", "./src/quests.js": "./src/quests.js?v=20261107t", "./src/rimdata.js": "./src/rimdata.js?v=20261107t", "./src/state.js": "./src/state.js?v=20261107t", "./src/util.js": "./src/util.js?v=20261107t", "./src/world.js": "./src/world.js?v=20261107t", "./src/worlddata.js": "./src/worlddata.js?v=20261107t", "./src/mobs.js": "./src/mobs.js?v=20261107t", "./src/dgmech.js": "./src/dgmech.js?v=20261107t", "./src/avatar.js": "./src/avatar.js?v=20261107t", "./src/glb.js": "./src/glb.js?v=20261107t", "./src/beasts.js": "./src/beasts.js?v=20261107t", "./src/nature.js": "./src/nature.js?v=20261107t", "./src/buildings.js": "./src/buildings.js?v=20261107t", "./src/dgkit.js": "./src/dgkit.js?v=20261107t", "./src/account.js": "./src/account.js?v=20261107t" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261107v", "./src/dungeon.js": "./src/dungeon.js?v=20261107v", "./src/dev.js": "./src/dev.js?v=20261107v", "./src/clock.js": "./src/clock.js?v=20261107v", "./src/coop.js": "./src/coop.js?v=20261107v", "./src/content.js": "./src/content.js?v=20261107v", "./src/engine.js": "./src/engine.js?v=20261107v", "./src/items.js": "./src/items.js?v=20261107v", "./src/keys.js": "./src/keys.js?v=20261107v", "./src/main.js": "./src/main.js?v=20261107v", "./src/models.js": "./src/models.js?v=20261107v", "./src/nav.js": "./src/nav.js?v=20261107v", "./src/quests.js": "./src/quests.js?v=20261107v", "./src/rimdata.js": "./src/rimdata.js?v=20261107v", "./src/state.js": "./src/state.js?v=20261107v", "./src/util.js": "./src/util.js?v=20261107v", "./src/world.js": "./src/world.js?v=20261107v", "./src/worlddata.js": "./src/worlddata.js?v=20261107v", "./src/mobs.js": "./src/mobs.js?v=20261107v", "./src/dgmech.js": "./src/dgmech.js?v=20261107v", "./src/avatar.js": "./src/avatar.js?v=20261107v", "./src/glb.js": "./src/glb.js?v=20261107v", "./src/beasts.js": "./src/beasts.js?v=20261107v", "./src/nature.js": "./src/nature.js?v=20261107v", "./src/buildings.js": "./src/buildings.js?v=20261107v", "./src/dgkit.js": "./src/dgkit.js?v=20261107v", "./src/account.js": "./src/account.js?v=20261107v" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -188,6 +189,7 @@
   <div id="chatbox" hidden><span>Say:</span><input id="chatin" maxlength="200" autocomplete="off" placeholder="Type a message – Enter sends, Esc cancels"></div>
   <div id="tracker"></div>
   <div id="barwrap"><div class="bar" id="cast" style="visibility:hidden"><i></i><b></b></div><div class="abar" id="petbar" hidden></div><div class="abar" id="bar2"></div><div class="abar" id="bar1"></div></div>
+<div id="rbars"><div class="abar vbar" id="bar4" hidden></div><div class="abar vbar" id="bar3" hidden></div></div>
   <div class="bar" id="xpbar"><i id="xpi"></i><b id="xpt"></b></div>
   <div id="fps"></div>
 </div>
@@ -195,7 +197,7 @@
 <div id="bigmap" hidden><div class="mbox"><div class="mhead"><b id="mapTitle">World map</b><span class="muted">M or Esc to close · mouse wheel to zoom</span></div><canvas id="mapcv"></canvas></div></div>
 <div id="gmenu" hidden><div class="box"><h2>Menu</h2>
   <button data-g="map">World map</button><button data-g="quests">Quests</button><button data-g="char">Character</button><button data-g="bag">Bag</button><button data-g="spells">Spellbook</button>
-  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="threat">Threat meter <small id="gthr">On</small></button><button data-g="gfx">Graphics <small id="ggfx">Medium</small></button><button data-g="coop">Co-op</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
+  <button data-g="tal">Talents</button><button data-g="keys">Key bindings</button><button data-g="threat">Threat meter <small id="gthr">On</small></button><button data-g="rbar1">Right bar 1 <small id="grb1">Off</small></button><button data-g="rbar2">Right bar 2 <small id="grb2">Off</small></button><button data-g="gfx">Graphics <small id="ggfx">Medium</small></button><button data-g="coop">Co-op</button><button data-g="logout" class="lo">Logout</button><button data-g="resume" class="ghost">Back to the game</button></div></div>
 <div id="panel" hidden><div class="tabs"><button data-tab="quests">Quests</button><button data-tab="char">Character</button><button data-tab="bag">Bag</button><button data-tab="spells">Spellbook</button><button data-tab="tal">Talents</button><button data-tab="keys">Keys</button><button data-tab="coop">Co-op</button><button class="x" title="Close (Esc)">✕</button></div><div id="pbody"></div></div>
 <div id="chars" hidden><div class="box">
   <h1>Rimfrost 2</h1>
@@ -214,6 +216,6 @@
 <div id="petcast" hidden><i></i></div>
 <div id="rezask" hidden><span></span><button id="rezyes">Accept</button><button id="rezno" class="no">Decline</button></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261107t"></script>
+<script type="module" src="./src/main.js?v=20261107v"></script>
 </body>
 </html>

@@ -3,6 +3,9 @@
 ## v0.32.0
 
 ### New
+- **Two more action bars** along the right edge of the screen. Turn them on or off in the menu (Esc → Right bar 1 / Right bar 2). Fill them from the Spellbook, and give them keys in Key bindings (K).
+- **Placing area spells:** Rain of Fire, Blizzard, Tempest and Meteor Fall are now placed where you choose. Press the spell, move the circle with the mouse, and left-click to cast it there. Right-click or Esc cancels. The circle turns red when the spot is out of range.
+- **Warlock – Drain Life** is now channeled: it drains the target and heals you every second for 8 sec while you stand still. No cooldown. Each hit you take while channeling shortens it by 1 sec.
 - **Talents reworked for every class:** most plain "+X% damage" talents are replaced by effects and new abilities. Talent points are refunded for every class except the Warlock, so you can choose again.
   - **Mage:** Arcane Concentration, Presence of Mind, Arcane Power, Archmage · Impact, Combustion · Frost Channeling, Frostbite, Cold Snap, Deep Freeze.
   - **Warrior:** Sweeping Strikes, Sudden Death, Mortal Strike · Unbridled Wrath, Blood Craze, Enrage, Flurry, Recklessness · Shield Specialization, Last Stand, Improved Shield Bash, Shield Wall.

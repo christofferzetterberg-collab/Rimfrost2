@@ -8,7 +8,9 @@ export const ACTIONS = [
   ["Shapeshift", [["formBear", "Bear Form"], ["formCat", "Wolf Form"], ["formTravel", "Travel Form"]], "druid"],
   ["Windows", [["map", "World map"], ["quests", "Quest log"], ["char", "Character"], ["bag", "Bag"], ["spells", "Spellbook"], ["tal", "Talents"], ["keys", "Key bindings"], ["coop", "Co-op"]]],
   ["Action bar", Array.from({length: 10}, (_, i) => ["b" + (i + 1), `Action bar slot ${i + 1}`])],
-  ["Second action bar", Array.from({length: 10}, (_, i) => ["s" + (i + 1), `Second bar slot ${i + 1}`])]
+  ["Second action bar", Array.from({length: 10}, (_, i) => ["s" + (i + 1), `Second bar slot ${i + 1}`])],
+  ["Right bar 1", Array.from({length: 10}, (_, i) => ["r" + (i + 1), `Right bar 1 slot ${i + 1}`])],
+  ["Right bar 2", Array.from({length: 10}, (_, i) => ["q" + (i + 1), `Right bar 2 slot ${i + 1}`])]
 ];
 const digit = i => "Digit" + ((i + 1) % 10);
 export const DEFAULTS = {
