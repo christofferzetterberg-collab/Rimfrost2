@@ -96,7 +96,33 @@ const MOBS = {
   isande: {name: "Ice Spirit", lv: [28, 29], color: "#b4d6e4", r: 10, sp: 90, shape: "wisp", ranged: 220, dg: 1, hpm: 1.25, dmm: 1.1},
   valvbjorn: {name: "Vault Ice Bear", lv: [30, 30], color: "#ffffff", r: 15, sp: 92, shape: "boar", elite: 3, dg: 1, hpm: 1.3, special: {name: "Frost Claw", every: 9, r: 90, windup: 1.3, mult: 2.0}},
   skrymer: {name: "Skrymer the Rime Troll", lv: [30, 30], color: "#9ab8c8", r: 15, sp: 88, shape: "troll", elite: 3, dg: 1, hpm: 1.3, special: {name: "Ice Quake", every: 9, r: 95, windup: 1.3, mult: 2.0}},
-  skadi: {name: "Skadi the Ice Queen", lv: [31, 31], color: "#a8d8ec", r: 18, sp: 85, shape: "humanoid", elite: 4, boss: true, ranged: 220, dg: 1, hpm: 1.5, special: {name: "Eternal Winter", every: 8, r: 125, windup: 1.5, mult: 2.5}}
+  skadi: {name: "Skadi the Ice Queen", lv: [31, 31], color: "#a8d8ec", r: 18, sp: 85, shape: "humanoid", elite: 4, boss: true, ranged: 220, dg: 1, hpm: 1.5, special: {name: "Eternal Winter", every: 8, r: 125, windup: 1.5, mult: 2.5}},
+  // ---- the Southern Reaches (levels 30–40). anim: an animal model [file, length at size 12]; people: a KayKit character
+  // Saltwind Shore
+  tidecrab: {name: "Tidecrawler", lv: [30, 32], color: "#3a9a9a", r: 12, sp: 85, shape: "spider", anim: ["scorpion", 2.2]},
+  coaststalker: {name: "Coast Stalker", lv: [30, 32], color: "#9a8a6a", r: 12, sp: 105, shape: "wolf"},
+  corsair: {name: "Saltwind Corsair", lv: [31, 32], color: "#3a5a8a", r: 11, sp: 92, shape: "humanoid", people: {char: "Rogue_Hooded", alt: "rogue_texture_alt_C", right: "sword_1handed", left: "dagger", melee: "DW"}},
+  blackwake: {name: "Captain Blackwake", lv: [33, 33], color: "#1a2a4a", r: 15, sp: 92, shape: "humanoid", elite: 4, people: {char: "Barbarian_Large", alt: null, right: "sword_2handed", size: 15}, special: {name: "Cannon Volley", every: 9, r: 100, windup: 1.4, mult: 2.2}},
+  // Verdant Tangle
+  vinepanther: {name: "Vine Panther", lv: [32, 34], color: "#2a4a2a", r: 12, sp: 108, shape: "wolf", anim: ["cat", 2.3]},
+  venomweb: {name: "Venomweb Spider", lv: [32, 34], color: "#4a8a2a", r: 12, sp: 100, shape: "spider"},
+  jungletroll: {name: "Jungle Troll", lv: [33, 34], color: "#3a7a4a", r: 14, sp: 88, shape: "troll", people: {char: "OrcBrute", tint: [130, 0.45, 0.75], size: 14}},
+  vinequeen: {name: "Ix'tala the Vinequeen", lv: [35, 35], color: "#5ac04a", r: 15, sp: 88, shape: "humanoid", elite: 4, ranged: 220, people: {char: "Witch", tint: [110, 0.5, 0.7], helm: true, caster: true, size: 13}, special: {name: "Strangling Vines", every: 9, r: 100, windup: 1.4, mult: 2.2}},
+  // Sunscorch Dunes
+  dunescorpid: {name: "Dune Scorpid", lv: [34, 36], color: "#d8b070", r: 13, sp: 90, shape: "spider", anim: ["scorpion", 2.4]},
+  sandwraith: {name: "Sand Wraith", lv: [34, 36], color: "#f0d8a0", r: 10, sp: 88, shape: "wisp", ranged: 220},
+  glassgolem: {name: "Glass Golem", lv: [35, 36], color: "#c8e0e0", r: 15, sp: 72, shape: "golem", people: {char: "FrostGolem", tint: [175, 0.25, 1.0], size: 15}},
+  sandmaw: {name: "Sandmaw the Devourer", lv: [37, 37], color: "#c89050", r: 18, sp: 85, shape: "spider", elite: 5, anim: ["scorpion", 2.6], special: {name: "Sandstorm", every: 8, r: 110, windup: 1.5, mult: 2.4}},
+  // Thornreach
+  razorback: {name: "Razorback", lv: [36, 38], color: "#8a3a2a", r: 13, sp: 90, shape: "boar"},
+  thornbrute: {name: "Thornreach Brute", lv: [36, 38], color: "#9a4a3a", r: 14, sp: 88, shape: "troll", people: {char: "OrcBrute", tint: [10, 0.45, 0.7], right: "Orc_Axe_Large", size: 14}},
+  canyonwyvern: {name: "Canyon Wyvern", lv: [37, 38], color: "#9a5a3a", r: 13, sp: 100, shape: "drake", anim: ["dragon", 2.6]},
+  gorrak: {name: "Gorrak Thornhide", lv: [39, 39], color: "#b04a2a", r: 18, sp: 88, shape: "troll", elite: 5, people: {char: "OrcBrute", tint: [14, 0.6, 0.6], alt: "orcbrute_texture_B", right: "Orc_Axe_Large", size: 13}, special: {name: "Thorn Burst", every: 8, r: 110, windup: 1.5, mult: 2.4}},
+  // Dreadspire Peaks
+  dreadknight: {name: "Dread Knight", lv: [38, 40], color: "#4a3a6a", r: 13, sp: 90, shape: "humanoid", people: {char: "BlackKnight", tint: [270, 0.35, 0.55], right: "BlackKnight_Sword_Large", left: "BlackKnight_Shield_Large", size: 15}},
+  voidfiend: {name: "Void Fiend", lv: [38, 40], color: "#6a3aaa", r: 14, sp: 80, shape: "golem", people: {char: "FrostGolem", tint: [272, 0.6, 0.45], glow: 0x2a1048, size: 15}},
+  dreadcaster: {name: "Dreadspire Cultist", lv: [38, 40], color: "#7a3a9a", r: 11, sp: 88, shape: "humanoid", ranged: 210, people: {char: "Necromancer", tint: [285, 0.4, 0.6], right: "Skeleton_Staff", helm: true, caster: true}},
+  malakar: {name: "Malakar the Dread Lord", lv: [40, 40], color: "#5a2a8a", r: 22, sp: 85, shape: "humanoid", elite: 7, boss: true, people: {char: "BlackKnight", alt: "blackknight_texture_alt", tint: [275, 0.5, 0.5], right: "BlackKnight_Sword_Large", left: "BlackKnight_Shield_Large", size: 14}, special: {name: "Shadow Cataclysm", every: 7, r: 135, windup: 1.5, mult: 2.6}},
 };
 const hx = s => parseInt(s.slice(1), 16);
 const shade = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();
@@ -134,7 +160,7 @@ const LOOKS = {
 // the new models (KayKit and Quaternius): animals in the monster's colour, people and skeletons on the KayKit rig
 // kobolds and goblins: the goblin model, tinted for the kobolds (h = height at size 10)
 const GOBLINS = {troll: {h: 1.7}, goblin: {h: 1.75}, goblinshaman: {h: 1.75, tint: 0xb0a0e0}, kobold: {h: 1.8, tint: 0xd8b860}, frostkobold: {h: 1.8, tint: 0x9ac0d8}, gruvkobold: {h: 1.8, tint: 0xc9a24a}, krakk: {h: 1.9, tint: 0xe0b040}, snorre: {h: 1.95, tint: 0xe8c050}};
-const WOLVES = new Set(["wolf", "oldgray", "shadewolf", "plaguewolf", "hound", "frostwolf", "eldhund", "frostulv"]);
+const WOLVES = new Set(["coaststalker", "wolf", "oldgray", "shadewolf", "plaguewolf", "hound", "frostwolf", "eldhund", "frostulv"]);
 const PEOPLE = {
   thief: {char: "Rogue", alt: "rogue_texture_alt_B", right: "dagger", left: "dagger", melee: "DW"},
   bandit: {char: "Rogue_Hooded", alt: "rogue_texture_alt_B", right: "sword_1handed", left: "dagger", melee: "DW"},
@@ -166,6 +192,7 @@ const PEOPLE = {
   boss: {char: "BlackKnight", alt: "blackknight_texture_alt", right: "BlackKnight_Sword_Large", left: "BlackKnight_Shield_Large", size: 15},
 };
 function newModel(kind, d, c){
+  if(d.anim) return makeMobAnimal(d.anim[0], d.anim[1] * d.r / 12, c);
   if(WOLVES.has(kind)) return makeMobAnimal("wolf2", 2.2 * d.r / 11, c);
   if(kind === "lynx") return makeMobAnimal("fox", 1.6 * d.r / 11, null);
   if(kind === "jackal") return makeMobAnimal("fox", 1.7 * d.r / 11, c);
@@ -180,7 +207,7 @@ function newModel(kind, d, c){
   if(d.shape === "drake") return makeMobAnimal("dragon", 3.4 * d.r / 18, c);
   if(kind === "gargoyle" || kind === "magmagargoyl") return makeMobAnimal("dragon", 2.4 * d.r / 12, c);
   if(GOBLINS[kind]) return makeMobAnimal("goblin", 0, GOBLINS[kind].tint ?? null, {height: GOBLINS[kind].h * d.r / 10});
-  const P = PEOPLE[kind]; if(!P) return null;
+  const P = PEOPLE[kind] || d.people; if(!P) return null;
   const g = makeAvatar(P.race || "human", null, {}, {...P, scale: d.r / (P.size || 11)}); if(g && P.caster) g.userData.caster = true; return g;
 }
 function makeModel(kind, d){
@@ -233,9 +260,15 @@ export const SPAWNS = [
   ["ghoul", 10, "dimma"], ["wisp", 7, "dimma"], ["goblin", 9, "dimma"], ["goblinshaman", 5, "dimma"], ["dragon", 3, "dimma"],
   ["hound", 11, "aska"], ["elemental", 8, "aska"], ["gargoyle", 10, "aska"],
   ["frostwolf", 12, "frost"], ["icegolem", 12, "frost"], ["rimtroll", 12, "frost"],
-  ["rat", 12, "gravmark"], ["plaguewolf", 9, "gravmark"], ["shambler", 10, "gravmark"], ["robber", 10, "benfalt"], ["boneguard", 10, "benfalt"], ["plaguebear", 7, "benfalt"]
+  ["rat", 12, "gravmark"], ["plaguewolf", 9, "gravmark"], ["shambler", 10, "gravmark"], ["robber", 10, "benfalt"], ["boneguard", 10, "benfalt"], ["plaguebear", 7, "benfalt"],
+  ["tidecrab", 12, "saltwind"], ["coaststalker", 11, "saltwind"], ["corsair", 11, "saltwind"],
+  ["vinepanther", 11, "verdant"], ["venomweb", 12, "verdant"], ["jungletroll", 11, "verdant"],
+  ["dunescorpid", 12, "dunes"], ["sandwraith", 9, "dunes"], ["glassgolem", 10, "dunes"],
+  ["razorback", 12, "thorn"], ["thornbrute", 11, "thorn"], ["canyonwyvern", 7, "thorn"],
+  ["dreadknight", 11, "dread"], ["voidfiend", 10, "dread"], ["dreadcaster", 10, "dread"]
 ];
-export const ZONE_MOB_MULT = {dimma: 1.9, aska: 2.9, frost: 2.2, rod: 1.3, jarn: 1.2, gravmark: 1.2, benfalt: 1.2};
+export const ZONE_MOB_MULT = {saltwind: 1.8, verdant: 2, dunes: 2.2, thorn: 1.9, dread: 2, dimma: 1.9, aska: 2.9, frost: 2.2, rod: 1.3, jarn: 1.2, gravmark: 1.2, benfalt: 1.2};
 // the elites in their lairs (and Old Gray, somewhere far out in Frost Meadows)
 export const FIXED = [["oldgray", {zone: "frostang", far: "frostvik", d: 45}], ["leader", {lair: "banditcamp"}], ["morvel", {lair: "morvel"}], ["snorre", {lair: "snorre"}],
-  ["garuk", {lair: "garuk"}], ["magma", {lair: "magma"}], ["giant", {lair: "giant"}], ["vex", {lair: "vex"}]];
+  ["garuk", {lair: "garuk"}], ["magma", {lair: "magma"}], ["giant", {lair: "giant"}], ["vex", {lair: "vex"}],
+  ["blackwake", {lair: "blackwake"}], ["vinequeen", {lair: "vinequeen"}], ["sandmaw", {lair: "sandmaw"}], ["gorrak", {lair: "gorrak"}], ["malakar", {lair: "malakar"}]];

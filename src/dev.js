@@ -37,7 +37,7 @@ function render(){
   el.innerHTML = `<div class="r" style="justify-content:space-between"><b style="color:#ffb860;font-size:15px">Dev tools</b><span class="m">F8 to close</span></div>
     ${c ? `<div class="m">${esc(c.name)} · level ${c.level} ${CLASSES[c.cls].name} · ${c.gold} gold</div>
     <h3>Character</h3>
-    <div class="r">Level <select id="devlvl">${Array.from({length: 30}, (_, i) => `<option ${i + 1 === c.level ? "selected" : ""}>${i + 1}</option>`).join("")}</select><button data-dev="setlvl">Set</button>
+    <div class="r">Level <select id="devlvl">${Array.from({length: 40}, (_, i) => `<option ${i + 1 === c.level ? "selected" : ""}>${i + 1}</option>`).join("")}</select><button data-dev="setlvl">Set</button>
       <button data-dev="gold">+1000 gold</button><button data-dev="learn">Learn all abilities</button><button data-dev="riding">Riding + all mounts</button></div>
     <div class="r">Gear <select id="devq">${QUAL.map((q, i) => `<option value="${i}" ${i === 3 ? "selected" : ""}>${q.name}</option>`).join("")}</select><button data-dev="gear">Equip a full set (your level)</button><button data-dev="prof">Mining & Herbalism 150</button></div>
     <div class="r"><button data-dev="heal">Full health & mana</button><button data-dev="cds">Reset cooldowns</button><button data-dev="god" class="${DEV.god ? "on" : ""}">God mode</button>
@@ -47,7 +47,7 @@ function render(){
     <h3>Teleport</h3><div class="r"><select id="devtp">${hubs}</select><button data-dev="tp">Go</button></div>` : `<div class="m">Pick a character first.</div>`}
     <h3>Balance test</h3>
     <div class="m">Every class (human, no race bonus) fights the same monsters at the same level with the same quality gear. Hunters are tested with a bear and with a wolf; druids as caster, bear and wolf. The game pauses while it runs.</div>
-    <div class="r">Level <select data-set="lvl">${[5, 10, 15, 20, 25, 30].map(l => `<option ${String(l) === BT.lvl ? "selected" : ""}>${l}</option>`).join("")}</select>
+    <div class="r">Level <select data-set="lvl">${[5, 10, 15, 20, 25, 30, 35, 40].map(l => `<option ${String(l) === BT.lvl ? "selected" : ""}>${l}</option>`).join("")}</select>
       Gear <select data-set="q">${QUAL.map((q, i) => `<option value="${i}" ${String(i) === BT.q ? "selected" : ""}>${q.name}</option>`).join("")}</select>
       Talents <select data-set="spec"><option value="0" ${BT.spec === "0" ? "selected" : ""}>none</option>${[1, 2, 3].map(i => `<option value="${i}" ${BT.spec === String(i) ? "selected" : ""}>tree ${i}</option>`).join("")}</select>
       Runs <select data-set="trials">${[1, 3, 5].map(n => `<option ${String(n) === BT.trials ? "selected" : ""}>${n}</option>`).join("")}</select></div>

@@ -1,5 +1,101 @@
 # Rimfrost 2 – Release notes
 
+## v0.37.1
+
+### Changed
+- **Shaman totems** are placed in a square around you, based on where you face: Earth front left, Fire front right, Water back left and Air back right.
+
+## v0.37.0
+
+### New
+- **Deeper talent trees:** every tree has two new tiers. Tier 6 (14 points in the tree) has a 5-rank talent and Tier 7 (19 points) a 3-rank talent. A full tree now takes 24 points, so 31 points at level 40 fill one tree and leave a few for another.
+- **Proc alerts:** when a talent makes your next spell instant or free (for example Maelstrom Weapon, Hot Streak, Clearcasting or Nightfall), a glowing ring surrounds your character, a large alert with the time left appears above the action bars, and the empowered spells light up on your bar.
+- The places to explore in the Southern Reaches now have proper landmarks: the Old Lighthouse, the Wreck of the Gull, the Overgrown Idol, the Sunken Spire, the Bleached Bones and the Void Rift.
+
+## v0.36.0
+
+### New
+- **Totem bar (Shaman):** your totems now have their own bar above the action bars, like druid forms and the pet bar.
+- **Grace of Air Totem (Shaman, level 24):** a new Air totem that increases the critical strike chance of you and nearby allies by 3%. Learn it from your trainer.
+- Totems are grouped into four elements (Fire, Earth, Water and Air); only one totem of each element can be active.
+- Active totems are shown as buffs under your portrait. Right-click one to cancel it.
+- **Elite, rare and boss frames:** the target frame now has its own border and label for elite, rare and boss enemies.
+- **World map:** drag the map to look around when zoomed in. The mouse wheel zooms towards the cursor.
+- **Gear vendors** now offer a limited selection that changes every 10 minutes, sometimes including a rare item. Items you buy are gone until the next delivery.
+
+### Changed
+- **Lightning Shield:** now costs more mana and can damage an attacker at most once every 5 sec (still 3 charges).
+- **Potions:** healing and mana potions share a 2 min cooldown.
+- **Elixirs:** much more expensive. Only one elixir can be active at a time; drinking a new one replaces the old one. Elixirs do not share a cooldown with potions.
+- The ranged slot is now called Relic (Paladin), Totem (Shaman) and Idol (Druid).
+
+### Fixed
+- Melee and ranged auto attacks did not play an attack animation.
+- Drakes did not flap their wings while moving or flying.
+- Arriving by ship, you now step ashore on open ground instead of at the water's edge.
+
+## v0.35.2
+
+### Changed
+- Flights are slower, but still faster than riding a mount.
+
+## v0.35.1
+
+### Changed
+- Flight Masters are now found in towns only (Frostwick, Leafhome, Mountdale, Burnmark, Palestead, Rimhaven, Stormhaven and Port Solace), no longer in camps.
+
+### Fixed
+- As a spirit, you can now enter a dungeon to reach your corpse; you are no longer reported as being in combat.
+- Resurrection Sickness is now shown as a debuff under your character frame.
+
+## v0.35.0 – The Southern Reaches
+
+### New
+- **A new continent:** the Southern Reaches lie across the sea, south of Rimfrost. Five new zones for levels 30–40: Saltwind Shore, Verdant Tangle, Sunscorch Dunes, Thornreach and Dreadspire Peaks.
+- **Ships:** the new harbour town of **Stormhaven**, on Rimfrost's south coast, sails to **Port Solace** and back. Speak with the ship captain at the pier (5 gold).
+- **Level cap raised to 40.** Talent points continue up to 31, and equipment now goes up to item level 40.
+- New towns and camps: Port Solace, Vinewatch, Sunwell Oasis, Thornhold and Lastlight, each with a Flight Master. Flight paths connect the towns and camps of the same continent.
+- 15 new monster types and 5 elite lords, including **Malakar the Dread Lord** (level 40).
+- 35 new quests, starting with *Across the Sea* from Commander Halvard in Rimhaven at level 30.
+- The south coast of Rimfrost is now a coastline with beaches instead of mountains.
+
+### Fixed
+- Monsters near you could appear as sheep for a few seconds after logging in.
+
+## v0.34.0
+
+### New
+- **Flight paths:** every town and camp now has a Flight Master with a drake. Speak with a Flight Master to discover that flight path, then fly to any discovered destination for a small fee.
+- Your home town's flight path is known from the start.
+- While flying you cannot be attacked and cannot use abilities. Your pet travels with you.
+- Flight Masters are marked on the world map; discovered ones are highlighted.
+
+## v0.33.2
+
+### Changed
+- **Strafing on a mount:** holding the right mouse button and pressing A or D now turns your mount partly towards where it runs, instead of it galloping sideways while facing forward.
+
+## v0.33.1
+
+### Fixed
+- On the Dire Wolf you now sit over its shoulders instead of far back.
+
+## v0.33.0
+
+### New
+- **New mount models:** the Brown Horse and Gray Stallion are now animated horses that gallop, and the Dire Wolf is an animated wolf.
+- The Mountain Ram is replaced by the **Great Stag**. If you own the Ram, you now ride the Great Stag.
+
+### Changed
+- **Resurrecting at your corpse** brings you back where you stand, as long as you are within reach of your body.
+- **Pets** regain health more slowly out of combat (about 1.5 min from empty to full).
+- **Holding the left mouse button** and moving the mouse now turns only the camera. Holding the right mouse button still turns your character and the camera.
+
+## v0.32.1
+
+### Changed
+- **Pets** keep attacking the enemy they started on when you change target. Use **Attack** to send your pet after your new target.
+
 ## v0.32.0
 
 ### New

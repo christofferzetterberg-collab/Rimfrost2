@@ -18,8 +18,16 @@ export const ZONES = {
   aska:     {name: "Ashfields", lv: [20, 25], c: [304, 80], w: 16, t: "ash"},
   frost:    {name: "Frostcrown", lv: [25, 30], c: [384, 184], w: 20, t: "snow"},
   gravmark: {name: "Gravelands", lv: [1, 5], c: [100, 328], w: 0, t: "blight", race: "undead"},
-  benfalt:  {name: "Bonefields", lv: [5, 10], c: [184, 304], w: 0, t: "gloom", race: "undead"}
+  benfalt:  {name: "Bonefields", lv: [5, 10], c: [184, 304], w: 0, t: "gloom", race: "undead"},
+  // the Southern Reaches, across the sea (s: on the southern continent)
+  saltwind: {name: "Saltwind Shore", lv: [30, 32], c: [140, 428], w: 6, t: "coast", s: 1},
+  verdant:  {name: "Verdant Tangle", lv: [32, 34], c: [272, 438], w: 6, t: "jungle", s: 1},
+  dunes:    {name: "Sunscorch Dunes", lv: [34, 36], c: [384, 476], w: 8, t: "desert", s: 1},
+  thorn:    {name: "Thornreach", lv: [36, 38], c: [96, 520], w: 4, t: "badlands", s: 1},
+  dread:    {name: "Dreadspire Peaks", lv: [38, 40], c: [268, 540], w: 6, t: "dread", s: 1}
 };
+// the sea between the continents (world z): the north coast runs near SEA.n, the south coast near SEA.s
+export const SEA = {n: 250, s: 300};
 // Towns and camps (safe places). kind: town = a village, camp = a small camp, city = Rimhaven.
 export const HUBS = {
   frostvik:     {name: "Frostwick", tx: 48, ty: 148, r: 7, kind: "town", race: "human"},
@@ -35,7 +43,13 @@ export const HUBS = {
   askvakten:    {name: "Ashwatch", tx: 300, ty: 88, r: 5, kind: "camp"},
   isporten:     {name: "Icegate", tx: 376, ty: 180, r: 5, kind: "camp"},
   bleksted:     {name: "Palestead", tx: 100, ty: 328, r: 7, kind: "town", race: "undead"},
-  benvakten:    {name: "Bonewatch", tx: 184, ty: 304, r: 4, kind: "camp"}
+  benvakten:    {name: "Bonewatch", tx: 184, ty: 304, r: 4, kind: "camp"},
+  stormhaven:   {name: "Stormhaven", tx: 250, ty: 350, r: 6, kind: "town", race: "human", port: "s"},
+  solace:       {name: "Port Solace", tx: 160, ty: 405, r: 7, kind: "town", race: "human", port: "n"},
+  vinewatch:    {name: "Vinewatch", tx: 262, ty: 440, r: 4, kind: "camp"},
+  sunwell:      {name: "Sunwell Oasis", tx: 372, ty: 480, r: 5, kind: "camp"},
+  thornhold:    {name: "Thornhold", tx: 96, ty: 506, r: 4, kind: "camp"},
+  lastlight:    {name: "Lastlight", tx: 262, ty: 532, r: 5, kind: "camp"}
 };
 // Rimhaven's districts (tile offsets from the centre) with a sign each
 export const CITY_SIGNS = [["Mage & Priest Quarter", 0, -7.5], ["The Barracks", 7.5, 0], ["Hunters' Lodge & Grove", 0, 7.5], ["The Market", -7.5, 0]];
@@ -44,12 +58,16 @@ export const ROADS = [["frostvik", "holgerstuga"], ["lovhem", "manglanta"], ["be
   ["holgerstuga", "jarnfastet"], ["manglanta", "jarnfastet"], ["snostugan", "jarnfastet"], ["kanjonlagret", "jarnfastet"],
   ["frostvik", "lovhem"], ["frostvik", "brannmark"], ["lovhem", "bergsdal"], ["manglanta", "snostugan"], ["holgerstuga", "kanjonlagret"],
   ["jarnfastet", "traskvakten"], ["jarnfastet", "askvakten"], ["askvakten", "isporten"], ["traskvakten", "isporten"], ["bergsdal", "askvakten"],
-  ["bleksted", "benvakten"], ["bleksted", "brannmark"], ["benvakten", "kanjonlagret"], ["benvakten", "traskvakten"], ["benvakten", "jarnfastet"]];
+  ["bleksted", "benvakten"], ["bleksted", "brannmark"], ["benvakten", "kanjonlagret"], ["benvakten", "traskvakten"], ["benvakten", "jarnfastet"],
+  ["stormhaven", "benvakten"], ["stormhaven", "traskvakten"],
+  ["solace", "vinewatch"], ["solace", "thornhold"], ["vinewatch", "sunwell"], ["vinewatch", "lastlight"], ["thornhold", "lastlight"], ["sunwell", "lastlight"]];
 // Lairs: cleared spots for the elites and bosses, each with a road from a camp
 export const LAIRS = {
   banditcamp: {tx: 84, ty: 192, r: 6, from: "holgerstuga"}, morvel: {tx: 136, ty: 64, r: 4, from: "manglanta"}, snorre: {tx: 172, ty: 108, r: 4, from: "snostugan"},
   garuk: {tx: 148, ty: 248, r: 4, from: "kanjonlagret"}, magma: {tx: 320, ty: 28, r: 5, from: "askvakten"}, giant: {tx: 412, ty: 224, r: 6, from: "isporten"},
-  vex: {tx: 224, ty: 332, r: 4, from: "benvakten"}
+  vex: {tx: 224, ty: 332, r: 4, from: "benvakten"},
+  blackwake: {tx: 92, ty: 418, r: 5, from: "solace"}, vinequeen: {tx: 312, ty: 418, r: 5, from: "vinewatch"}, sandmaw: {tx: 412, ty: 500, r: 6, from: "sunwell"},
+  gorrak: {tx: 60, ty: 540, r: 5, from: "thornhold"}, malakar: {tx: 300, ty: 556, r: 7, from: "lastlight"}
 };
 // Places quests send you to
 export const EXPLORE = {
@@ -60,7 +78,9 @@ export const EXPLORE = {
   watchtower: {name: "the Broken Watchtower", tx: 236, ty: 134}, minershrine: {name: "the Miner's Shrine", tx: 178, ty: 198},
   witchhut: {name: "the Witch's Hut", tx: 256, ty: 224}, sunkenbell: {name: "the Sunken Bell", tx: 300, ty: 268},
   obelisk: {name: "the Cinder Obelisk", tx: 328, ty: 102}, scorchbridge: {name: "the Scorched Bridge", tx: 282, ty: 58},
-  frozencamp: {name: "the Frozen Camp", tx: 404, ty: 160}, giantprint: {name: "the Giant's Footprint", tx: 364, ty: 208}
+  frozencamp: {name: "the Frozen Camp", tx: 404, ty: 160}, giantprint: {name: "the Giant's Footprint", tx: 364, ty: 208},
+  wreck: {name: "the Wreck of the Gull", tx: 196, ty: 404}, oldlighthouse: {name: "the Old Lighthouse", tx: 40, ty: 404}, sunkenidol: {name: "the Overgrown Idol", tx: 236, ty: 462},
+  sunspire: {name: "the Sunken Spire", tx: 344, ty: 452}, bonepit: {name: "the Bleached Bones", tx: 140, ty: 488}, voidrift: {name: "the Void Rift", tx: 214, ty: 552}
 };
 // Dungeon doors in the world (tiles) and the camp whose road leads there
 export const DG_DOORS = {
@@ -72,3 +92,5 @@ export const DG_DOORS = {
 for(const o of [...Object.values(HUBS), ...Object.values(LAIRS), ...Object.values(EXPLORE), ...Object.values(DG_DOORS)]){ Object.assign(o, W(o.tx, o.ty)); if(o.r) o.R = o.r * TS; }
 for(const z of Object.values(ZONES)) Object.assign(z, {cx: W(z.c[0], z.c[1]).x, cz: W(z.c[0], z.c[1]).z, wu: (z.w || 0) * TS});
 for(const [id, h] of Object.entries(HUBS)) h.id = id;
+// which continent a point is on: 0 the north (Rimfrost), 1 the Southern Reaches
+export const continentOf = z => z > (SEA.n + SEA.s) / 2 ? 1 : 0;

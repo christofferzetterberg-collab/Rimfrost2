@@ -31,7 +31,7 @@ const T = (...a) => E.T(...a);
 const curse = (...a) => E.curse(...a), totem = (...a) => E.totem(...a), finisher = (...a) => E.finisher(...a), drain = (...a) => E.drain(...a);
 const coopGroupFx = (...a) => E.coopGroupFx(...a);
 const petCallCheck = (...a) => E.petCallCheck(...a), petCall = (...a) => E.petCall(...a), petMend = (...a) => E.petMend(...a), petDismiss = (...a) => E.petDismiss(...a), petFight = (...a) => E.petFight(...a), PET_CAST = 10;
-const MAX_LVL = 30;
+const MAX_LVL = 40;
 export const HUNTER_MIN = 138;      // bows need at least 6 m to the target (in Rimfrost pixels; 23 px = 1 m)
 export const RACES = {
   human:{name:"Human", skin:"#e2b48e", desc:"Experience gained increased by 5%. Racial ability: Sprint.", hair:"#5b3a22"},
@@ -470,8 +470,8 @@ Object.assign(AB, {
   hstream:{name:"Healing Stream Totem", lvl:12, cost:20, range:0, school:"nature", icon:"totem", tgt:"self",
     desc:()=>`Places a Water totem that heals you and nearby allies for 3% of maximum health every 2 sec. Lasts 1 min.`,
     run:()=>totem("hstream")},
-  lshield:{name:"Lightning Shield", lvl:14, cost:20, range:0, school:"nature", icon:"bubble", tgt:"self",
-    desc:()=>`Surrounds you with lightning. Melee attackers take ${fmt(spow()*0.6)} Nature damage. 3 charges. Lasts 10 min.`,
+  lshield:{name:"Lightning Shield", lvl:14, cost:45, range:0, school:"nature", icon:"bubble", tgt:"self",
+    desc:()=>`Surrounds you with lightning. Melee attackers take ${fmt(spow()*0.6)} Nature damage, at most once every 5 sec. 3 charges. Lasts 10 min.`,
     run:()=>{buff("lshield",600);P.lsCharges=3;ring(P.px,P.py,40,"#cfe8ff");}},
   chain:{name:"Chain Lightning", lvl:16, cost:35, cd:6, cast:2.0, range:300, school:"nature", icon:"bolt", tgt:"enemy",
     desc:()=>`Hurls lightning that strikes the target for ${fmt(spow()*1.6)} Nature damage and jumps to up to 2 nearby enemies.`,
@@ -485,6 +485,9 @@ Object.assign(AB, {
   magma:{name:"Magma Totem", lvl:22, cost:30, range:0, school:"fire", icon:"totem", tgt:"self",
     desc:()=>`Places a Fire totem that deals ${fmt(spow()*0.6)} Fire damage to enemies within 4 m every 2 sec. Lasts 20 sec.`,
     run:()=>totem("magma")},
+  graceair:{name:"Grace of Air Totem", lvl:24, cost:20, range:0, school:"nature", icon:"totem", tgt:"self",
+    desc:()=>`Places an Air totem that increases the critical strike chance of you and nearby allies by 3%. Lasts 2 min.`,
+    run:()=>totem("graceair")},
   heroism:{name:"Heroism", lvl:26, cost:30, cd:180, range:0, school:"nature", icon:"horn", tgt:"self", offGcd:true,
     desc:()=>`Increases damage dealt by you and nearby allies by 20%. Lasts 15 sec.`,
     run:()=>{buff("heroism",15);ring(P.px,P.py,120,"#ffb84a");coopGroupFx(700,[["buff","heroism",15]],"Heroism");}},
@@ -595,7 +598,7 @@ export const BARS = {
   paladin:["palstrike","palheal","hammer","holyshield","crusader","consecrate","avenging","bubble","judge","redemption","divinefavor","holyshock","avengershield","divinestorm"],
   warlock:["shadowbolt","summonimp","immolate","corruption","fear","agony","lifetap","drainlife","summonvoid","healthfunnel","weakness","rainfire","soulfire","deathcoil","dismissdemon","demonfrenzy","unstable","shadowburn","conflagrate","wand"],
   rogue:["sinister","eviscerate","stealth","gouge","backstab","slicedice","rupture","evasion","ambush","fanknives","kidney","vanish","adrenaline","coldblood","bladeflurry","premed","shadowdance","shoot"],
-  shaman:["lightning","healwave","earthshock","searing","flameshock","stoneskin","hstream","lshield","chain","frostshock","strengthtotem","magma","heroism","stormstrike","elemmastery","ancswift","manatide"]
+  shaman:["lightning","healwave","earthshock","searing","flameshock","stoneskin","hstream","lshield","chain","frostshock","strengthtotem","magma","graceair","heroism","stormstrike","elemmastery","ancswift","manatide"]
 };
 
 // the healing abilities: their strength grows with spell healing (and spell power) on your gear and with healing talents
@@ -606,7 +609,7 @@ for(const c of ["mage", "hunter", "priest", "druid", "warlock", "shaman"]) for(c
 // Talents: every class has three specializations (trees). A tier opens when you have spent enough points IN THAT TREE: 1:0, 2:3, 3:6, 4:8, 5:10.
 // eff = generic bonus per rank: dmg, crit, dodge, parry, def (less damage taken), hp, mana, heal (healing done), form (damage in Bear/Wolf Form),
 // petdmg / pethp (hunter pets), and a school name (fire, frost, arcane, nature, holy, shadow, phys) for more damage with that school.
-export const TIER_NEED = {1:0, 2:3, 3:6, 4:8, 5:10};
+export const TIER_NEED = {1:0, 2:3, 3:6, 4:8, 5:10, 6:14, 7:19};
 export const TALENT_VERSION = 4;
 export const TALENT_CLASS_VER = {warlock: 3};           // a class whose talents changed again gets its points back once more
 export const TREES = {
@@ -622,6 +625,12 @@ export const TREES = {
 };
 export const TALENTS = {
   mage:[
+    {id:"t6_arcane",tree:"arcane",tier:6,max:5,name:"Arcane Mastery",eff:{dmg:0.015},d:r=>`Increases all damage dealt by ${+(1.5*r).toFixed(1)}%.`},
+    {id:"t7_arcane",tree:"arcane",tier:7,max:3,name:"Arcane Fortitude",eff:{mana:0.04},d:r=>`Increases maximum mana by ${+(4.0*r).toFixed(1)}%.`},
+    {id:"t6_fire",tree:"fire",tier:6,max:5,name:"Fire Mastery",eff:{fire:0.02},d:r=>`Increases Fire damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_fire",tree:"fire",tier:7,max:3,name:"Pyromaniac",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_frost",tree:"frost",tier:6,max:5,name:"Frost Mastery",eff:{frost:0.02},d:r=>`Increases Frost damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_frost",tree:"frost",tier:7,max:3,name:"Ice Ward",eff:{def:0.02},d:r=>`Reduces damage taken by ${+(2.0*r).toFixed(1)}%.`},
     {id:"arcMind",tree:"arcane",tier:1,max:3,name:"Arcane Mind",d:r=>`Increases maximum mana by ${10*r}%.`},
     {id:"m_conc",tree:"arcane",tier:1,max:3,name:"Arcane Concentration",d:r=>`Your damaging spells have a ${3*r}% chance to make your next spell cost no mana.`},
     {id:"m_medit",tree:"arcane",tier:2,max:3,name:"Arcane Meditation",d:r=>`Increases your mana regeneration in combat by ${50*r}%.`},
@@ -644,6 +653,12 @@ export const TALENTS = {
     {id:"m_coldsnap",tree:"frost",tier:4,max:1,name:"Cold Snap",grants:"coldsnap",d:()=>`Teaches Cold Snap: finishes the cooldown of your Frost spells. 3 min cooldown.`},
     {id:"m_deep",tree:"frost",tier:5,max:1,name:"Deep Freeze",grants:"deepfreeze",d:()=>`Teaches Deep Freeze: stuns the target for 4 sec and deals Frost damage, tripled against frozen targets. 30 sec cooldown.`}],
   warrior:[
+    {id:"t6_arms",tree:"arms",tier:6,max:5,name:"Weapon Mastery",eff:{phys:0.02},d:r=>`Increases physical damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_arms",tree:"arms",tier:7,max:3,name:"Deadly Precision",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_fury",tree:"fury",tier:6,max:5,name:"Unbridled Fury",eff:{dmg:0.015},d:r=>`Increases all damage dealt by ${+(1.5*r).toFixed(1)}%.`},
+    {id:"t7_fury",tree:"fury",tier:7,max:3,name:"Bloodlust",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_prot",tree:"prot",tier:6,max:5,name:"Ironclad",eff:{def:0.015},d:r=>`Reduces damage taken by ${+(1.5*r).toFixed(1)}%.`},
+    {id:"t7_prot",tree:"prot",tier:7,max:3,name:"Bulwark",eff:{hp:0.03},d:r=>`Increases maximum health by ${+(3.0*r).toFixed(1)}%.`},
     {id:"impHS",tree:"arms",tier:1,max:3,name:"Improved Strike",d:r=>`Increases the damage of Mighty Strike by ${10*r}%.`},
     {id:"w_weapon",tree:"arms",tier:1,max:3,name:"Weapon Mastery",eff:{phys:0.03},d:r=>`Increases physical damage by ${3*r}%.`},
     {id:"deepWounds",tree:"arms",tier:2,max:3,name:"Deep Wounds",d:r=>`Your critical strikes cause the target to bleed for an additional ${15*r}% of the damage over 4 sec.`},
@@ -666,6 +681,12 @@ export const TALENTS = {
     {id:"w_bash",tree:"prot",tier:4,max:2,name:"Improved Shield Bash",d:r=>`Reduces the cooldown of Shield Bash by ${3*r} sec.`},
     {id:"w_wall",tree:"prot",tier:5,max:1,name:"Shield Wall",grants:"shieldwall",d:()=>`Teaches Shield Wall: reduces damage taken by 50% for 10 sec. 3 min cooldown.`}],
   hunter:[
+    {id:"t6_beast",tree:"beast",tier:6,max:5,name:"Pack Leader",eff:{petdmg:0.04},d:r=>`Increases your pet's damage by ${+(4.0*r).toFixed(1)}%.`},
+    {id:"t7_beast",tree:"beast",tier:7,max:3,name:"Thick Fur",eff:{pethp:0.05},d:r=>`Increases your pet's maximum health by ${+(5.0*r).toFixed(1)}%.`},
+    {id:"t6_marks",tree:"marks",tier:6,max:5,name:"Sharpshooter",eff:{phys:0.02},d:r=>`Increases physical damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_marks",tree:"marks",tier:7,max:3,name:"Eagle Eye",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_surv",tree:"surv",tier:6,max:5,name:"Survivalist",eff:{hp:0.02},d:r=>`Increases maximum health by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_surv",tree:"surv",tier:7,max:3,name:"Elemental Arrows",eff:{fire:0.03,frost:0.03,nature:0.03},d:r=>`Increases Fire, Frost and Nature damage by ${+(3.0*r).toFixed(1)}%.`},
     {id:"h_pethp",tree:"beast",tier:1,max:3,name:"Endurance Training",eff:{pethp:0.08},d:r=>`Increases your pet\'s health by ${8*r}%.`},
     {id:"h_throat",tree:"beast",tier:1,max:3,name:"Go for the Throat",d:r=>`Your critical strikes grant your pet ${10*r} rage or energy.`},
     {id:"h_frenzy",tree:"beast",tier:2,max:3,name:"Frenzy",d:r=>`Increases your pet\'s attack speed by ${7*r}%.`},
@@ -688,6 +709,12 @@ export const TALENTS = {
     {id:"h_thrill",tree:"surv",tier:4,max:3,name:"Thrill of the Hunt",d:r=>`Your critical strikes restore ${5*r} focus.`},
     {id:"h_explosive",tree:"surv",tier:5,max:1,name:"Explosive Shot",grants:"explosive",d:()=>`Teaches Explosive Shot: an arrow that explodes, dealing Fire damage to the target and nearby enemies. 8 sec cooldown.`}],
   priest:[
+    {id:"t6_disc",tree:"disc",tier:6,max:5,name:"Disciplined Mind",eff:{mana:0.03},d:r=>`Increases maximum mana by ${+(3.0*r).toFixed(1)}%.`},
+    {id:"t7_disc",tree:"disc",tier:7,max:3,name:"Resolve",eff:{def:0.02},d:r=>`Reduces damage taken by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t6_holy",tree:"holy",tier:6,max:5,name:"Holy Mastery",eff:{heal:0.02},d:r=>`Increases healing done by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_holy",tree:"holy",tier:7,max:3,name:"Divine Clarity",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_shadow",tree:"shadow",tier:6,max:5,name:"Shadow Mastery",eff:{shadow:0.02},d:r=>`Increases Shadow damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_shadow",tree:"shadow",tier:7,max:3,name:"Dark Vigor",eff:{hp:0.03},d:r=>`Increases maximum health by ${+(3.0*r).toFixed(1)}%.`},
     {id:"spiritual",tree:"disc",tier:1,max:3,name:"Spiritual Strength",d:r=>`Increases maximum mana by ${10*r}%.`},
     {id:"impShield",tree:"disc",tier:1,max:2,name:"Reinforced Barrier",d:r=>`Increases the damage absorbed by Barrier of Light by ${15*r}%.`},
     {id:"p_borrowed",tree:"disc",tier:2,max:3,name:"Borrowed Time",d:r=>`After you cast Barrier of Light, your next spell casts ${10*r}% faster.`},
@@ -710,6 +737,12 @@ export const TALENTS = {
     {id:"p_affinity",tree:"shadow",tier:4,max:3,name:"Shadow Affinity",d:r=>`Each time Shadow Pain deals damage, you regain ${(0.3*r).toFixed(1)}% of your maximum mana.`},
     {id:"p_void",tree:"shadow",tier:5,max:1,name:"Void Eruption",grants:"voideruption",d:()=>`Teaches Void Eruption: deals Shadow damage to the target and nearby enemies. 15 sec cooldown.`}],
   druid:[
+    {id:"t6_balance",tree:"balance",tier:6,max:5,name:"Moonglow",eff:{nature:0.02,arcane:0.02},d:r=>`Increases Nature and Arcane damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_balance",tree:"balance",tier:7,max:3,name:"Celestial Focus",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_feral",tree:"feral",tier:6,max:5,name:"Primal Fury",eff:{form:0.02},d:r=>`Increases damage dealt in Bear and Wolf Form by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_feral",tree:"feral",tier:7,max:3,name:"Hardened Hide",eff:{def:0.02},d:r=>`Reduces damage taken by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t6_resto",tree:"resto",tier:6,max:5,name:"Nature's Gift",eff:{heal:0.02},d:r=>`Increases healing done by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_resto",tree:"resto",tier:7,max:3,name:"Living Spirit",eff:{mana:0.04},d:r=>`Increases maximum mana by ${+(4.0*r).toFixed(1)}%.`},
     {id:"moonfury",tree:"balance",tier:1,max:3,name:"Moonfury",d:r=>`Increases the damage of Nature's Wrath, Moonfire and Starfall by ${8*r}%.`},
     {id:"naturesGrace",tree:"balance",tier:1,max:3,name:"Nature's Grace",d:r=>`Reduces the cast time of Nature's Wrath and Starfall by ${(0.15*r).toFixed(2)} sec.`},
     {id:"d_omen",tree:"balance",tier:2,max:3,name:"Omen of Clarity",d:r=>`Your damaging spells have a ${3*r}% chance to make your next spell cost no mana.`},
@@ -732,6 +765,12 @@ export const TALENTS = {
     {id:"d_ilb",tree:"resto",tier:4,max:2,name:"Improved Lifebloom",d:r=>`Reduces the cooldown of Lifebloom by ${5*r} sec.`},
     {id:"d_tranq",tree:"resto",tier:5,max:1,name:"Tranquility",grants:"tranquility",d:()=>`Teaches Tranquility: heals you for 60% of your maximum health over 8 sec. 3 min cooldown.`}],
   paladin:[
+    {id:"t6_pholy",tree:"pholy",tier:6,max:5,name:"Holy Guidance",eff:{heal:0.02},d:r=>`Increases healing done by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_pholy",tree:"pholy",tier:7,max:3,name:"Divine Intellect",eff:{mana:0.04},d:r=>`Increases maximum mana by ${+(4.0*r).toFixed(1)}%.`},
+    {id:"t6_pprot",tree:"pprot",tier:6,max:5,name:"Sacred Bulwark",eff:{def:0.015},d:r=>`Reduces damage taken by ${+(1.5*r).toFixed(1)}%.`},
+    {id:"t7_pprot",tree:"pprot",tier:7,max:3,name:"Steadfast",eff:{hp:0.03},d:r=>`Increases maximum health by ${+(3.0*r).toFixed(1)}%.`},
+    {id:"t6_ret",tree:"ret",tier:6,max:5,name:"Crusade",eff:{holy:0.02,phys:0.02},d:r=>`Increases Holy and physical damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_ret",tree:"ret",tier:7,max:3,name:"Sanctified Strikes",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
     {id:"palWis",tree:"pholy",tier:1,max:3,name:"Wisdom",d:r=>`Increases maximum mana by ${10*r}%.`},
     {id:"palHeal",tree:"pholy",tier:1,max:3,name:"Improved Mending",d:r=>`Increases the healing of Light's Mending by ${10*r}%.`},
     {id:"palQuick",tree:"pholy",tier:2,max:2,name:"Swift Prayer",d:r=>`Reduces the cast time of Light's Mending by ${(0.3*r).toFixed(1)} sec.`},
@@ -755,6 +794,12 @@ export const TALENTS = {
     {id:"pal_storm",tree:"ret",tier:5,max:1,name:"Divine Storm",grants:"divinestorm",d:()=>`Teaches Divine Storm: deals Holy damage to nearby enemies and heals you for part of it. 10 sec cooldown.`}]
 
   ,warlock:[
+    {id:"t6_affl",tree:"affl",tier:6,max:5,name:"Shadow Embrace",eff:{shadow:0.02},d:r=>`Increases Shadow damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_affl",tree:"affl",tier:7,max:3,name:"Fel Vitality",eff:{hp:0.03},d:r=>`Increases maximum health by ${+(3.0*r).toFixed(1)}%.`},
+    {id:"t6_demo",tree:"demo",tier:6,max:5,name:"Master Demonologist",eff:{petdmg:0.04},d:r=>`Increases your demon's damage by ${+(4.0*r).toFixed(1)}%.`},
+    {id:"t7_demo",tree:"demo",tier:7,max:3,name:"Demonic Resilience",eff:{pethp:0.05},d:r=>`Increases your demon's maximum health by ${+(5.0*r).toFixed(1)}%.`},
+    {id:"t6_destr",tree:"destr",tier:6,max:5,name:"Emberstorm",eff:{fire:0.02},d:r=>`Increases Fire damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_destr",tree:"destr",tier:7,max:3,name:"Devastation",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
     {id:"wl_agony",tree:"affl",tier:1,max:3,name:"Improved Curse of Agony",d:r=>`Increases the damage of Curse of Agony and Corruption by ${10*r}%.`},
     {id:"wl_tap",tree:"affl",tier:1,max:3,name:"Improved Life Tap",d:r=>`Increases the mana gained from Life Tap by ${10*r}%.`},
     {id:"wl_conc",tree:"affl",tier:2,max:3,name:"Fel Concentration",d:r=>`Reduces the casting time lost when you take damage while casting by ${[0,33,66,100][r]}%.`},
@@ -777,6 +822,12 @@ export const TALENTS = {
     {id:"wl_after",tree:"destr",tier:4,max:2,name:"Aftermath",d:r=>`Rain of Fire slows enemies by ${25*r}%.`},
     {id:"wl_conflag",tree:"destr",tier:5,max:1,name:"Conflagrate",grants:"conflagrate",d:()=>`Teaches Conflagrate: deals heavy Fire damage to a target burning with your Immolate. 10 sec cooldown.`}],
   rogue:[
+    {id:"t6_assa",tree:"assa",tier:6,max:5,name:"Lethality",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t7_assa",tree:"assa",tier:7,max:3,name:"Vile Poisons",eff:{dmg:0.02},d:r=>`Increases all damage dealt by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t6_combat",tree:"combat",tier:6,max:5,name:"Weapon Expertise",eff:{phys:0.02},d:r=>`Increases physical damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_combat",tree:"combat",tier:7,max:3,name:"Lightning Reflexes",eff:{dodge:0.01},d:r=>`Increases your chance to dodge by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_subt",tree:"subt",tier:6,max:5,name:"Elusiveness",eff:{dodge:0.01},d:r=>`Increases your chance to dodge by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t7_subt",tree:"subt",tier:7,max:3,name:"Deadened Nerves",eff:{hp:0.03},d:r=>`Increases maximum health by ${+(3.0*r).toFixed(1)}%.`},
     {id:"r_malice",tree:"assa",tier:1,max:3,name:"Malice",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${r}%.`},
     {id:"r_evisc",tree:"assa",tier:1,max:3,name:"Improved Eviscerate",d:r=>`Increases the damage of Eviscerate and Rupture by ${10*r}%.`},
     {id:"r_lethal",tree:"assa",tier:2,max:3,name:"Lethality",d:r=>`Increases critical strike damage by ${10*r}%.`},
@@ -799,6 +850,12 @@ export const TALENTS = {
     {id:"r_init",tree:"subt",tier:4,max:3,name:"Initiative",d:r=>`Ambush has a ${[0,33,66,100][r]}% chance to award an extra combo point.`},
     {id:"r_dance",tree:"subt",tier:5,max:1,name:"Shadow Dance",grants:"shadowdance",d:()=>`Teaches Shadow Dance: for 6 sec, you can use Ambush without being in Stealth. 1 min cooldown.`}],
   shaman:[
+    {id:"t6_elem",tree:"elem",tier:6,max:5,name:"Elemental Fury",eff:{nature:0.02,fire:0.02},d:r=>`Increases Nature and Fire damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_elem",tree:"elem",tier:7,max:3,name:"Storm Focus",eff:{crit:0.01},d:r=>`Increases critical strike chance by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_enh",tree:"enh",tier:6,max:5,name:"Weapon Mastery",eff:{phys:0.02},d:r=>`Increases physical damage by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_enh",tree:"enh",tier:7,max:3,name:"Anticipation",eff:{dodge:0.01},d:r=>`Increases your chance to dodge by ${+(1.0*r).toFixed(1)}%.`},
+    {id:"t6_sresto",tree:"sresto",tier:6,max:5,name:"Purification",eff:{heal:0.02},d:r=>`Increases healing done by ${+(2.0*r).toFixed(1)}%.`},
+    {id:"t7_sresto",tree:"sresto",tier:7,max:3,name:"Ancestral Knowledge",eff:{mana:0.04},d:r=>`Increases maximum mana by ${+(4.0*r).toFixed(1)}%.`},
     {id:"s_concuss",tree:"elem",tier:1,max:3,name:"Concussion",eff:{nature:0.04},d:r=>`Increases Nature damage by ${4*r}%.`},
     {id:"s_flame",tree:"elem",tier:1,max:3,name:"Call of Flame",d:r=>`Increases the damage of Fire totems by ${10*r}%.`},
     {id:"s_efocus",tree:"elem",tier:2,max:3,name:"Elemental Focus",d:r=>`After a spell critical strike, your next 2 spells cost ${15*r}% less mana.`},
@@ -847,7 +904,7 @@ export const AB_ICON = {
   sinister:["sword","#e8d84a"], eviscerate:["fang","#d84a42"], stealth:["moon","#5a5a6a"], gouge:["fist","#d8a040"], backstab:["dagger","#e0e0e0"], slicedice:["swipe","#e8d84a"],
   rupture:["rake","#c83a3a"], evasion:["leap","#e8d84a"], ambush:["dagger","#b03a3a"], fanknives:["multi","#d8d8d8"], kidney:["fist","#e0803a"], vanish:["moon","#3a3a4a"], adrenaline:["bolt","#ffd84a"],
   lightning:["bolt","#9fd0ff"], healwave:["wave","#5fc0ff"], earthshock:["quake","#9ad06a"], searing:["totem","#ff7a2a"], flameshock:["flame","#ff8a3a"], stoneskin:["totem","#a89a80"],
-  hstream:["totem","#5fc0ff"], lshield:["bubble","#cfe8ff"], chain:["bolt","#e8f4ff"], frostshock:["snowflake","#8fd8ff"], strengthtotem:["totem","#c8a060"], magma:["totem","#d84a1a"],
+  hstream:["totem","#5fc0ff"], lshield:["bubble","#cfe8ff"], chain:["bolt","#e8f4ff"], frostshock:["snowflake","#8fd8ff"], strengthtotem:["totem","#c8a060"], magma:["totem","#d84a1a"], graceair:["totem","#bfe8ff"],
   heroism:["horn","#ffb84a"], stormstrike:["bolt","#7fb8ff"],
 };
 export function abIcon(id){ const a = AB[id], x = AB_ICON[id]; return x || [a.icon, SCHOOL_COLOR[a.school]==="#f2f2f2"?"#8c939a":SCHOOL_COLOR[a.school]]; }

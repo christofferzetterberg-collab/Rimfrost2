@@ -2,21 +2,21 @@
 import * as THREE from "three";
 import {clamp, lerp, rng} from "./util.js";
 import {B, WATER, height, ground, houses, colliders, decor, buildWorld, zoneAt, landAt, hubAt, placeName, openAt, featureAt, roadDist, GROUND, waterColor, SIGNS, DOORS, STABLE_HORSES} from "./world.js";
-import {HUBS, ZONES, LAIRS, EXPLORE, RACE_HUB, DG_DOORS} from "./worlddata.js";
+import {HUBS, ZONES, LAIRS, EXPLORE, RACE_HUB, DG_DOORS, continentOf} from "./worlddata.js";
 import {KINDS, SPAWNS, ZONE_MOB_MULT, FIXED} from "./mobs.js";
 import {DUNGEONS, DG_VER, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
 import {initMech, updMech, envSpeed, onIce} from "./dgmech.js";
 import {preloadAvatars, makeAvatar} from "./avatar.js";
 import {preloadNature} from "./nature.js";
-import {preloadBuildings} from "./buildings.js";
+import {preloadBuildings, buildingModel} from "./buildings.js";
 import {preloadKit} from "./dgkit.js";
 import * as ACC from "./account.js";
-import {preloadBeasts} from "./beasts.js";
+import {preloadBeasts, makeMountModel} from "./beasts.js";
 import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount, makeSheep} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
 import {P, S, mobs, PXU} from "./state.js";
 import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, SCHOOL_COLOR, abIcon, drawIcon} from "./rimdata.js";
-import {ITEMS, QUAL, SLOTS, SLOT_ORDER, STAT_NAME, GEAR_MAX, CLASS_MAIN, canWear, gearTypeName, upgradeGear} from "./items.js";
+import {ITEMS, QUAL, SLOTS, slotName, SLOT_ORDER, STAT_NAME, GEAR_MAX, CLASS_MAIN, canWear, gearTypeName, upgradeGear} from "./items.js";
 import * as G from "./engine.js";
 import * as Q from "./quests.js";
 import * as K from "./keys.js";
@@ -56,11 +56,11 @@ addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); ca
 const avatarsP = preloadAvatars().catch(e => console.warn("New character models not loaded:", e)), beastsP = preloadBeasts().catch(e => console.warn("New animal models not loaded:", e));   // (all models load at the same time)
 await Promise.all([preloadNature().catch(e => console.warn("New nature models not loaded:", e)), preloadBuildings().catch(e => console.warn("Building models not loaded:", e)), preloadKit().catch(e => console.warn("Dungeon models not loaded:", e))]);      /* KayKit trees and rocks (else the old shapes) */
 const {terrain, water} = buildWorld(scene);
-["horse", "gray"].forEach((k, i) => { const s = STABLE_HORSES[i]; if(!s) return; const g = makeMount(MOUNTS[k]); g.position.set(s.x, height(s.x, s.z), s.z); g.rotation.y = s.rot; scene.add(g); });   /* horses in Rimhaven's stable */
 // ---------------------------------------------------------------- the people in the towns and camps
 const hexc = s => parseInt(s.slice(1), 16);
 await avatarsP;
-await beastsP;     /* the KayKit models: if they can't be loaded the old ones are used */
+await beastsP;
+["horse", "gray"].forEach((k, i) => { const s = STABLE_HORSES[i]; if(!s) return; const g = mountModel(k); g.position.set(s.x, height(s.x, s.z), s.z); g.rotation.y = s.rot; scene.add(g); });   /* horses in Rimhaven's stable */     /* the KayKit models: if they can't be loaded the old ones are used */
 // town folk on the KayKit models: the model follows the job, the colours vary from person to person
 const ALT = (n, h) => [null, "A", "B", "C"].map(k => k && n + "_texture_alt_" + k)[h % 4];
 function npcLook(d){ const h = [...d.id].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7), t = d.title + " " + d.name;
@@ -76,8 +76,21 @@ function npcModel(d){ if(d.trains) return makeHero(d.race, d.trains, RACES);    
   if(d.race === "elf") o.ears = true; if(d.race === "orc") o.tusks = true; if(d.race === "dwarf"){ o.beard = true; o.stocky = true; } if(d.race === "undead"){ o.gaunt = true; o.eyes = 0xffe86a; }
   if(/Alchem|Apothec|Shaman|Brewer|Herb/.test(d.title + d.name)) o.robe = true; if(d.id === "aldric"){ o.cape = 0x7a1a1a; o.shoulders = 0xd8b04a; }
   return makeHumanoid(o); }
+// flight masters stand at the edge of their town or camp, facing the square, where there is room for their drake behind them
+for(const d of NPCS) if(d.role === "flight"){ const h = HUBS[d.hub], r0 = h.kind === "camp" ? 5.2 : 9; let best = null;
+  for(let rr = r0; rr < r0 + 16 && !best; rr += 1.2) for(let k = 0; k < 32 && !best; k++){ const a = k / 32 * 6.283 + 0.2, ca = Math.cos(a), sa = Math.sin(a), x = h.x + ca * rr, z = h.z + sa * rr, dx = h.x + ca * (rr + 3.4), dz = h.z + sa * (rr + 3.4);
+    if(nearAny(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.4 || Math.hypot(c.x - dx, c.z - dz) < c.r + 2.6)) continue;
+    if(NPCS.some(o => !o.flight && (Math.hypot(o.x - x, o.z - z) < 2.6 || Math.hypot(o.x - dx, o.z - dz) < 3.6))) continue;
+    if(Math.abs(height(x, z) - height(h.x, h.z)) > 1.5 || height(dx, dz) < WATER + 0.3 || blocked(x, z, x, z, 0.6)) continue;
+    best = {x, z, dx, dz}; }
+  if(!best) best = {x: d.x, z: d.z, dx: d.x + 3, dz: d.z};
+  d.x = best.x; d.z = best.z; d.perch = {x: best.dx, z: best.dz}; d.rot = Math.atan2(h.x - d.x, h.z - d.z); }
+for(const d of NPCS) if(d.role === "ship"){ const h = HUBS[d.hub]; if(h.dock){ d.x = h.dock.x; d.z = h.dock.z; d.rot = h.dockRot + Math.PI; } }   // captains stand at the pier
 const npcs = NPCS.map(d => { const mesh = npcModel(d); mesh.position.set(d.x, height(d.x, d.z), d.z); mesh.rotation.y = d.rot; scene.add(mesh);
   const n = {...d, mesh, rot0: d.rot, r: 0.45}; mesh.traverse(o => { if(o.isMesh) o.userData.npc = n; }); decor.push({x: d.x, z: d.z, r: 0.45}); return n; });   // people can be walked through
+// each flight master's drake hovers beside them
+const perchDrakes = []; for(const n of npcs) if(n.role === "flight"){ const g = mountModel("drake"), q = n.perch;
+  g.position.set(q.x, height(q.x, q.z) + 1.2, q.z); g.rotation.y = n.rot; scene.add(g); perchDrakes.push(g); colliders.push({x: q.x, z: q.z, r: 1.3}); }
 // things you can pick up for quests (placed further down, once we know where you can walk)
 const nodes = [];
 // ---------------------------------------------------------------- dungeons (each its own small map) and the doors in and out
@@ -165,7 +178,8 @@ function buildHero(){
 }
 // ---------------------------------------------------------------- riding (from level 20): summon your mount, 60% faster
 let mountMesh = null;
-function buildMount(){ if(mountMesh){ scene.remove(mountMesh); mountMesh = null; } if(P.mount && MOUNTS[P.mount]){ mountMesh = makeMount(MOUNTS[P.mount]); scene.add(mountMesh); } }
+function buildMount(){ if(mountMesh){ scene.remove(mountMesh); mountMesh = null; } if(P.mount && MOUNTS[P.mount]){ mountMesh = mountModel(P.mount); scene.add(mountMesh); } }
+function mountModel(k){ if(k === "ship") return shipModel(); return makeMountModel(k) || makeMount(MOUNTS[k] || MOUNTS.horse); }   // the animal models (else the shape-built ones)
 function toggleMount(){ const c = S.cur; if(P.dead) return; if(P.mount) return dismount();
   if(P.casting && P.casting.kind === "mount") return G.cancelCast();
   if(!c.riding) return err("You do not know how to ride");
@@ -175,6 +189,69 @@ function toggleMount(){ const c = S.cur; if(P.dead) return; if(P.mount) return d
   P.casting = {kind: "mount", mount: k, total: 1.5, el: 0, label: MOUNTS[k].name}; P.auto = false; }
 function finishMount(k){ if(P.dead || inCrypt()) return; P.mount = k; buildMount(); G.burst(P.px, P.py, "#d8c08a", 12); }
 function dismount(){ if(!P.mount) return; P.mount = null; buildMount(); }
+// ---------------------------------------------------------------- flight paths: a drake carries you between the towns and camps whose flight master you have met
+const FLY_SPEED = 18, FLY_ALT = 14, FLY_STEP = 2;          // (a mount runs at about 11)
+let FLY_PITCH = 0.3, FLY_SEAT = 0.35;                                                // the drake leans into the flight; where you sit along its back
+let flightMesh = null;
+const flightMasters = NPCS.filter(n => n.role === "flight");
+const knownFlights = () => { const c = S.cur; return new Set([...(c.flights || []), RACE_HUB[c.race]].filter(Boolean)); };
+const flightCost = (a, b) => Math.max(1, Math.round(Math.hypot(a.x - b.x, a.z - b.z) / 30));
+function learnFlight(n){ const c = S.cur; if(knownFlights().has(n.hub)) return; (c.flights = c.flights || []).push(n.hub); log(`New flight path discovered: ${HUBS[n.hub].name}.`, "#ffd36b"); G.burst(P.px, P.py, "#ffd36b", 14); save(); }
+// the route: a gentle curve from here to the other flight master, high above the land (and higher over mountains)
+function flightRoute(x0, z0, x1, z1){
+  const L0 = Math.hypot(x1 - x0, z1 - z0), side = ((Math.round(x0 + z1) & 1) ? 1 : -1) * 0.12 * L0, mx = (x0 + x1) / 2 + (z1 - z0) / L0 * side, mz = (z0 + z1) / 2 - (x1 - x0) / L0 * side;
+  const fine = [], N = Math.max(8, Math.ceil(L0 / 0.5));
+  for(let i = 0; i <= N; i++){ const t = i / N, u = 1 - t; fine.push([u*u*x0 + 2*u*t*mx + t*t*x1, u*u*z0 + 2*u*t*mz + t*t*z1]); }
+  const pts = [fine[0]]; let acc = 0;                                                   // points every FLY_STEP yards along the curve
+  for(let i = 1; i < fine.length; i++){ acc += Math.hypot(fine[i][0] - fine[i-1][0], fine[i][1] - fine[i-1][1]); if(acc >= FLY_STEP){ pts.push(fine[i]); acc = 0; } }
+  pts.push(fine[fine.length - 1]);
+  const g = pts.map(([x, z]) => Math.max(WATER, height(x, z))), W = 20, n = pts.length;
+  let m = g.map((_, i) => { let h = -1e9; for(let j = Math.max(0, i - W); j <= Math.min(n - 1, i + W); j++) h = Math.max(h, g[j]); return h + FLY_ALT; });
+  for(let pass = 0; pass < 3; pass++) m = m.map((_, i) => { let s = 0, k = 0; for(let j = Math.max(0, i - 6); j <= Math.min(n - 1, i + 6); j++){ s += m[j]; k++; } return s / k; });
+  const L = (n - 1) * FLY_STEP, ys = pts.map((_, i) => { const d = Math.min(i, n - 1 - i) * FLY_STEP, e = d >= 36 ? 1 : (d / 36) * (d / 36) * (3 - 2 * d / 36);
+    return Math.max(g[i] + (d > 3 ? 2 : 0), g[i] + (m[i] - g[i]) * e); });
+  return {pts, ys, L}; }
+function startFlight(hub){ const c = S.cur, from = talkNpc, to = flightMasters.find(f => f.hub === hub); if(!from || from.role !== "flight" || !to) return;
+  if(!knownFlights().has(hub)) return err("You have not discovered that flight path");
+  if(P.dead) return; if(P.combatT > 0) return err("You cannot fly while in combat");
+  const cost = flightCost(from, to); if(c.gold < cost) return err("Not enough gold");
+  c.gold -= cost; closePanel(); if(P.sitting) G.standUp(); dismount(); if(P.form) G.setForm(null);
+  P.target = null; P.auto = false; P.dest = null; P.path = null; P.casting = null; P.pendingUse = null; marker.visible = false; CO.select(null);
+  const hb = HUBS[hub], d = Math.hypot(hb.x - to.x, hb.z - to.z) || 1, ex = to.x + (hb.x - to.x) / d * 2.2, ez = to.z + (hb.z - to.z) / d * 2.2;
+  P.flying = {...flightRoute(P.x, P.z, ex, ez), s: 0, end: {x: ex, z: ez}, to: hub, bank: 0}; P.fy = height(P.x, P.z);
+  flightMesh = mountModel("drake"); scene.add(flightMesh); { const pt = G.getPet(); if(pt) pt.curT = null; }
+  log(`Flying to ${hb.name}.`, "#ffd36b"); save(); updHUD(0); }
+function flyStep(dt){ const F = P.flying, n = F.pts.length;
+  const edge = Math.min(F.s, F.L - F.s), v = (F.ship ? SAIL_SPEED : FLY_SPEED) * clamp(0.3 + edge / 30, 0.3, 1); F.s = Math.min(F.L, F.s + v * dt);
+  const f = F.s / FLY_STEP, i = Math.min(n - 2, Math.floor(f)), t = f - i, a = F.pts[i], b = F.pts[i + 1];
+  P.x = a[0] + (b[0] - a[0]) * t; P.z = a[1] + (b[1] - a[1]) * t; P.fy = F.ys[i] + (F.ys[i + 1] - F.ys[i]) * t;
+  const want = Math.atan2(b[0] - a[0], b[1] - a[1]); let dr = want - P.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); P.rot += dr * Math.min(1, dt * (F.ship ? 1.2 : 3));
+  F.bank += (clamp(-dr * (F.ship ? 0.5 : 1.6), -0.45, 0.45) - F.bank) * Math.min(1, dt * 3); F.t = (F.t || 0) + dt;
+  if(F.s >= F.L) land(); }
+function land(){ const F = P.flying; if(!F) return; P.x = F.end.x; P.z = F.end.z; P.flying = null; P.fy = null;
+  if(flightMesh){ scene.remove(flightMesh); flightMesh = null; }
+  const pt = G.getPet(); if(pt){ pt.x = P.x + Math.sin(P.rot + 2.4) * 1.5; pt.z = P.z + Math.cos(P.rot + 2.4) * 1.5; pt.curT = null; pt.path = null; }
+  if(F.ship && HUBS[F.from].anchored) HUBS[F.from].anchored.visible = true;
+  log(`You have arrived at ${HUBS[F.to].name}.`, "#ffd36b"); save(); }
+const pY = () => P.flying ? P.fy : height(P.x, P.z);
+// ships: the captains in Stormhaven and Port Solace sail you across the sea, in a slow arc between the two harbours
+const SAIL_SPEED = 13, SAIL_COST = 5;
+function startVoyage(){ const from = talkNpc, c = S.cur; if(!from || from.role !== "ship") return; const A = HUBS[from.hub], Bh = HUBS[from.ship];
+  if(P.dead) return; if(P.combatT > 0) return err("You cannot sail while in combat"); if(c.gold < SAIL_COST) return err("Not enough gold");
+  c.gold -= SAIL_COST; closePanel(); if(P.sitting) G.standUp(); dismount(); if(P.form) G.setForm(null);
+  P.target = null; P.auto = false; P.dest = null; P.path = null; P.casting = null; P.pendingUse = null; marker.visible = false; CO.select(null);
+  const a = A.berth, b = Bh.berth, mx = (a.x + b.x) / 2 + 30, mz = (a.z + b.z) / 2, pts = [], N = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / FLY_STEP) + 8;
+  for(let i = 0; i <= N; i++){ const t = i / N, u = 1 - t; pts.push([u*u*a.x + 2*u*t*mx + t*t*b.x, u*u*a.z + 2*u*t*mz + t*t*b.z]); }
+  let L = 0; for(let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]);
+  const even = [pts[0]]; { let acc = 0; for(let i = 1; i < pts.length; i++){ acc += Math.hypot(pts[i][0] - pts[i-1][0], pts[i][1] - pts[i-1][1]); if(acc >= FLY_STEP){ even.push(pts[i]); acc = 0; } } even.push(pts[pts.length - 1]); }
+  P.flying = {pts: even, ys: even.map(() => SHIP_DECK), L: (even.length - 1) * FLY_STEP, s: 0, end: {x: Bh.dock.x, z: Bh.dock.z}, to: Bh.id, from: A.id, bank: 0, ship: true};
+  P.x = a.x; P.z = a.z; P.fy = SHIP_DECK; P.rot = Math.atan2(even[1][0] - a.x, even[1][1] - a.z); if(A.anchored) A.anchored.visible = false;
+  flightMesh = shipModel(); scene.add(flightMesh); { const pt = G.getPet(); if(pt) pt.curT = null; }
+  log(`You set sail for ${Bh.name}.`, "#ffd36b"); save(); updHUD(0); }
+const SHIP_DECK = 2.6;
+function shipModel(){ const g = new THREE.Group(), m = buildingModel("ship_blue_accent", {width: 11});
+  if(m){ m.position.y = -1.1 - SHIP_DECK; g.add(m); } else { const hull = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.6, 9), new THREE.MeshLambertMaterial({color: 0x7a4a2a})); hull.position.y = -0.8; g.add(hull); }
+  g.userData.saddle = 0.38; g.userData.ship = true; g.userData.animate = () => {}; return g; }
 function learnRiding(){ const c = S.cur; if(c.riding || c.level < RIDING_LVL) return; if(c.gold < RIDING_COST) return err("You don't have enough gold");
   c.gold -= RIDING_COST; c.riding = true; G.burst(P.px, P.py, "#9fd6e8", 16); log("You have learned Riding.", "#9fd6e8"); save(); refresh(); }
 function buyMount(k){ const c = S.cur, M = MOUNTS[k]; if(!M || !c.riding) return; c.mounts = c.mounts || []; if(c.mounts.includes(k)) return; if(c.gold < M.price) return err("You don't have enough gold");
@@ -246,7 +323,7 @@ function evade(m){ m.state = "return"; m.dots = []; m.path = null; m.thMe = m.th
 let KEY = "rimfrost2-chars";
 function loadChars(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
 function saveChars(list){ try{ localStorage.setItem(KEY, JSON.stringify(list)); }catch(e){} cloudSoon(); }
-function save(){ const c = S.cur; if(!c || !running || DEV.sim) return; const at = P.corpse || P; c.x = Math.round(at.x * 10) / 10; c.z = Math.round(at.z * 10) / 10; c.t = Date.now();   // a spirit is saved where its body lies
+function save(){ const c = S.cur; if(!c || !running || DEV.sim) return; const at = P.corpse || (P.flying && P.flying.end) || P; c.x = Math.round(at.x * 10) / 10; c.z = Math.round(at.z * 10) / 10; c.t = Date.now();   // a spirit is saved where its body lies
   // health, mana, death and Resurrection Sickness are kept, so reloading the page changes nothing
   c.hpPct = P.maxHp ? Math.round(P.hp / P.maxHp * 1000) / 1000 : 1; c.mpPct = P.maxMana ? Math.round(P.mana / P.maxMana * 1000) / 1000 : 1;
   c.sick = P.buffs.ressick ? Math.round(P.buffs.ressick) : 0;
@@ -311,6 +388,7 @@ function loadWorld(){ let w = null; try{ w = JSON.parse(localStorage.getItem(WKE
 addEventListener("beforeunload", () => save());
 let running = false;
 function play(c){
+  P.flying = null; P.fy = null; if(flightMesh){ scene.remove(flightMesh); flightMesh = null; }
   S.cur = c; K.useChar(c);                                                        /* every character has its own key bindings */ if(!c.learned) c.learned = []; for(const id of Q.starterAbilities(c.cls)) if(!c.learned.includes(id)) c.learned.push(id);   // the abilities every new character starts with
   if(RACIAL[c.race] && !c.learned.includes(RACIAL[c.race])) c.learned.push(RACIAL[c.race]);                        // and the racial ability
   if(!c.quests) c.quests = {}; if(!c.qbag) c.qbag = {};
@@ -428,13 +506,17 @@ function buildBar(){
 const FORMS = [["bear", "formBear"], ["cat", "formCat"], ["leopard", "formTravel"]];
 let petSlots = [], petBarKind = null;
 function classBarKey(){ const c = S.cur; if(!c) return null; if(G.PET_CLASSES.has(c.cls)){ const pt = G.getPet(); return pt ? "pet:" + pt.kind : null; }
-  if(c.cls === "druid"){ const f = FORMS.filter(([id]) => c.learned.includes(id)).map(f => f[0]).join(","); return f ? "forms:" + f : null; } return null; }
+  if(c.cls === "druid"){ const f = FORMS.filter(([id]) => c.learned.includes(id)).map(f => f[0]).join(","); return f ? "forms:" + f : null; }
+  if(c.cls === "shaman"){ const t = TOTEM_BAR.filter(id => c.learned.includes(id)).join(","); return t ? "totems:" + t : null; } return null; }
+// a shaman's totems, by element: Fire, Earth, Water, Air
+const TOTEM_BAR = ["searing", "magma", "stoneskin", "strengthtotem", "hstream", "graceair"];
 function buildPetBar(){ const el = $("petbar"), key = classBarKey(); petBarKind = key; el.hidden = !key; el.innerHTML = ""; petSlots = []; if(!key) return;
   let list;
   if(key.startsWith("pet:")){ const pt = G.getPet();
     list = [{x: "pa", name: "Attack", icon: "fang", color: "#d84a42", key: "petAttack", desc: "Commands your pet to attack your target."},
       {x: "pf", name: "Follow", icon: "leap", color: "#9ccf8a", key: "petFollow", desc: "Commands your pet to stop attacking and return to you."},
       ...G.PET_SKILLS[pt.kind].map((sk, i) => ({...sk, x: sk.id, key: "petSkill" + (i + 1), skill: true}))]; }
+  else if(key.startsWith("totems:")) list = key.slice(7).split(",").map(id => { const [ic, col] = abIcon(id); return {x: "totem:" + id, form: id, totem: G.TOTEM_OF[id], name: AB[id].name, icon: ic, color: col, desc: AB[id].desc()}; });
   else list = FORMS.filter(([id]) => S.cur.learned.includes(id)).map(([id, key]) => { const [ic, col] = abIcon(id); return {x: "form:" + id, form: id, name: AB[id].name, icon: ic, color: col, key, desc: AB[id].desc()}; });
   for(const it of list){ const s = document.createElement("div"); s.className = "slot"; const cv = document.createElement("canvas"); cv.width = cv.height = 52; drawIcon(cv, it.icon, it.color); s.append(cv);
     s.insertAdjacentHTML("beforeend", `<span class="k">${K.short((K.binds[it.key] || [])[0])}</span><span class="cd"></span>`);
@@ -444,6 +526,7 @@ function buildPetBar(){ const el = $("petbar"), key = classBarKey(); petBarKind 
 function updPetBar(){ const key = classBarKey(); if(key !== petBarKind) buildPetBar(); if(!key) return;
   const pt = G.getPet();
   for(const p of petSlots){ const x = p.it.x;
+    if(p.it.totem){ p.el.classList.toggle("on", G.totemList().some(t => t.kind === p.it.totem)); const cd = Math.max(P.cds[p.it.form] || 0, P.gcd || 0); p.cd.textContent = cd > 0.05 && P.cds[p.it.form] ? Math.ceil(cd) : ""; continue; }
     if(p.it.form){ p.el.classList.toggle("on", P.form === p.it.form); const cd = P.cds[p.it.form] || 0; p.cd.textContent = cd > 0 ? Math.ceil(cd) : ""; continue; }
     if(!pt) continue;
     if(x === "pa") p.el.classList.toggle("on", pt.mode === "attack" || (pt.mode === "assist" && petBusy(pt)));
@@ -514,7 +597,7 @@ function statLines(it, cmp){
     return v ? `+${v}${unit} ${STAT_NAME[k]}${diff}` : `<span class="muted">${STAT_NAME[k]}${diff}</span>`; }).join("<br>");
 }
 function gearTip(it){ const c = S.cur, cur = c.eq[it.slot], cmp = cur && cur !== it ? cur : null, ok = canWear(it, c.cls);
-  return `<h4 style="color:${QUAL[it.q].color}">${it.n}</h4><div class="m">${QUAL[it.q].name} · ${SLOTS[it.slot].name} · ${gearTypeName(it)}</div>${statLines(it, cmp)}${it.bonus && AB[it.bonus.ab] ? `<div style="color:#7be08a;margin-top:4px">Equip: Increases the ${it.bonus.kind === "heal" ? "healing" : "damage"} of ${AB[it.bonus.ab].name} by ${Math.round(it.bonus.v * 100)}%.</div>` : ""}
+  return `<h4 style="color:${QUAL[it.q].color}">${it.n}</h4><div class="m">${QUAL[it.q].name} · ${slotName(it.slot, it.wt, S.cur.cls)} · ${gearTypeName(it)}</div>${statLines(it, cmp)}${it.bonus && AB[it.bonus.ab] ? `<div style="color:#7be08a;margin-top:4px">Equip: Increases the ${it.bonus.kind === "heal" ? "healing" : "damage"} of ${AB[it.bonus.ab].name} by ${Math.round(it.bonus.v * 100)}%.</div>` : ""}
     <div class="m" style="margin-top:4px">${ok ? "" : `<span style="color:#ff6b5e">Cannot be used by ${CLASSES[c.cls].name}s. </span>`}<span style="color:${c.level >= it.il ? "" : "#ff6b5e"}">Requires level ${it.il}</span>${cmp ? ` · compared to ${cmp.n}` : ""}</div>`; }
 function showTipAt(e, html){ const t = $("tip"); t.innerHTML = html; t.hidden = false; t.style.left = clamp(e.clientX - 300, 8, innerWidth - 290) + "px"; t.style.top = clamp(e.clientY - 20, 8, innerHeight - t.offsetHeight - 8) + "px"; }
 const pct = v => (Math.round(v * 1000) / 10) + "%";
@@ -525,7 +608,7 @@ function renderPanel(){
   document.querySelector("#panel .tabs").style.display = panelTab === "dgenter" || panelTab === "npc" || panelTab === "trade" || panelTab === "pick" ? "none" : "";
   if(panelTab === "pick"){ const p = c.pick; if(!p) return closePanel(); const q = Q.qById(p.qid);
     h += `<h3>Choose your reward</h3><div class="muted" style="margin-bottom:6px">${q ? q.name : ""} – take one of these:</div>`;
-    p.items.forEach((it, i) => { h += `<div class="it" data-tip="pick:${i}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${SLOTS[it.slot].name} · ${gearTypeName(it)} · level ${it.il}</small></div><button class="sbtn pri" data-act="takepick" data-id="${i}">Take</button></div>`; }); }
+    p.items.forEach((it, i) => { h += `<div class="it" data-tip="pick:${i}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${slotName(it.slot, it.wt, S.cur.cls)} · ${gearTypeName(it)} · level ${it.il}</small></div><button class="sbtn pri" data-act="takepick" data-id="${i}">Take</button></div>`; }); }
   else if(panelTab === "dgenter"){ if(!dgAsk) return closePanel(); h += dgEnterHTML(dgAsk); }
   else if(panelTab === "npc"){ if(!talkNpc) return closePanel(); h += `<div style="text-align:right;margin:-2px -4px 0"><button class="sbtn" data-act="close">✕</button></div>` + npcHTML(talkNpc); }
   else if(panelTab === "quests"){
@@ -556,8 +639,8 @@ function renderPanel(){
     h += `<div class="row" style="justify-content:space-between"><b style="font-size:16px;color:${CLASSES[c.cls].color}">${c.name}</b><span class="muted">Level ${c.level} ${RACES[c.race].name} ${CLASSES[c.cls].name}</span></div>`;
     h += `<h3>Equipment</h3>`;
     for(const slot of SLOT_ORDER){ const it = c.eq[slot];
-      h += it ? `<div class="it" data-tip="eq:${slot}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${SLOTS[slot].name}</small></div><button class="sbtn" data-act="uneq" data-id="${slot}">Remove</button></div>`
-        : `<div class="it"><div style="width:32px;height:32px;border-radius:4px;border:1px dashed #3a4a54"></div><div class="nm muted">${SLOTS[slot].name}<small>empty</small></div></div>`; }
+      h += it ? `<div class="it" data-tip="eq:${slot}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${slotName(slot, null, S.cur.cls)}</small></div><button class="sbtn" data-act="uneq" data-id="${slot}">Remove</button></div>`
+        : `<div class="it"><div style="width:32px;height:32px;border-radius:4px;border:1px dashed #3a4a54"></div><div class="nm muted">${slotName(slot, null, S.cur.cls)}<small>empty</small></div></div>`; }
     const MAIN = CLASS_MAIN[c.cls], an = {str: "Strength", agi: "Agility", int: "Intellect", sta: "Stamina"};
     h += `<h3>Attributes</h3><div class="muted" style="font-size:12px;margin-bottom:4px">Main stats for a ${CLASSES[c.cls].name}: ${MAIN.map(k => an[k]).join(", ")}</div><div class="stats">
       ${["str", "agi", "int", "sta"].map(k => `<span${MAIN.includes(k) ? ` style="color:#ffd36b"` : ""}>${an[k]}</span><b>${Math.round(G.attr(k))}</b>`).join("")}
@@ -576,7 +659,7 @@ function renderPanel(){
     h += `<h3>Equipment</h3>`;
     if(!c.gear.length) h += `<div class="muted">No equipment.</div>`;
     for(const it of c.gear){ const ok = canWear(it, c.cls) && c.level >= it.il;
-      h += `<div class="it" data-tip="gear:${it.id}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${SLOTS[it.slot].name} · ${gearTypeName(it)} · level ${it.il}</small></div>
+      h += `<div class="it" data-tip="gear:${it.id}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${slotName(it.slot, it.wt, S.cur.cls)} · ${gearTypeName(it)} · level ${it.il}</small></div>
         <button class="sbtn" data-act="equip" data-id="${it.id}" ${ok ? "" : "disabled"}>Equip</button><button class="sbtn" data-act="destroy" data-id="${it.id}">${sureId === it.id ? "Sure?" : "Destroy"}</button></div>`; }
     const keys = Object.keys(c.bag).filter(k => ITEMS[k]);
     h += `<h3>Items</h3>`;
@@ -585,13 +668,13 @@ function renderPanel(){
       h += `<div class="it">${itemImg(k)}<div class="nm"><b>${I.name}</b> <span class="muted">× ${c.bag[k]}</span><small>${I.desc || (I.kind === "junk" ? `Sell price: ${I.sell} gold.` : I.kind === "ore" || I.kind === "herb" ? `Trade good. Sell price: ${I.sell} gold.` : "")}</small></div>${I.kind === "use" ? `<button class="sbtn" data-act="use" data-id="${k}">Use</button>` : ""}</div>`; }
   } else if(panelTab === "tal"){
     const pts = G.talentPoints(), spent = G.talentsSpent(), left = pts - spent;
-    if(c.level < 10) h += `<div class="muted" style="margin:4px 0 8px">Talents unlock at level 10. One talent point is awarded per level, up to 21 at level 30.</div>`;
+    if(c.level < 10) h += `<div class="muted" style="margin:4px 0 8px">Talents unlock at level 10. One talent point is awarded per level, up to 31 at level 40.</div>`;
     else h += `<div class="row" style="justify-content:space-between;margin:4px 0"><span><b>${left}</b> point${left === 1 ? "" : "s"} left · ${spent} spent</span></div>`;
     // one specialization at a time: tabs with the points spent in each
     const trees = G.TREES[c.cls]; if(!trees.some(t => t.id === talTree)) talTree = (trees.find(t => G.treePoints(t.id) > 0) || trees[0]).id;
     h += `<div class="tabs vtabs">${trees.map(t => `<button class="${t.id === talTree ? "on" : ""}" data-act="taltree" data-id="${t.id}">${t.name} <span class="muted">${G.treePoints(t.id)}</span></button>`).join("")}</div>`;
     const tr = trees.find(t => t.id === talTree); h += `<div class="muted" style="margin:2px 0 4px">${tr.d}</div>`;
-    for(const tier of [1, 2, 3, 4, 5]){ const need = TIER_NEED[tier], open = G.treePoints(talTree) >= need;
+    for(const tier of [1, 2, 3, 4, 5, 6, 7]){ const need = TIER_NEED[tier], open = G.treePoints(talTree) >= need;
       h += `<h3${open ? "" : ` style="opacity:.6"`}>Tier ${tier}${need ? ` · ${need} points in ${tr.name}` : ""}</h3><div class="tier">`;
       for(const t of TALENTS[c.cls].filter(t => t.tier === tier && t.tree === talTree)){ const r = G.T(t.id), can = G.canLearnTalent(t);
         h += `<button class="tal ${can ? "can" : ""} ${r === t.max ? "max" : ""}" data-act="tal" data-id="${t.id}"><div class="n"><span>${t.name}</span><span class="r">${r}/${t.max}</span></div><div class="d">${t.d(Math.max(1, r))}</div></button>`; }
@@ -614,6 +697,7 @@ $("pbody").addEventListener("click", e => { const el = e.target.closest("[data-a
   else if(a === "dgenter"){ if(dgAsk && distU(P, dgAsk.door) < 8) enterDungeon(dgAsk); return; }
   else if(a === "dgreset"){ if(sureId !== "dgreset"){ sureId = "dgreset"; renderPanel(); return; } sureId = null; if(dgAsk && CO.COOP.role !== "guest" && !CO.anyRemoteIn(regionOf(dgAsk.x0))){ resetDungeon(dgAsk); enterDungeon(dgAsk); } return; }
   else if(a === "taltree") talTree = id;
+  else if(a === "fly"){ startFlight(id); return; } else if(a === "sail"){ startVoyage(); return; }
   else if(a === "learnriding") learnRiding(); else if(a === "buymount") buyMount(id); else if(a === "pickmount"){ S.cur.mountSel = id; if(P.mount){ P.mount = id; buildMount(); } save(); }
   else if(a === "takepick"){ Q.takePick(+id); if(!S.cur.pick) closePanel(); return; }
   else if(a === "accept") Q.acceptQuest(id); else if(a === "turnin") Q.turnIn(id); else if(a === "learn") Q.learnAbility(id);
@@ -635,7 +719,7 @@ function useThing(n){
   if(distU(P, n) > USE_RANGE) return err(n.role ? `Get closer to talk to ${n.name}` : "Get closer to pick that up");
   P.pendingUse = null; P.dest = null;
   if(n.role){ talkTo(n); return; }
-  if(n.portal){ if(P.combatT > 0) return err("You cannot do that in combat"); if(n.portal === "in") askEnter(n.d); else exitDungeon(n.d); return; }
+  if(n.portal){ if(P.combatT > 0 && !P.ghost) return err("You cannot do that in combat"); if(n.portal === "in") askEnter(n.d); else exitDungeon(n.d); return; }
   if(!n.active) return;
   if(P.casting && P.casting.kind === "gather" && P.casting.node === n) return;   // already gathering it: clicking again does nothing
   const gath = !!Q.gatherReq(n.item);                    // herbs and ore can always be gathered (with enough skill); other things only for a quest
@@ -651,7 +735,7 @@ function finishGather(n){ if(!n.active) return; n.active = false; n.respawn = 18
   if(Q.needsQItem(n.item)) Q.gotQItem(n.item);           // for a quest: it goes to the quest
   else if(gath){ G.addItem(n.item, 1); log(`You receive ${n.name}.`, "#d9e3e7"); save(); refresh(); } }
 let talkNpc = null, vendorTab = "buy";
-function talkTo(n){ talkNpc = n; vendorTab = "buy"; panelTab = "npc"; sureId = null; hideTip(); $("panel").hidden = false; n.mesh.rotation.y = Math.atan2(P.x - n.x, P.z - n.z); renderPanel(); }
+function talkTo(n){ if(n.role === "flight") learnFlight(n); talkNpc = n; vendorTab = "buy"; panelTab = "npc"; sureId = null; hideTip(); $("panel").hidden = false; n.mesh.rotation.y = Math.atan2(P.x - n.x, P.z - n.z); renderPanel(); }
 // the quest tracker on the right side of the screen
 function updTracker(){
   const el = $("tracker"); if(!running || !S.cur){ el.innerHTML = ""; return; }
@@ -712,12 +796,22 @@ function npcHTML(n){
         ${own ? `<button class="sbtn" data-act="pickmount" data-id="${k}" ${sel ? "disabled" : ""}>${sel ? "Riding" : "Ride"}</button>` : `<button class="sbtn" data-act="buymount" data-id="${k}" ${c.riding && c.gold >= M.price ? "" : "disabled"}>Buy</button>`}</div>`; }
     if(c.cls === "druid") h += `<div class="muted" style="margin-top:8px">Druids also learn Travel Form at level ${RIDING_LVL}.</div>`;
   }
+  if(n.role === "flight"){
+    const known = knownFlights(), dests = flightMasters.filter(f => f.hub !== n.hub && continentOf(f.z) === continentOf(n.z)).sort((a, b) => (known.has(b.hub) - known.has(a.hub)) || distU(n, a) - distU(n, b));
+    h += `<h3>Flight paths · you have <b>${c.gold}</b> gold</h3>`;
+    for(const f of dests){ const k = known.has(f.hub), cost = flightCost(n, f), H2 = HUBS[f.hub];
+      h += `<div class="it"><div class="nm"><b>${H2.name}</b> <span class="muted">· ${k ? cost + " gold" : "undiscovered"}</span><small>${k ? `${placeName(H2.x, H2.z)} · about ${Math.round(distU(n, f) / FLY_SPEED + 3)} sec` : "Speak with the flight master there to unlock this route."}</small></div>
+        <button class="sbtn" data-act="fly" data-id="${f.hub}" ${k && c.gold >= cost ? "" : "disabled"}>Fly</button></div>`; }
+  }
+  if(n.role === "ship"){ const to = HUBS[n.ship], south = continentOf(to.z) === 1;
+    h += `<h3>Passage · you have <b>${c.gold}</b> gold</h3><div class="it"><div class="nm"><b>${to.name}</b> <span class="muted">· ${SAIL_COST} gold</span><small>${south ? "The Southern Reaches · recommended level 30 and above" : "Rimfrost"}</small></div>
+      <button class="sbtn pri" data-act="sail" ${c.gold >= SAIL_COST ? "" : "disabled"}>Sail</button></div>`; }
   if(n.role === "vendor"){
     h += `<div class="tabs vtabs"><button class="${vendorTab === "buy" ? "on" : ""}" data-act="vtab" data-id="buy">Buy</button><button class="${vendorTab === "sell" ? "on" : ""}" data-act="vtab" data-id="sell">Sell</button><span class="muted" style="margin-left:auto">you have <b>${c.gold}</b> gold</span></div>`;
     if(vendorTab === "buy"){
       if(n.shop === "goods" || n.shop === "basic") for(const [k, price] of (n.shop === "basic" ? GOODS_BASIC : GOODS)) h += `<div class="it">${itemImg(k)}<div class="nm"><b>${ITEMS[k].name}</b> <span class="muted">· ${price} gold</span><small>${ITEMS[k].desc || ""}</small></div><button class="sbtn" data-act="buy" data-id="${k}" ${c.gold >= price ? "" : "disabled"}>Buy</button></div>`;
-      if(n.shop.includes("smith")){ shopStock = Q.smithStock(n);
-        for(const it of shopStock){ const price = Q.gearPrice(it); h += `<div class="it" data-tip="shop:${it.id}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${SLOTS[it.slot].name} · level ${it.il} · ${price} gold</small></div><button class="sbtn" data-act="buygear" data-id="${it.id}" ${c.gold >= price && c.level >= it.il ? "" : "disabled"}>Buy</button></div>`; } }
+      if(n.shop.includes("smith")){ shopStock = Q.smithStock(n); h += `<div class="muted" style="margin:2px 0 6px">${shopStock.length ? "" : "Sold out. "}New stock in ${Math.ceil(Q.stockLeft() / 60000)} min.</div>`;
+        for(const it of shopStock){ const price = Q.gearPrice(it); h += `<div class="it" data-tip="shop:${it.id}">${gearImg(it)}<div class="nm"><b style="color:${QUAL[it.q].color}">${it.n}</b><small>${slotName(it.slot, it.wt, S.cur.cls)} · level ${it.il} · ${price} gold</small></div><button class="sbtn" data-act="buygear" data-id="${it.id}" ${c.gold >= price && c.level >= it.il ? "" : "disabled"}>Buy</button></div>`; } }
     } else {
       const sell = Object.keys(c.bag).filter(k => ITEMS[k]), jv = Q.junkValue();
       h += `<div class="row" style="justify-content:space-between;margin:4px 0 8px"><span class="muted">Sells all gray items and poor equipment.</span><button class="sbtn pri" data-act="selljunk" ${jv ? "" : "disabled"}>Sell all junk${jv ? ` (${jv} gold)` : ""}</button></div>`;
@@ -781,7 +875,7 @@ function releaseSpirit(){ if(!P.dead || P.ghost) return;
   log(`You have released your spirit at ${sp.name}. Return to your corpse to resurrect.`, "#9fd6e8"); save(); }
 function comeBack(hpPct){ P.dead = false; P.corpse = null; P.shield = 0; P.hots = []; setGhost(false); G.recompute(false); P.hp = Math.max(1, P.maxHp * hpPct); P.mana = P.maxMana * hpPct; P.combatT = 0; }   // (a pet must be called again)
 function resurrectAtCorpse(){ if(!P.ghost || !P.corpse || Math.hypot(P.x - P.corpse.x, P.z - P.corpse.z) > CORPSE_RANGE) return;
-  P.x = P.corpse.x; P.z = P.corpse.z; comeBack(0.5); G.burst(P.px, P.py, "#ffffff", 20); log("You have been resurrected.", "#7be08a"); save(); }
+  if(blocked(P.x, P.z, P.x, P.z, P.r)){ P.x = P.corpse.x; P.z = P.corpse.z; } comeBack(0.5);   /* you come back where you stand (within reach of your body) */ G.burst(P.px, P.py, "#ffffff", 20); log("You have been resurrected.", "#7be08a"); save(); }
 function resurrectAtSpirit(){ if(!P.ghost) return; closePanel();
   P.buffs.ressick = SICK_TIME; P.sickOn = true; comeBack(1); G.burst(P.px, P.py, "#9fd6ff", 24);
   log(`You have been resurrected with Resurrection Sickness (${SICK_TIME / 60} min).`, "#e6bd5c"); save(); }
@@ -848,6 +942,31 @@ function updWotdBtn(){ const b = $("wotd"); if(!S.cur || S.cur.race !== "undead"
 // ---------------------------------------------------------------- racial ability effects on your character
 // a glowing ring at your feet while Sprint, Bloodrage, Stoneform or Shadowmeld is active; your body turns to stone, glows red or fades into the shadows
 const RACE_FX = {sprint: 0x7fe8ff, bloodrage: 0xff3a2a, stoneform: 0xb8b0a0, meld: 0x8a6ab8};
+// ---------------------------------------------------------------- procs: when a talent makes your next spell instant or free (Maelstrom Weapon, Hot Streak, Clearcasting …)
+// a glowing ring and swirl around you, a large alert above the action bars, and the spells it works on light up on the bar
+const PROC_FX = {hotstreak: ["#ff7a2a", ["pyroblast"]], nightfall: ["#a87aff", ["shadowbolt"]], backlash: ["#ff6a3a", ["shadowbolt", "soulfire"]], steadyaim: ["#e8d070", ["aimed"]],
+  surge: ["#fff0a0", ["smite"]], owlkin: ["#c8a8ff", ["starfire"]], lunar: ["#c8a8ff", ["starfire"]], solar: ["#ffd36b", ["wrath"]], artofwar: ["#ffe08a", ["palheal"]],
+  maelstrom: ["#8fd0ff", ["lightning", "healwave"]], clearcast: ["#9fd6ff", []], archmage: ["#c08aff", []], sudden: ["#ff5a4a", ["execute"]], counter: ["#e8e8e8", ["counter"]]};
+const activeProcs = () => running && !P.dead ? Object.keys(PROC_FX).filter(k => P.buffs[k] > 0) : [];
+function procAbilities(){ const out = new Set(); for(const k of activeProcs()) for(const id of PROC_FX[k][1]) out.add(id); return out; }
+const procFx = (() => { const g = new THREE.Group(), mat = c => new THREE.MeshBasicMaterial({color: c, transparent: true, opacity: 0.8, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending});
+  const r1 = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.25, 40), mat(0xffffff)); r1.rotation.x = -Math.PI / 2; g.add(r1);
+  const r2 = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.62, 6), mat(0xffffff)); r2.rotation.x = -Math.PI / 2; r2.position.y = 0.02; g.add(r2);
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.15, 2.6, 24, 1, true), mat(0xffffff)); col.position.y = 1.3; col.material.opacity = 0.12; g.add(col);
+  const sparks = []; for(let i = 0; i < 6; i++){ const sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.09, 0), mat(0xffffff)); g.add(sp); sparks.push(sp); }
+  for(const o of [r1, r2, col, ...sparks]) o.raycast = () => {};
+  g.visible = false; scene.add(g); return {g, r1, r2, col, sparks}; })();
+let procShown = "";
+function updProcs(dt){ const L = activeProcs(), F = procFx; F.g.visible = L.length > 0 && !!hero;
+  if(F.g.visible){ const c = new THREE.Color(PROC_FX[L[0]][0]), pulse = 0.75 + Math.sin(now * 5) * 0.25, y = hero.position.y;
+    F.g.position.set(P.x, y + 0.06, P.z); for(const o of [F.r1, F.r2, ...F.sparks]) o.material.color.copy(c); F.col.material.color.copy(c);
+    F.r1.material.opacity = 0.55 * pulse + 0.2; F.r2.rotation.z += dt * 2; F.r1.scale.setScalar(1 + Math.sin(now * 5) * 0.06); F.col.material.opacity = 0.08 + 0.06 * pulse;
+    F.sparks.forEach((sp, i) => { const a = now * 2.2 + i / F.sparks.length * Math.PI * 2, h = ((now * 0.9 + i * 0.37) % 1); sp.position.set(Math.cos(a) * 1.05, 0.2 + h * 2.4, Math.sin(a) * 1.05); sp.rotation.y += dt * 4; sp.material.opacity = 0.9 * (1 - h); }); }
+  // the alert above the action bars: the empowered spell's icon, the proc's name and time left
+  const key = L.join(","); if(key !== procShown){ procShown = key; const el = $("procs");
+    el.innerHTML = L.map(k => { const id = PROC_FX[k][1][0] || AURA[k]; const [ic, col] = id && AB[id] ? abIcon(id) : ["spark", PROC_FX[k][0]];
+      return `<div class="proc" style="--pc:${PROC_FX[k][0]}"><img src="${iconURL(ic, col)}"><span>${AURA_NAME[k] || (AB[AURA[k]] || {}).name || k}</span><b data-k="${k}"></b></div>`; }).join(""); }
+  for(const b of $("procs").querySelectorAll("b[data-k]")){ const t = P.buffs[b.dataset.k]; b.textContent = t > 0 ? Math.ceil(t) + "s" : ""; } }
 const fxRing = new THREE.Mesh(new THREE.RingGeometry(0.75, 1.0, 32), new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide}));
 fxRing.rotation.x = -Math.PI / 2; fxRing.visible = false; fxRing.raycast = () => {}; scene.add(fxRing);
 const raiseCol = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.3, 9, 16, 1, true), new THREE.MeshBasicMaterial({color: 0x7aff6a, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending}));
@@ -890,7 +1009,7 @@ $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("ch
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
 G.initEngine(scene, {startAim, floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
-CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? makeMount(MOUNTS[k]) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
+CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? mountModel(k) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t), zoneVis: (m, l) => zoneVis(m, l), bossSync: (m, f) => bossSync(m, f),
   someoneEnters: () => {}});
@@ -910,6 +1029,7 @@ const cam = {dist: 26, distT: 26, yaw: Math.PI / 4, yawT: Math.PI / 4, pitch: 0.
 let capture = null;                         // {action, slot} while waiting for a new key in the Key bindings window
 function doAction(a, e){
   if(a === "zoomIn") cam.distT = clamp(cam.distT - 3, 12, 48); else if(a === "zoomOut") cam.distT = clamp(cam.distT + 3, 12, 48);
+  else if(P.flying && !["map", "chat", "quests", "char", "bag", "spells", "tal", "keys", "coop"].includes(a)) return;
   else if(a === "attack") startAttack(); else if(a === "target") cycleTarget(); else if(a === "rest") G.toggleRest();
   else if(a === "interact"){ if(P.ghost && P.corpse && Math.hypot(P.x - P.corpse.x, P.z - P.corpse.z) <= CORPSE_RANGE) return resurrectAtCorpse();
     const n = nearestUsable(USE_RANGE); if(n) useThing(n); else err("Nothing to interact with"); }
@@ -994,26 +1114,31 @@ function moveAim(cx, cy){ if(!aim) return; const p = groundAt(cx, cy); if(!p){ a
   aim.mesh.children.forEach(m => m.material.color.set(far ? "#ff5a4f" : (SCHOOL_COLOR[AB[aim.id].school] || "#ffffff"))); }
 renderer.domElement.addEventListener("pointermove", e => { aimMouse = {x: e.clientX, y: e.clientY}; moveAim(e.clientX, e.clientY); });
 // mouse: left click targets, right click attacks / talks / picks up, hold the right button and move the mouse to turn the camera and your character
-const rmb = {down: false, moved: 0, x: 0, y: 0};
+const rmb = {down: false, moved: 0, x: 0, y: 0}, lmb = {down: false, moved: 0, x: 0, y: 0};   // right button: turns you and the camera; left button: only the camera
 // while you turn with the right button, your character faces where the camera looks (as in WoW)
-const mouseTurn = () => rmb.down && rmb.moved > 4 && running && !(P.dead && !P.ghost) && !P.dash && !P.leap;
+const mouseTurn = () => rmb.down && rmb.moved > 4 && running && !(P.dead && !P.ghost) && !P.dash && !P.leap && !P.flying;
 renderer.domElement.addEventListener("pointerdown", e => {
   if(!running) return;
   if(aim){ if(e.button === 0 && aim.p && !P.dead){ const id = aim.id, p = aim.p; endAim(); G.tryUse(id, p); } else endAim(); return; }
   if(e.button === 2){ rmb.down = true; rmb.moved = 0; rmb.x = e.clientX; rmb.y = e.clientY; renderer.domElement.setPointerCapture(e.pointerId); return; }
-  if(e.button !== 0 || P.dead) return; const h = pick(e);
+  if(e.button === 0){ lmb.down = true; lmb.moved = 0; lmb.x = e.clientX; lmb.y = e.clientY; renderer.domElement.setPointerCapture(e.pointerId); } });
+// a left click (not a drag) selects: a monster, your pet, a friend, or nothing
+function leftClick(e){ if(P.dead || P.flying) return; const h = pick(e);
   if(h && h.mob){ P.target = h.mob; CO.select(null); }                                                 // left = select only
   else if(h && h.pet) selectPet();
   else if(h && h.friend) CO.select(h.friend.id);                                                         // a friend: your heals go to them
   else if(!h || h.point){ P.target = null; P.auto = false; CO.select(null); P.selfT = false; }                           // clicking nothing clears your target
-});
+}
 renderer.domElement.addEventListener("pointermove", e => {
+  if(lmb.down && !rmb.down){ const dx = e.clientX - lmb.x, dy = e.clientY - lmb.y; lmb.x = e.clientX; lmb.y = e.clientY; lmb.moved += Math.abs(dx) + Math.abs(dy);
+    if(lmb.moved > 4){ cam.yaw = cam.yawT = cam.yaw - dx * 0.008; cam.pitch = clamp(cam.pitch + dy * 0.004, 0.45, 1.35); renderer.domElement.style.cursor = "grabbing"; } return; }
   if(!rmb.down) return; const dx = e.clientX - rmb.x, dy = e.clientY - rmb.y; rmb.x = e.clientX; rmb.y = e.clientY; rmb.moved += Math.abs(dx) + Math.abs(dy);
   if(rmb.moved > 4){ cam.yaw = cam.yawT = cam.yaw - dx * 0.008; cam.pitch = clamp(cam.pitch + dy * 0.004, 0.45, 1.35); renderer.domElement.style.cursor = "grabbing"; if(mouseTurn()) P.rot = cam.yawT + Math.PI; }
 });
 renderer.domElement.addEventListener("pointerup", e => {
+  if(e.button === 0 && lmb.down){ lmb.down = false; renderer.domElement.style.cursor = ""; if(lmb.moved <= 4 && running) leftClick(e); return; }
   if(e.button !== 2 || !rmb.down) return; rmb.down = false; renderer.domElement.style.cursor = "";
-  if(rmb.moved > 4 || (P.dead && !P.ghost) || !running) return;                                   // (a spirit can still right-click the Spirit Guide)                                                     // it was a camera turn, not a click
+  if(rmb.moved > 4 || (P.dead && !P.ghost) || !running || P.flying) return;                                   // (a spirit can still right-click the Spirit Guide)                                                     // it was a camera turn, not a click
   const h = pick(e); if(!h) return;
   if(h.mob) startAttack(h.mob); else if(h.use) useThing(h.use); else if(h.friend) CO.tradeRequest(h.friend.id);   // right-click a friend: ask to trade
 });
@@ -1031,7 +1156,7 @@ function updMob(m, dt){
   if(m.dead){ if(m.zones && m.zones.length) clearZones(m); m.deadT += dt; if(!m.mesh.userData.ownDeath) m.mesh.rotation.z = Math.min(1.4, m.deadT * 4);   // tips over, then sinks and respawns
     if(m.deadT > 4) m.mesh.position.y -= dt * 0.6; if(m.deadT > 6) m.mesh.visible = false; if(!m.dg && !CO.guestMob(m) && !(m.night && (m.nightGone || !nightNow)) && m.deadT > (m.elite ? RESPAWN_ELITE : RESPAWN)) respawn(m); return; }
   if(CO.guestMob(m)){ CO.guestUpd(m, dt); return; }                                        // a friend hosts this monster: just follow what they send
-  const dp = P.dead || !running ? 1e9 : distU(m, P);
+  const dp = P.dead || P.flying || !running ? 1e9 : distU(m, P);
   m.moving = false;
   const free = G.updMobStatus(m, dt); if(m.dead) return;
   if(m.state === "idle"){
@@ -1146,6 +1271,8 @@ function separate(){ const act = mobs.filter(m => m.state === "chase");
 // ---------------------------------------------------------------- the player moving
 function updMovement(dt){
   P.moving = false; let voluntary = false;
+  if(P.flying){ flyStep(dt); return false; }
+  if(P.ghost) P.combatT = 0;                                                                // a spirit is never in combat
   if(P.dead && !P.ghost) return false;                                                       // (a spirit can walk)
   if(P.target && P.target.dead){ P.target = null; P.auto = false; }
   if(P.dash){                                                                                // Charge: rush to the target
@@ -1186,6 +1313,11 @@ function updMovement(dt){
   return voluntary && P.moving;
 }
 
+// on a mount, strafing turns the animal (and you) partly towards where it runs, since a horse cannot side-step
+let mountTurn = 0;
+function mountYaw(){ let want = 0;
+  if(P.mount && P.moving && (P.gait === "left" || P.gait === "right") && P.lastMv){ const d = Math.atan2(P.lastMv.px, P.lastMv.py) - P.rot; want = Math.atan2(Math.sin(d), Math.cos(d)) * 0.6; }
+  mountTurn += (want - mountTurn) * 0.2; return P.rot + mountTurn; }
 // ---------------------------------------------------------------- HUD
 const plates = new Map();
 function plateFor(m){ let p = plates.get(m); if(!p){ p = document.createElement("div"); p.className = "plate"; p.innerHTML = `<span></span><div class="hb"><i></i></div>`; hud.appendChild(p); plates.set(m, p); } return p; }
@@ -1198,7 +1330,7 @@ function npcPlate(n){ let p = npcPlates.get(n); if(!p){ p = document.createEleme
 const AURA = {   // buff key → ability whose icon it uses
   shout: "shout", bark: "bark", avenging: "avenging", bubble: "bubble", dash: "dash", hotstreak: "pyroblast", nightfall: "shadowbolt", backlash: "soulfire",
   ignite: "fireball", deep: "rend", burn: "firearrow", pyro: "pyroblast", sprint: "sprint", bloodrage: "bloodrage", meld: "meld", stoneform: "stoneform",
-  stskin: "stoneskin", earthstr: "strengthtotem", heroism: "heroism", lshield: "lshield", slice: "slicedice", evasion: "evasion", adren: "adrenaline", stealth: "stealth",
+  stskin: "stoneskin", earthstr: "strengthtotem", airgrace: "graceair", heroism: "heroism", lshield: "lshield", slice: "slicedice", evasion: "evasion", adren: "adrenaline", stealth: "stealth",
   immolate: "immolate", corruption: "corruption", agony: "agony", rupture: "rupture", flameshock: "flameshock",
   // talents
   presence: "presence", arcanepower: "arcanepower", combust: "combustion", clearcast: "sparkrain", archmage: "presence", sweep: "sweeping", sudden: "execute", enrage: "heroic", flurry: "whirlwind",
@@ -1212,10 +1344,13 @@ const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir
 function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good}; }
 function playerAuras(){ const L = [];
   for(const k in P.buffs){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], left: P.buffs[k], good: true});
+    else if(OWN_TOTEM_BUFF[k] && G.totemList().some(t => t.kind === OWN_TOTEM_BUFF[k])) continue;          // (your own totem is shown instead)
     else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : P.buffs[k], true, AURA_NAME[k] || null)); }   // (Stealth has no time limit)
+  for(const t of G.totemList()){ const id = Object.keys(G.TOTEM_OF).find(a => G.TOTEM_OF[a] === t.kind); L.push({...abAura(id, t.left, true, `${t.name} (${G.TOTEM_EL[t.el]}). Right-click to cancel.`), cancel: "totem:" + t.kind}); }
   for(const h of P.hots) L.push(AB[h.key] ? abAura(h.key, h.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", left: h.left, good: true});
   if(P.shield > 0) L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(P.shield)} left)`, left: P.shieldT, good: true});
   if(P.sitting) L.push({url: iconURL("halo", "#7fa8b8"), name: "Resting", left: null, good: true});
+  if(P.buffs.ressick) L.push({url: iconURL("skull", "#8a9aa8"), name: "Resurrection Sickness: damage, healing, health, mana and stats reduced by 75%", left: P.buffs.ressick, good: false});
   if(P.potCd > 0) L.push({url: iconURL("flask", "#8a8a8a"), name: "Potion cooldown", left: P.potCd, good: false});
   if(P.buffs.chill) L.push({url: iconURL("snowflake", "#bfe9ff"), name: "Chilled: movement speed reduced by 40%", left: P.buffs.chill, good: false});
   if(P.envSpeed < 1) L.push({url: iconURL("drop", "#5fa8e0"), name: "Wading: movement speed reduced by 45%", left: null, good: false});
@@ -1234,8 +1369,11 @@ function targetAuras(m){ const L = [];
 function petAurasHUD(){ return G.petAuras().map(a => a.shield ? {url: iconURL("shield", "#fff2b0"), name: a.name, left: a.left, good: true} : a.taunt ? {url: iconURL("roar", "#e6bd5c"), name: "Taunting", left: a.left, good: true}
   : AB[a.id] ? abAura(a.id, a.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", left: a.left, good: true}); }
 const fmtLeft = s => s == null ? "" : s >= 60 ? Math.ceil(s / 60) + "m" : Math.ceil(s) + "";
-function setAuras(el, list){ const html = list.map(a => `<span class="aura ${a.good ? "" : "bad"}" title="${a.name}"><img src="${a.url}"><b>${fmtLeft(a.left)}</b></span>`).join("");
+const OWN_TOTEM_BUFF = {stskin: "stoneskin", earthstr: "strength", airgrace: "graceair"};
+function setAuras(el, list){ const html = list.map(a => `<span class="aura ${a.good ? "" : "bad"}" title="${a.name}"${a.cancel ? ` data-cancel="${a.cancel}"` : ""}><img src="${a.url}"><b>${fmtLeft(a.left)}</b></span>`).join("");
   if(el.innerHTML !== html) el.innerHTML = html; }
+// right-click a totem under your portrait to cancel it
+$("pbuffs").addEventListener("contextmenu", e => { e.preventDefault(); const a = e.target.closest("[data-cancel]"); if(!a) return; const [k, id] = a.dataset.cancel.split(":"); if(k === "totem") G.cancelTotem(id); });
 const BUFF_NAMES = {shout: "War Cry", bark: "Barkskin", avenging: "Righteous Wrath", bubble: "Divine Shield", dash: "Dash"};
 function updHUD(dt){
   for(const f of floats){ f.t += dt; const s = toScreen(f.x, f.y + f.t * 1.2, f.z); f.el.style.left = s.x + "px"; f.el.style.top = s.y + "px"; f.el.style.opacity = Math.min(1, 2.2 - f.t * 2); if(f.t > 1.1) f.el.remove(); }
@@ -1264,6 +1402,8 @@ function updHUD(dt){
   const t = P.target, tf = $("tframe"), fr = !t && P.ftarget ? CO.remoteById(P.ftarget) : null, me = !t && !fr && P.selfT, pe = !t && !fr && !me && G.petSelected() ? G.getPet() : null;
   setAuras($("tauras"), t && !t.dead ? targetAuras(t) : pe ? petAurasHUD() : []);
   tf.classList.toggle("friend", !!fr); tf.classList.toggle("self", !!(me || pe));
+  { const mob = t && !t.dead ? t : null, rank = !mob ? "" : mob.boss ? "boss" : mob.elite ? "elite" : (mob.rare || mob.K.rare) ? "rare" : "";   // elites, rares and bosses get their own frame
+    for(const k of ["boss", "elite", "rare"]) tf.classList.toggle(k, rank === k); tf.dataset.rank = rank ? rank[0].toUpperCase() + rank.slice(1) : ""; }
   if(pe){ tf.hidden = false; $("tname").textContent = pe.name; $("tlvl").textContent = "Level " + c.level; $("tlvl").style.color = "#7be08a";
     $("thpi").style.width = (pe.hp / pe.maxHp * 100) + "%"; $("thpt").textContent = `${Math.ceil(pe.hp)} / ${pe.maxHp}`; $("tstate").textContent = "Your pet"; }
   else
@@ -1285,7 +1425,8 @@ function updHUD(dt){
   // action bar: cooldowns, range, resources
   document.querySelector("#gmenu [data-g=tal]").classList.toggle("glow", G.talentPoints() - G.talentsSpent() > 0);
   const potN = keys => keys.reduce((a, k) => a + (c.bag[k] || 0), 0);
-  for(const s of slots){ const x = s.x; if(!x) continue;
+  const procIds = procAbilities();
+  for(const s of slots){ const x = s.x; if(!x) continue; s.el.classList.toggle("proc", procIds.has(x));
     if(SPECIALS[x]){
       if(x === "pothp" || x === "potmana"){ const n = potN(x === "pothp" ? ["potHp", "potHp2", "potHp3"] : ["potMana", "potMana2"]); s.n.textContent = n; s.el.classList.toggle("nores", !n); s.cd.textContent = P.potCd > 0 ? Math.ceil(P.potCd) : ""; }
       s.el.classList.toggle("on", (x === "attack" && !!P.auto) || (x === "rest" && !!P.sitting) || (x === "mount" && (!!P.mount || P.casting?.kind === "mount"))); continue; }
@@ -1388,9 +1529,18 @@ function questAreas(){ const out = [];
   return out; }
 // the nearest of those areas to you, for the quest tracker
 function nearestArea(o){ const list = objAreas(o); if(!list.length) return null; return list.reduce((b, a) => Math.hypot(a.x - P.x, a.z - P.z) < Math.hypot(b.x - P.x, b.z - P.z) ? a : b); }
-let mapZoom = 1;
-function toggleMap(){ const el = $("bigmap"); if(!running) return; el.hidden = !el.hidden; if(!el.hidden){ closePanel(); hideTip(); mapZoom = 1; drawBigMap(); } }
-$("bigmap").addEventListener("wheel", e => { e.preventDefault(); mapZoom = clamp(mapZoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2), 1, 4); drawBigMap(); }, {passive: false});
+let mapZoom = 1, mapCenter = null;                                                  // mapCenter: the spot in the middle of the map (null = follows you)
+function toggleMap(){ const el = $("bigmap"); if(!running) return; el.hidden = !el.hidden; if(!el.hidden){ closePanel(); hideTip(); mapZoom = 1; mapCenter = null; drawBigMap(); } }
+$("bigmap").addEventListener("wheel", e => { e.preventDefault(); const z0 = mapZoom; mapZoom = clamp(mapZoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2), 1, 4);
+  const m = mapAt(e); if(m && mapZoom !== z0){ const c = mapCenter || {x: mapView.cx, z: mapView.cz}, k = z0 / mapZoom; mapCenter = {x: m.x + (c.x - m.x) * k, z: m.z + (c.z - m.z) * k}; }   // zoom towards the mouse
+  drawBigMap(); }, {passive: false});
+// drag the map to look around when zoomed in
+const mapView = {sc: 1, cx: 0, cz: 0, ox: 0, oz: 0, left: 0, top: 0};
+function mapAt(e){ const r = $("mapcv").getBoundingClientRect(); if(!mapView.sc) return null; return {x: mapView.ox + (e.clientX - r.left + mapView.left) / mapView.sc, z: mapView.oz + (e.clientY - r.top + mapView.top) / mapView.sc}; }
+{ let drag = null; const cv = $("mapcv");
+  cv.addEventListener("pointerdown", e => { if(mapZoom <= 1) return; drag = {x: e.clientX, z: e.clientY, c: mapCenter || {x: mapView.cx, z: mapView.cz}}; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
+  cv.addEventListener("pointermove", e => { if(!drag) return; mapCenter = {x: drag.c.x - (e.clientX - drag.x) / mapView.sc, z: drag.c.z - (e.clientY - drag.z) / mapView.sc}; drawBigMap(); });
+  const end = () => { drag = null; cv.style.cursor = mapZoom > 1 ? "grab" : ""; }; cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end); }
 $("bigmap").addEventListener("pointerdown", e => { if(e.target === $("bigmap")) toggleMap(); });
 function drawBigMap(){
   const cv = $("mapcv"), dg = curDungeon(), img = dg ? dgImgs.get(dg) : mapImg, ox = dg ? dg.x0 : B.x0, oz = dg ? dg.z0 : B.z0;
@@ -1398,8 +1548,10 @@ function drawBigMap(){
   cv.width = Math.round(img.width * fit); cv.height = Math.round(img.height * fit); $("mapTitle").textContent = dg ? dg.name : "World map";
   const g = cv.getContext("2d"), sc = fit * mapZoom * MM_PX;                           // pixels per world unit
   // keep you in view when zoomed in
-  let cx = (P.x - ox) * sc - cv.width / 2, cz = (P.z - oz) * sc - cv.height / 2; cx = clamp(cx, 0, Math.max(0, img.width * fit * mapZoom - cv.width)); cz = clamp(cz, 0, Math.max(0, img.height * fit * mapZoom - cv.height));
-  if(mapZoom === 1){ cx = 0; cz = 0; }
+  const ctr = mapCenter || P; let cx = (ctr.x - ox) * sc - cv.width / 2, cz = (ctr.z - oz) * sc - cv.height / 2; cx = clamp(cx, 0, Math.max(0, img.width * fit * mapZoom - cv.width)); cz = clamp(cz, 0, Math.max(0, img.height * fit * mapZoom - cv.height));
+  if(mapZoom === 1){ cx = 0; cz = 0; mapCenter = null; }
+  Object.assign(mapView, {sc, ox, oz, left: cx, top: cz, cx: ox + (cx + cv.width / 2) / sc, cz: oz + (cz + cv.height / 2) / sc}); if(mapCenter) mapCenter = {x: mapView.cx, z: mapView.cz};   // (kept inside the map)
+  if(cv.style.cursor !== "grabbing") cv.style.cursor = mapZoom > 1 ? "grab" : "";
   const to = (x, z) => [(x - ox) * sc - cx, (z - oz) * sc - cz];
   g.fillStyle = "#0a0806"; g.fillRect(0, 0, cv.width, cv.height);
   g.drawImage(img, -cx, -cz, img.width * fit * mapZoom, img.height * fit * mapZoom);
@@ -1414,6 +1566,9 @@ function drawBigMap(){
   if(!dg && !P.ghost) for(const e of exploreTargets()){ dot(e.x, e.z, 6, "#ffd84a", "#000"); const [px, py] = to(e.x, e.z); g.font = "700 12px 'Alegreya Sans', sans-serif"; g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText(e.name, px, py - 9); g.fillStyle = "#ffd84a"; g.fillText(e.name, px, py - 9); }
   for(const p of portals) if(!!dungeonAt(p.x) === !!dg && (!dg || dungeonAt(p.x) === dg)) dot(p.x, p.z, 5, "#9fd6e8", "#000");
   for(const n of nodes) if(n.active && needSet.has(n.item) && !dg && !P.ghost && (!n.def.night || nightNow)) dot(n.x, n.z, 3.5, "#ffd84a", "#000");
+  if(!dg && !P.ghost){ const kf = knownFlights();                                  // flight masters: a small drake-wing mark, bright for the ones you know
+    for(const f of flightMasters){ const [px, py] = to(f.x, f.z), on = kf.has(f.hub); g.lineWidth = 2; g.strokeStyle = "#000"; g.fillStyle = on ? "#7fe0c8" : "#5a6a66";
+      g.beginPath(); g.moveTo(px, py - 6); g.lineTo(px + 7, py + 3); g.lineTo(px, py); g.lineTo(px - 7, py + 3); g.closePath(); g.stroke(); g.fill(); } }
   if(!dg && !P.ghost){ g.font = "800 18px 'Alegreya Sans', sans-serif";
     for(const n of npcs){ const mk = Q.npcMarker(n.id), [px, py] = to(n.x, n.z); if(mk && mk !== "…"){ g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText(mk, px, py + 6); g.fillStyle = "#ffd84a"; g.fillText(mk, px, py + 6); } } }
   for(const r of CO.visible()) dot(r.x, r.z, 4.5, "#7fc4ff", "#000");
@@ -1427,8 +1582,8 @@ function drawBigMap(){
 
 // ---------------------------------------------------------------- game loop
 const zoneEl = $("zone"), fpsEl = $("fps");
-const SKIES = {out: [0xa9d3ea, 70, 150], mist: [0x9db8a4, 40, 105], gloom: [0x6e6e80, 35, 95], ash: [0x9a7a68, 45, 115], snow: [0xd8e6ee, 55, 130], blight: [0x9aa08a, 50, 120], in: [0x0a0806, 18, 48]};
-const SKY_OF = {swamp: "mist", gloom: "gloom", ash: "ash", snow: "snow", snowhigh: "snow", blight: "blight"}, skyCol = new THREE.Color();
+const SKIES = {jungle: [0x9cc4a0, 45, 115], desert: [0xe6d6b0, 60, 140], dread: [0x5e5070, 38, 100], out: [0xa9d3ea, 70, 150], mist: [0x9db8a4, 40, 105], gloom: [0x6e6e80, 35, 95], ash: [0x9a7a68, 45, 115], snow: [0xd8e6ee, 55, 130], blight: [0x9aa08a, 50, 120], in: [0x0a0806, 18, 48]};
+const SKY_OF = {jungle: "jungle", desert: "desert", badlands: "desert", dread: "dread", swamp: "mist", gloom: "gloom", ash: "ash", snow: "snow", snowhigh: "snow", blight: "blight"}, skyCol = new THREE.Color();
 let exploreT = 0, needSet = new Set(), mobNeedSet = new Set();
 const questMob = m => mobNeedSet.has(m.kind);
 let last = performance.now(), fpsT = 0, frames = 0, saveT = 0, trackT = 0;
@@ -1449,13 +1604,18 @@ function update(dt){
   }
   // the hero
   if(hero){ P.walk = P.moving ? P.walk + dt * 9 : P.walk * 0.85;
-    const pose = P.sitting ? "sit" : P.pose || (P.attackAnim > 0 && P.attackKind === "cast" ? "cast" : null);
+    const pose = P.sitting || (P.flying && !P.flying.ship) ? "sit" : P.pose || (P.attackAnim > 0 && P.attackKind === "cast" ? "cast" : null);
     const sk = hero.userData.skinned, lying = P.dead && !P.ghost;
-    hero.userData.animate(P.walk, P.moving, sk || P.attackKind !== "cast" ? P.attackAnim : 0, pose, {kind: P.attackKind, dead: lying, mount: !!P.mount, speed: G.playerSpeed(), gait: P.mount ? null : P.gait});
-    hero.position.set(P.x, height(P.x, P.z) + (P.moving && !sk ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(lying && !sk ? -1.4 : 0, P.rot, 0); if(lying && !sk) hero.position.y += 0.3;
-  updRaceFx(dt);
+    hero.userData.animate(P.walk, P.moving, sk || P.attackKind !== "cast" ? P.attackAnim : 0, pose, {kind: P.attackKind, dead: lying, mount: !!P.mount || (!!P.flying && !P.flying.ship), speed: G.playerSpeed(), gait: P.mount ? null : P.gait});
+    hero.position.set(P.x, height(P.x, P.z) + (P.moving && !sk ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(lying && !sk ? -1.4 : 0, P.mount ? mountYaw() : P.rot, 0); if(lying && !sk) hero.position.y += 0.3;
+  updRaceFx(dt); updProcs(dt);
     if(P.ghost) hero.position.y += 0.25 + Math.sin(now * 2) * 0.08;                            // a spirit floats
-    if(mountMesh){ const gy = height(P.x, P.z); mountMesh.position.set(P.x, gy, P.z); mountMesh.rotation.y = P.rot; mountMesh.userData.animate(P.walk * 0.75, P.moving, 0); hero.position.y = gy + mountMesh.userData.saddle - 0.38 + (P.moving ? Math.abs(Math.sin(P.walk * 0.75)) * 0.08 : 0); } }
+    if(flightMesh && P.flying && P.flying.ship){ const t = P.flying.t || 0, bob = Math.sin(t * 1.3) * 0.12, roll = Math.sin(t * 0.9) * 0.05 + P.flying.bank * 0.4, pitch = Math.sin(t * 1.1 + 1) * 0.03;
+      flightMesh.position.set(P.x, P.fy + bob, P.z); flightMesh.rotation.set(pitch, P.rot, roll, "YXZ");
+      hero.position.set(P.x - Math.sin(P.rot) * 1.5, P.fy + bob, P.z - Math.cos(P.rot) * 1.5); hero.rotation.set(0, P.rot, roll, "YXZ"); }
+    else if(flightMesh && P.flying){ flightMesh.position.set(P.x, P.fy, P.z); flightMesh.rotation.set(FLY_PITCH, P.rot, P.flying.bank, "YXZ"); flightMesh.userData.animate(0, true, 0);
+      const sd = flightMesh.userData.saddle; hero.position.set(P.x + Math.sin(P.rot) * FLY_SEAT, P.fy + sd - 0.5, P.z + Math.cos(P.rot) * FLY_SEAT); hero.rotation.set(FLY_PITCH * 0.6, P.rot, P.flying.bank * 0.8, "YXZ"); }
+    else if(mountMesh){ const gy = height(P.x, P.z); mountMesh.position.set(P.x, gy, P.z); mountMesh.rotation.y = hero.rotation.y; mountMesh.userData.animate(P.walk * 0.75, P.moving, 0); hero.position.y = gy + mountMesh.userData.saddle - 0.38 + (P.moving ? Math.abs(Math.sin(P.walk * 0.75)) * 0.08 : 0); } }
   // monsters: only the ones near you (or a friend) are drawn and move about
   { const rs = CO.visible(), reg0 = curDungeon();
     for(const m of mobs){ const d = Math.hypot(m.x - P.x, m.z - P.z), dr = rs.length ? Math.min(...rs.map(r => Math.hypot(m.x - r.x, m.z - r.z))) : 1e9;
@@ -1463,13 +1623,14 @@ function update(dt){
       if(show !== m.inScene){ m.inScene = show; if(show) scene.add(m.mesh); else scene.remove(m.mesh); if(m.sheep){ if(show) scene.add(m.sheep); else scene.remove(m.sheep); } } } }
   for(const m of mobs) updMob(m, dt); separate();
   if(running && !inCrypt() && (exploreT -= dt) <= 0){ exploreT = 0.4; Q.questExplore(P.x, P.z); }
-  if(running) G.updPet(dt, blocked, tryMove, turnTo);
+  if(running && !P.flying) G.updPet(dt, blocked, tryMove, turnTo);
   CO.update(dt); if(running){ CO.render(); CO.tradeTick(); CO.rollTick(); updRolls(); }
   if(running && P.pendingUse && !P.dead){ if(!P.dest) P.pendingUse = null; else if(distU(P, P.pendingUse) < USE_RANGE){ const n = P.pendingUse; P.dest = null; marker.visible = false; useThing(n); } }
   if(talkNpc && distU(P, talkNpc) > 7) closePanel();
   for(const n of npcs){ const d = distU(P, n), want = talkNpc === n && running && !P.dead ? Math.atan2(P.x - n.x, P.z - n.z) : n.rot0;   // people only turn to you while you talk to them
     n.mesh.visible = d < GFX.view && (!P.ghost || d < GHOST_SIGHT); if(!n.mesh.visible) continue;          // people far away are not drawn or animated
     let dr = want - n.mesh.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); n.mesh.rotation.y += dr * Math.min(1, dt * 4); if(d < 30 || (frameNo + n.mesh.id) % 2 === 0) n.mesh.userData.animate(0, false, 0, null); }
+  for(const g of perchDrakes){ const d = Math.hypot(g.position.x - P.x, g.position.z - P.z); g.visible = d < GFX.view && !P.ghost; if(g.visible && (d < 40 || (frameNo + g.id) % 3 === 0)) g.userData.animate(0, false, 0); }
   needSet = running ? Q.neededItems() : new Set(); mobNeedSet = running ? Q.neededMobs() : new Set();
   for(const n of nodes){ if(!n.active){ n.respawn -= dt; if(n.respawn <= 0) n.active = true; }
     const need = needSet.has(n.item), gath = running && Q.gatherReq(n.item) && Q.canGather(n.item) === true;
@@ -1495,7 +1656,7 @@ function update(dt){
     scene.fog.near = lerp(scene.fog.near, S2[1] * (0.75 + dl * 0.25) * gf, k); scene.fog.far = lerp(scene.fog.far, S2[2] * (0.8 + dl * 0.2) * gf, k);
     sunAng = dl > 0 ? (hr - 4.5) / 15 * Math.PI : (hr >= 21 ? hr - 21 : hr + 3) / 6 * Math.PI;
     if(ins){ torch.position.set(P.x, height(P.x, P.z) + 3.5, P.z); for(const db of dgBuilt) for(const b of db.braziers) b.fire.scale.setScalar(0.85 + Math.sin(now * 9 + b.x) * 0.15); } }
-  { const pt = G.getPet(); if(pt){ pt.mesh.visible = !(pt.dead && pt.deadT > 3); pt.mesh.position.set(pt.x, height(pt.x, pt.z), pt.z); pt.mesh.rotation.set(0, pt.rot, pt.dead ? Math.min(1.4, pt.deadT * 4) : 0);
+  { const pt = G.getPet(); if(pt){ pt.mesh.visible = !(pt.dead && pt.deadT > 3) && !P.flying; pt.mesh.position.set(pt.x, height(pt.x, pt.z), pt.z); pt.mesh.rotation.set(0, pt.rot, pt.dead ? Math.min(1.4, pt.deadT * 4) : 0);
     pt.mesh.userData.animate(pt.walk, pt.moving, pt.attackAnim); } }
   frameNo++;
   for(const m of mobs){
@@ -1517,7 +1678,7 @@ function update(dt){
   // camera: angled from above, follows you, smooth zoom and turning
   cam.dist = lerp(cam.dist, cam.distT, Math.min(1, dt * 8)); cam.yaw = lerp(cam.yaw, cam.yawT, Math.min(1, dt * 8));
   const cy = Math.sin(cam.pitch) * cam.dist, ch = Math.cos(cam.pitch) * cam.dist;
-  camera.position.set(P.x + Math.sin(cam.yaw) * ch, height(P.x, P.z) + cy, P.z + Math.cos(cam.yaw) * ch); camera.lookAt(P.x, height(P.x, P.z) + 1, P.z); camera.updateMatrixWorld();   // (so name plates use this frame's camera, not the last one)
+  { const py = pY(); camera.position.set(P.x + Math.sin(cam.yaw) * ch, py + cy, P.z + Math.cos(cam.yaw) * ch); camera.lookAt(P.x, py + 1, P.z); } camera.updateMatrixWorld();   // (so name plates use this frame's camera, not the last one)
   sun.position.set(P.x - Math.cos(sunAng) * 45, 22 + Math.sin(Math.max(0.15, Math.min(Math.PI - 0.15, sunAng))) * 45, P.z + 20); sun.target.position.set(P.x, 0, P.z);
   // houses between the camera and you turn see-through, so you never lose your character
   { const cx = camera.position.x - P.x, cz = camera.position.z - P.z, cl = Math.hypot(cx, cz) || 1;
@@ -1531,7 +1692,7 @@ function update(dt){
     if(ce.textContent !== txt){ ce.textContent = txt; ce.classList.toggle("night", nt); } }
 }
 function loop(t){
-  const dt = Math.min(0.05, (t - last) / 1000); last = t;
+  const dt = Math.max(0, Math.min(0.05, (t - last) / 1000)); last = Math.max(last, t);   // (the first frame can report a time from before the world was built)
   if(DEV.sim){ requestAnimationFrame(loop); return; }                       // the balance test runs the game on its own
   update(dt); updHUD(dt); if(running) drawMinimap(); if(!$("bigmap").hidden) drawBigMap(); { const far = Math.max(60, scene.fog.far + 12); if(Math.abs(camera.far - far) > 2){ camera.far = far; camera.updateProjectionMatrix(); } }   // nothing past the fog is drawn
   renderer.render(scene, camera);
@@ -1550,5 +1711,5 @@ initDev({update, save, refresh, buildBar, buildHero, hubSpot, log, arena: ARENA,
   makeMob: (kind, p, lvl) => { const m = makeMob(kind, p, lvl, rng(7)); m.dev = true; return m; },
   removeMob: m => { const i = mobs.indexOf(m); if(i >= 0) mobs.splice(i, 1); scene.remove(m.mesh); const pl = plates.get(m); if(pl){ pl.remove(); plates.delete(m); } if(P.target === m) P.target = null; },
   restore: c => { G.clearFx(); play(c); }});
-window.R2 = {renderer, rezAt, setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
+window.R2 = {renderer, rezAt, hero: () => hero, startFlight: h => startFlight(h), startVoyage: () => startVoyage(), perchDrakes, flyTune: (p, s) => { FLY_PITCH = p; FLY_SEAT = s; }, buildMount: () => buildMount(), setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
 requestAnimationFrame(loop);

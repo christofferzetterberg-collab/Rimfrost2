@@ -6,20 +6,24 @@ export const ITEMS = {
   obsidian:{name:"Obsidian", sell:15, kind:"ore"}, rimkr:{name:"Rime Crystal", sell:22, kind:"ore"},
   ang:{name:"Meadow Bloom", sell:2, kind:"herb"}, silver:{name:"Silverweed", sell:5, kind:"herb"}, drake:{name:"Dragon's Eye", sell:10, kind:"herb"},
   fireflower:{name:"Fire Bloom", sell:15, kind:"herb"}, moonbloom:{name:"Moonbloom", sell:9, kind:"herb"}, iceflower:{name:"Ice Bloom", sell:22, kind:"herb"},
-  potHp:{name:"Healing Potion", sell:3, kind:"use", desc:"Restores 40% of your health."},
-  potHp2:{name:"Greater Healing Potion", sell:8, kind:"use", desc:"Restores 75% of your health."},
-  potHp3:{name:"Mighty Healing Potion", sell:20, kind:"use", desc:"Fully restores your health."},
-  potMana:{name:"Mana Potion", sell:3, kind:"use", desc:"Restores 50% of your mana."},
-  potMana2:{name:"Greater Mana Potion", sell:20, kind:"use", desc:"Fully restores your mana."},
-  elixir:{name:"Elixir of Strength", sell:10, kind:"use", desc:"Increases damage dealt by 20% for 5 min."},
-  elixirIron:{name:"Elixir of Ironskin", sell:8, kind:"use", desc:"Reduces damage taken by 15% for 10 min."},
-  elixirKeen:{name:"Elixir of Keenness", sell:14, kind:"use", desc:"Increases critical strike chance by 5% for 10 min."},
-  elixirSage:{name:"Elixir of Wisdom", sell:18, kind:"use", desc:"Increases spell power by 20% for 10 min."},
+  potHp:{name:"Healing Potion", sell:3, kind:"use", desc:"Restores 40% of your health. Shares a 2 min cooldown with other potions."},
+  potHp2:{name:"Greater Healing Potion", sell:8, kind:"use", desc:"Restores 75% of your health. Shares a 2 min cooldown with other potions."},
+  potHp3:{name:"Mighty Healing Potion", sell:20, kind:"use", desc:"Fully restores your health. Shares a 2 min cooldown with other potions."},
+  potMana:{name:"Mana Potion", sell:3, kind:"use", desc:"Restores 50% of your mana. Shares a 2 min cooldown with other potions."},
+  potMana2:{name:"Greater Mana Potion", sell:20, kind:"use", desc:"Fully restores your mana. Shares a 2 min cooldown with other potions."},
+  elixir:{name:"Elixir of Strength", sell:80, kind:"use", desc:"Increases damage dealt by 20% for 5 min. Only one elixir can be active."},
+  elixirIron:{name:"Elixir of Ironskin", sell:90, kind:"use", desc:"Reduces damage taken by 15% for 10 min. Only one elixir can be active."},
+  elixirKeen:{name:"Elixir of Keenness", sell:90, kind:"use", desc:"Increases critical strike chance by 5% for 10 min. Only one elixir can be active."},
+  elixirSage:{name:"Elixir of Wisdom", sell:90, kind:"use", desc:"Increases spell power by 20% for 10 min. Only one elixir can be active."},
   pelt:{name:"Wolf Pelt", sell:1, kind:"junk"}, tusk:{name:"Boar Tusk", sell:1, kind:"junk"}, silk:{name:"Spider Silk", sell:3, kind:"junk"},
   ring:{name:"Stolen Ring", sell:6, kind:"junk"}, tooth:{name:"Troll Tooth", sell:5, kind:"junk"}, gobtooth:{name:"Goblin Tooth", sell:4, kind:"junk"}, rune:{name:"Runestone", sell:7, kind:"junk"},
   cloth:{name:"Rotten Cloth", sell:6, kind:"junk"}, dust:{name:"Sprite Dust", sell:8, kind:"junk"}, crown:{name:"The Draug Crown", sell:150, kind:"junk"},
   ember:{name:"Glowing Claw", sell:10, kind:"junk"}, cinder:{name:"Slagstone", sell:12, kind:"junk"}, fur:{name:"Frost Fur", sell:14, kind:"junk"},
   shard:{name:"Ice Shard", sell:16, kind:"junk"},
+  crabshell:{name:"Tidecrawler Shell", sell:16, kind:"junk"}, doubloon:{name:"Tarnished Doubloon", sell:22, kind:"junk"}, panthercloak:{name:"Panther Hide", sell:18, kind:"junk"},
+  venomsac:{name:"Venom Sac", sell:18, kind:"junk"}, junglefetish:{name:"Troll Fetish", sell:20, kind:"junk"}, sunglass:{name:"Sunfused Glass", sell:22, kind:"junk"},
+  wraithsand:{name:"Wraith Sand", sell:20, kind:"junk"}, razortusk:{name:"Razor Tusk", sell:22, kind:"junk"}, wyvernscale:{name:"Wyvern Scale", sell:26, kind:"junk"},
+  voidshard:{name:"Void Shard", sell:28, kind:"junk"}, dreadsigil:{name:"Dread Sigil", sell:30, kind:"junk"}, dreadcrown:{name:"Crown of the Dread Lord", sell:300, kind:"junk"},
   fang:{name:"Wolf Fang", sell:2, kind:"junk"}, foxpelt:{name:"Fox Pelt", sell:2, kind:"junk"}, jackalpelt:{name:"Jackal Pelt", sell:2, kind:"junk"},
   harepelt:{name:"Hare Pelt", sell:1, kind:"junk"}, deerhide:{name:"Deer Hide", sell:2, kind:"junk"}, antler:{name:"Stag Antler", sell:4, kind:"junk"},
   bearfur:{name:"Bearskin", sell:5, kind:"junk"}, stinger:{name:"Scorpion Stinger", sell:2, kind:"junk"}, thornspike:{name:"Thorn Spike", sell:1, kind:"junk"},
@@ -27,6 +31,11 @@ export const ITEMS = {
 };
 // what each monster can drop (besides gold and gear): [item, chance]
 export const LOOT = {
+  tidecrab:[["crabshell",0.4]], coaststalker:[["pelt",0.35],["fang",0.2]], corsair:[["doubloon",0.35]], blackwake:[["doubloon",1]],
+  vinepanther:[["panthercloak",0.4]], venomweb:[["venomsac",0.4],["silk",0.3]], jungletroll:[["junglefetish",0.3],["tooth",0.2]], vinequeen:[["junglefetish",1]],
+  dunescorpid:[["stinger",0.4]], sandwraith:[["wraithsand",0.4]], glassgolem:[["sunglass",0.35]], sandmaw:[["sunglass",1],["stinger",1]],
+  razorback:[["razortusk",0.4]], thornbrute:[["tooth",0.3],["ring",0.2]], canyonwyvern:[["wyvernscale",0.5]], gorrak:[["razortusk",1],["tooth",1]],
+  dreadknight:[["dreadsigil",0.3]], voidfiend:[["voidshard",0.4]], dreadcaster:[["dreadsigil",0.3],["cloth",0.2]], malakar:[["dreadcrown",1]],
   wolf:[["pelt",0.4],["fang",0.15]], oldgray:[["pelt",1],["fang",1]], boar:[["tusk",0.4]], thief:[["ring",0.2]], spider:[["silk",0.4]], bandit:[["ring",0.25]],
   lynx:[["foxpelt",0.4]], thorn:[["thornspike",0.4]], wisplight:[["glowdust",0.35]], shadewolf:[["pelt",0.35],["fang",0.2]], lostdruid:[["cloth",0.25]],
   rocksvin:[["tusk",0.35]], kobold:[["candle",0.3]], beetle:[["shell",0.4]], icebear:[["bearfur",0.4]], frostkobold:[["candle",0.3]],
@@ -85,6 +94,9 @@ export const WTYPES = {
 };
 export const CLASS_WEAP = {warrior:["sword","axe"], paladin:["sword","mace"], hunter:["sword","axe","dagger"], mage:["staff"], priest:["staff"], druid:["staff"], warlock:["staff"], rogue:["dagger","sword"], shaman:["mace","axe","staff"]};
 // the ranged slot: a bow, rifle or crossbow for fighters, a wand for casters, and an idol, relic or totem for druids, paladins and shamans
+// the ranged slot is a Relic for paladins, a Totem for shamans and an Idol for druids
+const RELIC_SLOT = {relic: "Relic", totemr: "Totem", idol: "Idol"}, RELIC_CLASS = {paladin: "Relic", shaman: "Totem", druid: "Idol"};
+export const slotName = (slot, wt, cls) => slot !== "ranged" ? SLOTS[slot].name : RELIC_SLOT[wt] || (wt ? "Ranged" : RELIC_CLASS[cls] || "Ranged");
 export const CLASS_RANGED = {warrior:["bow","rifle","crossbow"], rogue:["bow","rifle","crossbow"], hunter:["bow","rifle","crossbow"], mage:["wand"], priest:["wand"], warlock:["wand"], druid:["idol"], paladin:["relic"], shaman:["totemr"]};
 // idols, relics and totems also make one of the class's abilities stronger: [ability, "dmg" or "heal"]
 export const RELIC_BONUS = {
@@ -119,7 +131,7 @@ export function gearTypeName(it){ return it.arm ? ARMOR[it.arm].name : it.wt ? W
 const EXTRA = {warrior:["agi","crit"], paladin:["sh","crit"], hunter:["crit","str"], mage:["sd","crit"], priest:["sh","sd"], druid:["sh","sd","crit"], warlock:["sd","crit"], rogue:["crit","str"], shaman:["sh","crit","agi"]};
 // make one item. opts: {slot, cls, q, il, r}
 export function makeGear(opts){
-  const r = opts.r || Math.random, q = opts.q, il = Math.max(1, Math.min(30, Math.round(opts.il)));
+  const r = opts.r || Math.random, q = opts.q, il = Math.max(1, Math.min(40, Math.round(opts.il)));
   const cls = opts.cls || pickR(Object.keys(CLASSES), r);
   let slot = opts.slot;
   if(!slot){ const pool = SLOT_ORDER.filter(s=>s!=="offhand" || CLASS_OFF[cls].length); slot = pickR(pool, r); }

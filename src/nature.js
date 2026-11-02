@@ -6,12 +6,12 @@ import {load, build} from "./glb.js";
 const A = "./assets/nature/";
 const SETS = {
   oak: ["Tree_1_A", "Tree_1_B", "Tree_7_A", "Tree_2_A", "Tree_2_B"], birch: ["Tree_6_A", "Tree_6_B", "Tree_2_A"], violet: ["Tree_7_A", "Tree_1_A", "Tree_7_B"],
-  pine: ["Tree_5_A", "Tree_5_B", "Tree_4_A", "Tree_5_D"], snowpine: ["Tree_5_A", "Tree_5_B", "Tree_5_D"],
+  pine: ["Tree_5_A", "Tree_5_B", "Tree_4_A", "Tree_5_D"], jungle: ["Tree_1_A", "Tree_2_A", "Tree_2_B", "Tree_7_A", "Tree_7_B"], dreadwood: ["Tree_7_A", "Tree_7_B", "Tree_1_B"], snowpine: ["Tree_5_A", "Tree_5_B", "Tree_5_D"],
   dead: ["Tree_Bare_1_A", "Tree_Bare_1_B", "Tree_Bare_2_A", "Tree_Bare_2_B"],
   rock: ["Rock_1_E", "Rock_3_E", "Rock_2_C", "Rock_6_C", "Rock_3_G", "Rock_5_C"], bush: ["Bush_1_C", "Bush_2_C", "Bush_3_A", "Bush_4_C", "Bush_1_E"]
 };
 // leaf colours: [new hue, saturation, lightness factor, lightness add] for the green parts of the texture
-const LEAVES = {birch: [78, 0.55, 1.05, 0.06], violet: [282, 0.4, 0.85, 0.02], snowpine: [200, 0.12, 0.35, 0.62]};
+const LEAVES = {birch: [78, 0.55, 1.05, 0.06], violet: [282, 0.4, 0.85, 0.02], snowpine: [200, 0.12, 0.35, 0.62], jungle: [132, 0.5, 0.62, 0], dreadwood: [292, 0.35, 0.6, 0.02]};
 const assets = {}, textures = {}; let READY = false;
 export const natureReady = () => READY;
 export async function preloadNature(){

@@ -14,10 +14,11 @@ export const LOOKS = {
   orc:    [b("tent", "red"), b("tent", "yellow"), b("watchtower", "red"), b("tent", "red"), b("watchtower", "yellow")],
   undead: [b("home_A", "blue"), "building_destroyed", b("church", "blue"), b("home_B", "red")],
   camp:   [b("tent", "yellow"), b("tent", "red")],
-  witch:  [b("home_A", "green")]
+  witch:  [b("home_A", "green")],
+  port:   [b("market", "blue"), b("home_A", "blue"), b("shipyard", "blue"), b("tavern", "blue"), b("home_B", "red"), b("market", "green")]
 };
 export const PROPS = ["barrel", "crate_A_big", "crate_open", "haybale", "sack", "wheelbarrow", "resource_lumber", "bucket_water", "trough", "weaponrack"];
-const EXTRA = ["wall_straight", b("tower_A", "blue")];
+const EXTRA = ["wall_straight", b("tower_A", "blue"), "ship_blue_accent", b("docks", "red"), "boat", b("well", "blue")];
 const assets = {}; let READY = false;
 export const buildingsReady = () => READY;
 export async function preloadBuildings(){

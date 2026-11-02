@@ -32,7 +32,7 @@ Every character has its own keys, changed in **Key bindings (K)**. The defaults:
 - Tree, rock and bush models: **KayKit Forest Nature Pack** by Kay Lousberg, CC0 (`assets/nature`).
 - Building and prop models: **KayKit Medieval Hexagon Pack** by Kay Lousberg, CC0 (`assets/buildings`).
 - Dungeon models: **KayKit Dungeon Pack** by Kay Lousberg, CC0 (`assets/dungeon`).
-- Animal and monster models: **Quaternius** (quaternius.com), CC0: wolf, fox, deer, stag, cat, spider, rat, dragon and goblin (`assets/animals`).
+- Animal and monster models: **Quaternius** (quaternius.com), CC0: wolf, fox, deer, stag, horse, cat, spider, rat, dragon and goblin (`assets/animals`).
 - [Black bear](https://poly.pizza/m/56ym_pyVnel), [Boar](https://poly.pizza/m/57fSWum6F1P), [Beetle](https://poly.pizza/m/4yufxgZ1QQ2) and [Rabbit](https://poly.pizza/m/9OBTRVYUSmt) by [Poly by Google](https://poly.pizza/u/Poly%20by%20Google), [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/), via Poly Pizza. Rigged and animated for the game.
 - [Scorpion](https://poly.pizza/m/cJfrRPiSgA4) by [jeremy](https://poly.pizza/u/jeremy), [CC-BY 3.0](https://creativecommons.org/licenses/by/3.0/), via Poly Pizza. Rigged and animated for the game.
 - The stable, braziers, gates and the remaining scenery are made from simple shapes in code.

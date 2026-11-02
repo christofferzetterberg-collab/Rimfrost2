@@ -4,7 +4,7 @@ import {CLASSES, RACE_CLASSES} from "./rimdata.js";
 
 // ---------------------------------------------------------------- people
 // role: "quest" | "vendor" (shop: "goods" = potions and elixirs, "basic" = potions, "smith" = equipment) | "trainer" (trains: the one class they teach)
-const HUB_IL = {frostvik: 5, holgerstuga: 10, lovhem: 5, manglanta: 10, bergsdal: 5, snostugan: 10, brannmark: 5, kanjonlagret: 10, traskvakten: 20, askvakten: 25, isporten: 30, bleksted: 5, benvakten: 10};
+const HUB_IL = {frostvik: 5, holgerstuga: 10, lovhem: 5, manglanta: 10, bergsdal: 5, snostugan: 10, brannmark: 5, kanjonlagret: 10, traskvakten: 20, askvakten: 25, isporten: 30, bleksted: 5, benvakten: 10, stormhaven: 30, solace: 32, vinewatch: 34, sunwell: 36, thornhold: 38, lastlight: 40};
 const CLS = ["mage", "warrior", "hunter", "priest", "druid", "paladin", "warlock", "rogue", "shaman"];
 const list = [];
 const add = (hub, arr) => arr.forEach(n => list.push({...n, hub}));
@@ -60,18 +60,41 @@ add("isporten", [{id: "orm", name: "Veteran Orm", title: "Quest Giver", color: "
 add("traskvakten", [{id: "sigvard", name: "Sigvard the Witch Hunter", title: "Quest Giver", color: "#4a5a4a", race: "human"}, {id: "mora", name: "Old Mora", title: "Merchant", color: "#8a8a6a", shop: "goods", race: "orc"}]);
 add("askvakten", [{id: "runa", name: "Runa the Warden", title: "Quest Giver", color: "#8a6a9a", race: "elf"}, {id: "siv", name: "Quartermaster Siv", title: "Merchant", color: "#c09a40", shop: "goods", race: "human"}]);
 add("isporten", [{id: "hedda", name: "Hedda the Icewarden", title: "Quest Giver", color: "#8ab0c8", race: "dwarf"}, {id: "frode", name: "Frode the Merchant", title: "Merchant", color: "#c09a40", shop: "goods", race: "human"}]);
+// the harbour and the Southern Reaches
+add("stormhaven", [{id: "harbormaster", name: "Harbormaster Ylva", title: "Quest Giver", color: "#3a6a9a", race: "human"}, {id: "dagny", name: "Dagny the Chandler", title: "Merchant", color: "#c09a40", shop: "goods", race: "human"},
+  {id: "torgeir", name: "Torgeir the Smith", title: "Blacksmith", color: "#7a5a40", shop: "smith", race: "dwarf"}]);
+add("solace", [{id: "aldwin", name: "Governor Aldwin", title: "Quest Giver", color: "#c8a040", race: "human"}, {id: "mira", name: "Mira the Cartographer", title: "Quest Giver", color: "#6a8ab0", race: "elf"},
+  {id: "sefa", name: "Sefa the Herbalist", title: "Alchemist", color: "#6ab08a", shop: "goods", race: "elf"}, {id: "brannoc", name: "Brannoc the Smith", title: "Blacksmith", color: "#6a5a50", shop: "smith", race: "dwarf"},
+  {id: "lute", name: "Quartermaster Lute", title: "Merchant", color: "#c09a40", shop: "goods", race: "human"}]);
+add("vinewatch", [{id: "tahl", name: "Ranger Tahl", title: "Quest Giver", color: "#4a8a4a", race: "elf"}, {id: "nessa", name: "Nessa the Trader", title: "Merchant", color: "#8a9a5a", shop: "goods", race: "elf"}]);
+add("sunwell", [{id: "khamar", name: "Khamar the Oasis Keeper", title: "Quest Giver", color: "#c08a3a", race: "orc"}, {id: "zaira", name: "Zaira the Trader", title: "Merchant", color: "#c09a40", shop: "goods", race: "orc"},
+  {id: "uzg", name: "Uzg the Smith", title: "Blacksmith", color: "#5a4a40", shop: "smith", race: "orc"}]);
+add("thornhold", [{id: "hallgrim", name: "Thane Hallgrim", title: "Quest Giver", color: "#8a5a3a", race: "dwarf"}, {id: "hedvig", name: "Hedvig the Trader", title: "Merchant", color: "#a08a5a", shop: "goods", race: "dwarf"}]);
+add("lastlight", [{id: "sera", name: "Lightwarden Sera", title: "Quest Giver", color: "#e0d080", race: "human"}, {id: "aldo", name: "Brother Aldo", title: "Quest Giver", color: "#9a8ac0", race: "undead"},
+  {id: "corin", name: "Corin the Supplier", title: "Merchant", color: "#c09a40", shop: "goods", race: "human"}, {id: "ashka", name: "Ashka the Smith", title: "Blacksmith", color: "#4a4a4a", shop: "smith", race: "orc"}]);
+// flight masters: one in every town (not the camps). Talk to one to learn its flight path, then fly between the ones you know.
+const FLIERS = {frostvik: ["Gisle", "human"], holgerstuga: ["Tova", "human"], lovhem: ["Elyndra", "elf"], manglanta: ["Faren", "elf"], bergsdal: ["Hrodric", "dwarf"], snostugan: ["Asta", "dwarf"],
+  brannmark: ["Grukk", "orc"], kanjonlagret: ["Varsha", "orc"], jarnfastet: ["Sigrun", "human"], traskvakten: ["Ebbe", "human"], askvakten: ["Kael", "elf"], isporten: ["Dvalin", "dwarf"],
+  bleksted: ["Wither", "undead"], benvakten: ["Ossian", "undead"], stormhaven: ["Halla", "human"], solace: ["Corwin", "human"], vinewatch: ["Lirael", "elf"], sunwell: ["Rasha", "orc"],
+  thornhold: ["Borin", "dwarf"], lastlight: ["Mourne", "undead"]};
+// ship captains: they sail between Stormhaven and Port Solace (main.js puts them at the pier)
+add("stormhaven", [{id: "cap_stormhaven", name: "Captain Maren", title: "Ship Captain", color: "#3a6a9a", ship: "solace", race: "human", at: [0, 6]}]);
+add("solace", [{id: "cap_solace", name: "Captain Joss", title: "Ship Captain", color: "#3a6a9a", ship: "stormhaven", race: "human", at: [0, -6]}]);
+for(const [hub, [nm, race]] of Object.entries(FLIERS)) if(HUBS[hub].kind !== "camp") add(hub, [{id: "fly_" + hub, name: nm + " the Drakerider", title: "Flight Master", color: "#c8a46a", flight: true, race, at: [0, 6]}]);   // (main.js moves them to a free spot at the edge of town)
 // where they stand: Rimhaven's people at their spots, everyone else in a ring around the town square or campfire
 { const byHub = {}; for(const n of list) if(!n.at) (byHub[n.hub] = byHub[n.hub] || []).push(n);
   for(const [hid, arr] of Object.entries(byHub)){ const h = HUBS[hid], rad = (h.kind === "town" ? 4.9 : 2.4) * TS;
     arr.forEach((n, i) => { const a = i / arr.length * Math.PI * 2 - Math.PI / 2 + 0.3; n.x = h.x + Math.cos(a) * rad; n.z = h.z + Math.sin(a) * rad; }); }
   for(const n of list){ const h = HUBS[n.hub]; if(n.at){ n.x = h.x + n.at[0] * TS; n.z = h.z + n.at[1] * TS; } n.rot = Math.atan2(n.x - h.x, n.z - h.z) + (n.stable ? Math.PI : 0); } }
 const HELLO = {quest: "Well met, traveller.", goods: "Potions and elixirs.", basic: "Potions for the road.", smith: "Weapons and armor.",
-  aldric: "Rimhaven stands because heroes stand with it.", stable: "Riding lessons and mounts.", brenna: "Keep your blade sharp. The Ironclan never sleeps.", halvard: "Heroes from every people come through these gates. Rimhaven needs them all."};
-export const NPCS = list.map(n => ({...n, role: n.stable ? "stable" : n.trains ? "trainer" : n.shop ? "vendor" : "quest", maxIl: n.city ? null : HUB_IL[n.hub] || 30,
-  hello: HELLO[n.id] || (n.trains ? `I teach the ways of the ${CLASSES[n.trains].name}.` : n.shop ? HELLO[n.shop] : HELLO.quest)}));
+  aldric: "Rimhaven stands because heroes stand with it.", stable: "Riding lessons and mounts.", flight: "My drakes know every road in Rimfrost. Where to?", ship: "The sea is calm today. Ready to sail?", brenna: "Keep your blade sharp. The Ironclan never sleeps.", halvard: "Heroes from every people come through these gates. Rimhaven needs them all."};
+export const NPCS = list.map(n => ({...n, role: n.stable ? "stable" : n.flight ? "flight" : n.ship ? "ship" : n.trains ? "trainer" : n.shop ? "vendor" : "quest", maxIl: n.city ? null : HUB_IL[n.hub] || 30,
+  hello: HELLO[n.id] || (n.flight ? HELLO.flight : n.ship ? HELLO.ship : null) || (n.trains ? `I teach the ways of the ${CLASSES[n.trains].name}.` : n.shop ? HELLO[n.shop] : HELLO.quest)}));
 
 // ---------------------------------------------------------------- quest items and things to pick up
 export const QITEMS = {
+  crabgrit: {name: "Shell Grit"}, seacharts: {name: "Stolen Sea Chart"}, saltcrate: {name: "Salvaged Cargo"}, sleekpelt: {name: "Sleek Panther Pelt"}, venomgland: {name: "Venom Gland"},
+  wraithessence: {name: "Wraith Essence"}, wyvernplate: {name: "Wyvern Plate"}, voidcore: {name: "Void Core"}, dreadtome: {name: "Dread Tome"},
   grainsack: {name: "Sack of Grain"},
   boartusk: {name: "Large Boar Tusk"},
   patrolbadge: {name: "Patrol Badge"},
@@ -206,7 +229,8 @@ export const QOBJECTS = [
   {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "jarn", count: 7, color: "#c8d8ff", night: true},
   {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "manskog", count: 6, color: "#c8d8ff", night: true},
   {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "benfalt", count: 6, color: "#c8d8ff", night: true},
-  {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "dimma", count: 6, color: "#c8d8ff", night: true}
+  {kind: "herb", item: "moonbloom", name: "Moonbloom", zone: "dimma", count: 6, color: "#c8d8ff", night: true},
+  {kind: "crate", item: "saltcrate", name: "Salvaged Cargo", zone: "saltwind", count: 9}
 ];
 // gathering: herbs need Herbalism and ore veins need Mining, at least this skill (skills go from 1 to 150)
 export const GATHER = {
@@ -421,7 +445,43 @@ export const QUESTS = [
   {id: "x13", npc: "siv", lvl: 21, name: "Ash Hound Fangs", text: "Ash hound fangs never stop glowing. Bring me 6.", obj: [["loot", "houndfang", 6, "hound", 0.5]]},
   {id: "x14", npc: "runa", lvl: 22, name: "Gargoyles of Ashfields", text: "Ash gargoyles swoop down on our patrols. Smash 10 of them.", obj: [["kill", "gargoyle", 10]]},
   {id: "x15", npc: "frode", lvl: 26, name: "Frost Wolf Pelts", text: "Travellers freeze on the road to Icegate. Bring me 6 frost wolf pelts for cloaks.", obj: [["loot", "frostpelt", 6, "frostwolf", 0.5]]},
-  {id: "x16", npc: "hedda", lvl: 28, name: "Cores of Living Ice", text: "The ice golems have hearts of pure cold. Bring me 5 cores.", obj: [["loot", "icecore", 5, "icegolem", 0.5]]}
+  {id: "x16", npc: "hedda", lvl: 28, name: "Cores of Living Ice", text: "The ice golems have hearts of pure cold. Bring me 5 cores.", obj: [["loot", "icecore", 5, "icegolem", 0.5]]},
+  // ---- the Southern Reaches (levels 30–40)
+  {id: "sr0", npc: "halvard", lvl: 30, to: "harbormaster", name: "Across the Sea", text: "Our scouts have sighted unknown land across the southern sea. Ships sail from Stormhaven, on the south coast. Report to Harbormaster Ylva.", obj: [], mult: 0.5},
+  {id: "sr1", npc: "harbormaster", lvl: 30, to: "aldwin", name: "The Southern Reaches", text: "Captain Maren sails for Port Solace from the end of the pier. Governor Aldwin is expecting reinforcements. Go to him.", obj: [], mult: 0.5},
+  {id: "so1", npc: "aldwin", lvl: 30, name: "Crabs on the Docks", text: "Tidecrawlers swarm the beaches and attack anyone unloading cargo. Kill 10 of them.", obj: [["kill", "tidecrab", 10]]},
+  {id: "so2", npc: "sefa", lvl: 30, name: "Shell Grit", text: "Ground tidecrawler shell makes a fine healing salve. Bring me 8 handfuls of shell grit.", obj: [["loot", "crabgrit", 8, "tidecrab", 0.6]], items: {potHp3: 2}},
+  {id: "so3", npc: "mira", lvl: 30, name: "Charting the Coast", text: "Every map needs a landmark. Find the Old Lighthouse on the western shore.", obj: [["explore", "oldlighthouse", 1]]},
+  {id: "so4", npc: "mira", lvl: 31, req: ["so3"], name: "Salvage of the Gull", text: "The Gull ran aground east of here. Recover 6 crates of its cargo from the shore before the corsairs do.", obj: [["collect", "saltcrate", 6]]},
+  {id: "so5", npc: "aldwin", lvl: 31, req: ["so1"], name: "The Corsair Threat", text: "Corsairs raid our supply lines along the coast. Kill 8 Saltwind Corsairs.", obj: [["kill", "corsair", 8]]},
+  {id: "so6", npc: "mira", lvl: 31, req: ["so4"], name: "Stolen Charts", text: "The corsairs stole my charts of the southern coast. Take back 6 of them.", obj: [["loot", "seacharts", 6, "corsair", 0.5]]},
+  {id: "so7", npc: "aldwin", lvl: 31, name: "Stalkers in the Grass", text: "Coast stalkers hunt in the tall grass outside the walls. Kill 10.", obj: [["kill", "coaststalker", 10]]},
+  {id: "so8", npc: "aldwin", lvl: 33, req: ["so5"], name: "Blackwake's End", text: "Captain Blackwake leads the corsairs from his camp on the western coast. End his raids.", obj: [["kill", "blackwake", 1]], mult: 1.5},
+  {id: "so9", npc: "aldwin", lvl: 32, req: ["so5"], to: "tahl", name: "Into the Tangle", text: "Ranger Tahl holds Vinewatch, deep in the jungle to the east. He has asked for help. Go to him.", obj: [], mult: 0.5},
+  {id: "vi1", npc: "tahl", lvl: 32, name: "Panther Pelts", text: "Vine panthers stalk our scouts. Bring me 8 sleek pelts; the hides make fine silent boots.", obj: [["loot", "sleekpelt", 8, "vinepanther", 0.6]]},
+  {id: "vi2", npc: "nessa", lvl: 33, name: "Venom for Antidotes", text: "Venomweb bites kill within the hour. I need 8 venom glands to brew antidotes.", obj: [["loot", "venomgland", 8, "venomweb", 0.6]], items: {potHp3: 2}},
+  {id: "vi3", npc: "tahl", lvl: 33, name: "Troll Trouble", text: "Jungle trolls have taken the old paths. Kill 10.", obj: [["kill", "jungletroll", 10]]},
+  {id: "vi4", npc: "tahl", lvl: 34, req: ["vi3"], name: "The Overgrown Idol", text: "The trolls worship an idol deep in the Tangle. Find it.", obj: [["explore", "sunkenidol", 1]]},
+  {id: "vi5", npc: "tahl", lvl: 35, req: ["vi4"], name: "Ix'tala the Vinequeen", text: "Ix'tala commands the jungle from her grove to the east. Slay her and the Tangle will be ours.", obj: [["kill", "vinequeen", 1]], mult: 1.5},
+  {id: "vi6", npc: "tahl", lvl: 34, req: ["vi3"], to: "khamar", name: "The Burning Sands", text: "Khamar keeps the Sunwell Oasis in the dunes to the south-east. He needs help. Go to him.", obj: [], mult: 0.5},
+  {id: "du1", npc: "khamar", lvl: 34, name: "Scorpid Season", text: "Dune scorpids poison our water. Kill 10.", obj: [["kill", "dunescorpid", 10]]},
+  {id: "du2", npc: "zaira", lvl: 35, name: "Wraiths in the Wind", text: "Sand wraiths howl through the dunes at all hours. Bring me 6 wraith essences.", obj: [["loot", "wraithessence", 6, "sandwraith", 0.6]]},
+  {id: "du3", npc: "khamar", lvl: 35, name: "Glass Hearts", text: "Glass golems walk where lightning struck the sand. Shatter 8 of them.", obj: [["kill", "glassgolem", 8]]},
+  {id: "du4", npc: "khamar", lvl: 36, req: ["du1"], name: "The Sunken Spire", text: "A spire rises from the sand to the north. Scout it for me.", obj: [["explore", "sunspire", 1]]},
+  {id: "du5", npc: "khamar", lvl: 37, req: ["du4"], name: "Sandmaw the Devourer", text: "Sandmaw swallows whole caravans in the far east of the dunes. Slay it.", obj: [["kill", "sandmaw", 1]], mult: 1.5},
+  {id: "du6", npc: "khamar", lvl: 36, req: ["du3"], to: "hallgrim", name: "Word from Thornhold", text: "Thane Hallgrim of Thornhold, in the west, is under siege. Go to him.", obj: [], mult: 0.5},
+  {id: "th1", npc: "hallgrim", lvl: 36, name: "Razorback Roundup", text: "Razorbacks trample our fields. Kill 10.", obj: [["kill", "razorback", 10]]},
+  {id: "th2", npc: "hallgrim", lvl: 37, name: "Brutes at the Gate", text: "Thornreach brutes test our walls every night. Kill 10.", obj: [["kill", "thornbrute", 10]]},
+  {id: "th3", npc: "hedvig", lvl: 37, name: "Wyvern Plate", text: "Wyvern scales make the best armour plates. Bring me 6.", obj: [["loot", "wyvernplate", 6, "canyonwyvern", 0.6]]},
+  {id: "th4", npc: "hallgrim", lvl: 37, name: "The Bleached Bones", text: "Something huge died north of here. Find the bones and tell me what you see.", obj: [["explore", "bonepit", 1]]},
+  {id: "th5", npc: "hallgrim", lvl: 39, req: ["th2"], name: "Gorrak Thornhide", text: "Gorrak leads the brutes from his den to the west. Bring him down.", obj: [["kill", "gorrak", 1]], mult: 1.5},
+  {id: "th6", npc: "hallgrim", lvl: 38, req: ["th2"], to: "sera", name: "The Last Light", text: "Lastlight stands alone against the Dreadspire. Lightwarden Sera needs every blade. Go to her.", obj: [], mult: 0.5},
+  {id: "dr1", npc: "sera", lvl: 38, name: "Knights of Dread", text: "Dread knights march from the peaks. Kill 10.", obj: [["kill", "dreadknight", 10]]},
+  {id: "dr2", npc: "aldo", lvl: 38, name: "Silence the Cult", text: "The Dreadspire cultists call the void into our world. Kill 10.", obj: [["kill", "dreadcaster", 10]]},
+  {id: "dr3", npc: "aldo", lvl: 39, name: "Void Cores", text: "The void fiends are held together by dark cores. Bring me 6 so I can study them.", obj: [["loot", "voidcore", 6, "voidfiend", 0.6]]},
+  {id: "dr4", npc: "aldo", lvl: 39, req: ["dr2"], name: "The Dread Tomes", text: "The cultists carry tomes of their rites. Bring me 5.", obj: [["loot", "dreadtome", 5, "dreadcaster", 0.5]]},
+  {id: "dr5", npc: "sera", lvl: 39, req: ["dr1"], name: "The Void Rift", text: "A rift has opened west of the peaks. Find it.", obj: [["explore", "voidrift", 1]]},
+  {id: "dr6", npc: "sera", lvl: 40, req: ["dr5", "dr3"], name: "Malakar the Dread Lord", text: "Malakar rules the Dreadspire from his throne in the far south. End his reign. Bring friends.", obj: [["kill", "malakar", 1]], mult: 2}
 ];
 // gathering quests: raise your Mining and Herbalism (from the smiths and alchemists of the race towns, then Rimhaven's smith and apothecary)
 for(const [smith, alch] of [["bror", "linnea"], ["elvar", "faelin"], ["torvald", "ingrid"], ["grosh", "urk"], ["knota", "hilde"]]){
@@ -441,11 +501,11 @@ export const RIDING_LVL = 20, RIDING_COST = 120, MOUNT_SPEED = 1.6;
 export const MOUNTS = {
   horse: {name: "Brown Horse", price: 80, color: "#7a4e2e", mane: "#2a1a10"},
   gray: {name: "Gray Stallion", price: 80, color: "#9aa0a6", mane: "#e8eef2"},
-  ram: {name: "Mountain Ram", price: 90, color: "#c8b898", mane: "#6a5a4a", horns: true},
+  ram: {name: "Great Stag", price: 90, color: "#c8b898", mane: "#6a5a4a", horns: true},
   wolf: {name: "Dire Wolf", price: 90, color: "#4a4a52", mane: "#2a2a30", wolf: true}
 };
 // ---------------------------------------------------------------- shops
-export const GOODS = [["potHp", 12], ["potHp2", 35], ["potHp3", 90], ["potMana", 12], ["potMana2", 90], ["elixir", 60], ["elixirIron", 70], ["elixirKeen", 70], ["elixirSage", 70]];
+export const GOODS = [["potHp", 12], ["potHp2", 35], ["potHp3", 90], ["potMana", 12], ["potMana2", 90], ["elixir", 350], ["elixirIron", 400], ["elixirKeen", 400], ["elixirSage", 400]];
 export const GOODS_BASIC = GOODS.filter(([k]) => k.startsWith("pot"));
 export const trainCost = lvl => lvl <= 1 ? 0 : Math.round(lvl * lvl * 1.2 + 4);
 export const respecCost = level => Math.round(10 + level * level * 0.4);   // 50 gold at level 10, 170 at 20, 370 at 30

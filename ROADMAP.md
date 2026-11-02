@@ -267,6 +267,35 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] 68. Warlock: the Imp's Scorch does twice the damage and costs half the mana, and its tooltip no longer mentions a cooldown
 - [x] 69. Warlock: a cast bar over the Imp while it casts, and a longer attack range
 
+### To fix – list 9
+
+#### Shaman
+- [x] 70. Totems get their own bar (like druid forms and the pet bar)
+- [x] 71. Active totems show as buffs under the portrait and can be cancelled
+- [x] 72. Four totem elements (Fire, Earth, Water, Air): one totem of each element at a time
+- [x] 73. Lightning Shield triggers at most once every 5 sec (still 3 charges)
+- [x] 74. Lightning Shield costs more mana
+- [x] 75. Dwarf shaman attack animation stands still
+
+#### Items and vendors
+- [x] 76. Healing and mana potions share a 2 min cooldown
+- [x] 77. Elixirs cost much more
+- [x] 78. One elixir active at a time; a new one replaces the old (no shared cooldown with potions)
+- [x] 79. Gear vendors offer a limited selection that refreshes every 10 min; bought items disappear
+- [x] 80. Relic slot named Relic (paladin), Totem (shaman) and Idol (druid) instead of Ranged
+
+#### Interface and world
+- [x] 81. Drake wings flap while flying and moving
+- [x] 82. The world map can be dragged when zoomed in
+- [x] 83. Elite, rare and boss portraits have their own frames
+- [ ] 84. Boar snouts look odd when they walk
+- [x] 85. Arriving by ship: something blocks the way from the pier into town
+
+### To fix – list 10
+- [x] 86. Talent trees: more tiers and ranks, so two trees cannot both be filled
+- [x] 87. Procs (Maelstrom Weapon and the like) are shown clearly around the character, not only in the log
+- [x] 88. The Old Lighthouse (and the other new places to explore) need real landmarks, not only a sign
+
 ### Stage 10 – day and night
 - [x] Game clock: a day lasts 80 minutes (night 20), the same for everyone in co-op; light, sky, mist, town firelight and a small light around you at night
 - [x] More wolves, undead and spirits at night (a level higher); monsters see you from a bit shorter range in the dark
@@ -277,6 +306,14 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] A racial ability for each race with its own visual effect: Sprint (Human), Bloodrage (Orc), Shadowmeld (Elf), Stoneform (Dwarf), Will of the Dead (Undead)
 
 ## Planned
+
+### Expansion – the southern continent (levels 30–40)
+- [x] Phase 1: flight paths between all towns and camps (Flight Masters with drakes, discovered by speaking with them)
+- [x] Phase 2: the sea and a new continent to the south, reached by ship from a harbour; new zones, towns and roads
+- [x] Phase 3: level 30–40 monsters, quests and NPCs; level cap raised to 40 (talents and gear scaling)
+- [ ] New abilities between levels 30 and 40
+- [ ] Phase 4: a dungeon on the new continent
+- [ ] Phase 5: the raid
 
 ### Next
 - [ ] Sound effects (CC0 sounds from Rimfrost 1)

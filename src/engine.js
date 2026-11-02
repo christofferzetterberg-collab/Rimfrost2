@@ -14,7 +14,7 @@ import {clamp} from "./util.js";
 let scene = null, H = {};          // H: hooks from main.js (floatText, log, err, banner, onForm, onLevel, onDeath, buildBar)
 export function initEngine(sc, hooks){ scene = sc; H = hooks; }
 const C = () => S.cur;
-export const MAX_LVL = 30;
+export const MAX_LVL = 40;
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const fmt = n => Math.round(n);
 export const T = id => (C() && C().talents && C().talents[id]) || 0;       // talent rank
@@ -91,7 +91,7 @@ export function tmul(ab, school){
   return m;
 }
 export function critChance(m, school){
-  let c = 0.05 + gearStat("crit") / 100 + (P.buffs.keen ? 0.05 : 0);
+  let c = 0.05 + gearStat("crit") / 100 + (P.buffs.keen ? 0.05 : 0) + (P.buffs.airgrace ? 0.03 : 0);
   c += (school === "phys" || !school ? attr("agi") : attr("int")) / 3000;             // 30 Agility = +1% attack crit, 30 Intellect = +1% spell crit
   c += 0.03*T("cruelty") + 0.02*T("lethal") + teff("crit"); if(P.buffs.reckless) c += 0.3;
   if(school === "holy") c += 0.03*T("holySpec");
@@ -336,6 +336,7 @@ export function drain(t, amt, ab, mult){ const r = hit(t, amt, "shadow", ab); if
 // shaman shocks share a cooldown
 export function shockCd(){ const cd = 6 - 0.5*T("s_reverb"); for(const id of ["earthshock", "flameshock", "frostshock"]) P.cds[id] = cd; }
 export function setForm(f){
+  if(P.flying) return;
   if(P.casting) cancelCast(); if(P.mount) H.dismount();
   P.form = f; clearCP(); P.auto = P.auto && f !== "leopard";
   if(f === "bear") P.rage = Math.max(P.rage, 10);
@@ -352,11 +353,11 @@ export function avoidChances(){
 }
 const mobMiss = m => m ? clamp(0.05 + (C().level - m.lvl) * 0.01, 0.01, 0.1) : 0.05;
 export function playerDamage(raw, src, kind = "melee"){
-  if(P.dead || P.god) return;                                                   // (god mode: dev tools)
+  if(P.dead || P.god || P.flying) return;                                       // (god mode: dev tools; nothing reaches you on a flight)
   if(P.sitting) standUp();
   if(P.buffs.bubble){ H.floatText(P, "Immune", "#fff2b0"); return; }
   breakStealth();                                                               // any damage ends Stealth, traps too
-  if(kind === "melee" && src && !src.dead && P.buffs.lshield && P.lsCharges > 0){ hit(src, spow() * 0.6, "nature", "lshield"); burst(src.px, src.py, "#cfe8ff", 8); if(--P.lsCharges <= 0) delete P.buffs.lshield; }   // Lightning Shield
+  if(kind === "melee" && src && !src.dead && P.buffs.lshield && P.lsCharges > 0 && !(P.lsCd > 0)){ P.lsCd = 5; hit(src, spow() * 0.6, "nature", "lshield"); burst(src.px, src.py, "#cfe8ff", 8); if(--P.lsCharges <= 0) delete P.buffs.lshield; }   // Lightning Shield
   if(kind !== "env"){ const av = avoidChances(), r = Math.random(), mm = mobMiss(src); let txt = null;   /* (dungeon traps can't be dodged) */
     if(r < mm) txt = "Miss"; else if(r < mm + av.dodge) txt = "Dodge"; else if(kind === "melee" && r < mm + av.dodge + av.parry) txt = "Parry";
     if(txt === "Dodge" && T("h_counter")) buff("counter", 5);                                   // Counterattack
@@ -397,6 +398,7 @@ const rangePx = t => (distU(P, t) - t.r) * PXU;
 export function tryUse(id, at){
   if(!id) return;
   const a = AB[id]; if(!a || !C().learned.includes(id) || (P.dead && !a.whileDead)) return;
+  if(P.flying) return H.err("You cannot do that while flying");
   if(P.casting){ if(P.casting.kind === "gather" || P.casting.kind === "mount") cancelCast(); else return; }
   if(P.mount) H.dismount();                                                     // using an ability gets you off your mount
   if(P.sitting) standUp();
@@ -489,7 +491,8 @@ function autoAttack(dt){
   if(close && !mel) return;
   if(ai.wand){ P.autoT = ai.spd; P.attackAnim = 1; P.attackKind = "cast"; faceTo(t); const col = SCHOOL_COLOR[ai.school] || "#d38cff";
     proj(t, col, 3, () => hit(t, ai.base(), ai.school, "auto"), "orb"); P.combatT = 6; breakStealth(); return; }
-  P.autoT = ai.spd * (P.flurryN > 0 && P.buffs.flurry ? 1 - P.flurryK : 1) * (ai.ranged && P.buffs.rapidfire ? 1 / 1.4 : 1); if(P.flurryN > 0) P.flurryN--;   // Flurry, Rapid Fire P.attackAnim = 1; P.attackKind = ai.ranged && !mel ? "bow" : "melee"; faceTo(t);
+  P.autoT = ai.spd * (P.flurryN > 0 && P.buffs.flurry ? 1 - P.flurryK : 1) * (ai.ranged && P.buffs.rapidfire ? 1 / 1.4 : 1); if(P.flurryN > 0) P.flurryN--;   // Flurry, Rapid Fire
+  P.attackAnim = 1; P.attackKind = ai.ranged && !mel ? "bow" : "melee"; faceTo(t);
   if(mel) hit(t, pow() * 0.5, "phys", "auto");
   else if(ai.ranged) proj(t, "#e9e2c8", 3, () => hit(t, pow() * ai.mult, "phys", "auto"), "arrow");
   else { hit(t, pow() * ai.mult, "phys", "auto"); if(ai.rage) addRes("rage", ai.rage); }
@@ -503,7 +506,7 @@ export function updPlayer(dt, moving){
   P.attackAnim = Math.max(0, P.attackAnim - dt * 3);
   if(P.castDone){ P.castDone.t -= dt; if(P.castDone.t <= 0) P.castDone = null; }
   if(P.dead) return;
-  P.gcd = Math.max(0, P.gcd - dt); P.potCd = Math.max(0, (P.potCd || 0) - dt);
+  P.gcd = Math.max(0, P.gcd - dt); P.potCd = Math.max(0, (P.potCd || 0) - dt); P.lsCd = Math.max(0, (P.lsCd || 0) - dt);
   for(const k in P.cds){ P.cds[k] -= dt; if(P.cds[k] <= 0) delete P.cds[k]; }
   for(const k in P.buffs){ P.buffs[k] -= dt; if(P.buffs[k] <= 0){ delete P.buffs[k]; if(k === "laststand") recompute(false); } }
   if(P.buffs.manatide) addRes("mana", P.maxMana * 0.025 * dt);                    // Mana Tide: 30% over 12 sec
@@ -660,9 +663,12 @@ export function usePotion(kind){
   if(!k) return H.err(kind === "hp" ? "You have no healing potions" : "You have no mana potions");
   useItem(k);
 }
+export const POT_CD = 120;
+const ELIXIR_BUFFS = ["elixir", "ironskin", "keen", "sage"];
 export function useItem(k){
-  if(!C().bag[k] || P.dead) return;
-  if(k.startsWith("pot")){ if(P.potCd > 0) return H.err("Potions are not ready yet"); P.potCd = 20; }
+  if(!C().bag[k] || P.dead || P.flying) return;
+  if(k.startsWith("pot")){ if(P.potCd > 0) return H.err("Potions are not ready yet"); P.potCd = POT_CD; }   // healing and mana potions share one cooldown
+  if(k.startsWith("elixir")) for(const b of ELIXIR_BUFFS) delete P.buffs[b];                 // one elixir at a time: a new one replaces the old
   if(k === "potHp") healP(P.maxHp * 0.4);
   else if(k === "potHp2") healP(P.maxHp * 0.75);
   else if(k === "potHp3") healP(P.maxHp);
@@ -781,7 +787,7 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
   if(pet.dead){ pet.deadT += dt; return; }
   if(P.dead) return;
   const fight = petFight();
-  if(!fight) pet.hp = Math.min(pet.maxHp, pet.hp + pet.maxHp * 0.08 * dt);
+  if(!fight) pet.hp = Math.min(pet.maxHp, pet.hp + pet.maxHp * 0.011 * dt);   // out of combat: about 1.5 min from empty to full, like you
   if(d.res === "energy") pet.res = Math.min(100, pet.res + 12 * dt);                    // wolf: energy; Imp and Voidwalker: mana; bear: rage
   else if(d.res === "mana") pet.res = Math.min(100, pet.res + (fight ? 4 : 15) * dt); else if(!fight) pet.res = Math.max(0, pet.res - 5 * dt);
   const demon = d.res === "mana";
@@ -791,7 +797,9 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
   if(pet.mode === "attack"){ const c = pet.cmdT; if(c && !c.dead && c.state !== "return" && distU(c, P) < 45) t = c; else { pet.mode = "assist"; pet.cmdT = null; } }
   if(pet.mode === "follow" && !fight) pet.mode = "assist";
   if(pet.mode === "assist"){
-    t = (P.target && !P.target.dead && P.target.state !== "return" && P.combatT > 0 && distU(P.target, P) < 26 && !(P.target.polyT > 0 && !P.auto)) ? P.target : null;   // (it leaves a sheep alone unless you attack it)
+    const cur = pet.curT;                                   // it keeps fighting the enemy it started on, even when you change target; only Attack sends it elsewhere
+    if(cur && !cur.dead && cur.state !== "return" && !(cur.polyT > 0) && distU(cur, P) < 30 && petFight()) t = cur;
+    if(!t) t = (P.target && !P.target.dead && P.target.state !== "return" && P.combatT > 0 && distU(P.target, P) < 26 && !(P.target.polyT > 0 && !P.auto)) ? P.target : null;   // (it leaves a sheep alone unless you attack it)
     if(!t){ let bd = 18; for(const m of mobs){ if(m.dead || m.state !== "chase" || m.polyT > 0) continue; const dd = distU(m, P); if(dd < bd){ bd = dd; t = m; } } } }
   pet.curT = t;
   if(tank && petSkillOn(SK.taunt) && pet.growl <= 0 && t && distU(pet, t) < pet.r + t.r + 1.7){   // Growl: free, forces the enemy onto the bear for a few seconds
@@ -823,36 +831,44 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
   if(pet.stuckT > 2.5 && distU(pet, P) > 3){ pet.x = P.x - Math.sin(P.rot) * 1.4; pet.z = P.z - Math.cos(P.rot) * 1.4; pet.path = null; pet.stuckT = 0; if(pet.mode === "attack"){ pet.mode = "assist"; pet.cmdT = null; } }
   pet.walk = pet.moving ? pet.walk + dt * 10 : pet.walk * 0.85;
 }
-// ---------------------------------------------------------------- shaman totems: one of each element (Fire, Earth, Water); placed at your feet
+// ---------------------------------------------------------------- shaman totems: one of each element (Fire, Earth, Water, Air); placed at your feet
 const TOTEMS = {
   searing: {el: "fire", name: "Searing Totem", dur: 30, color: 0xd84a1a, tick: 1.8},
   magma: {el: "fire", name: "Magma Totem", dur: 20, color: 0xff6a1a, tick: 2},
   stoneskin: {el: "earth", name: "Stoneskin Totem", dur: 120, color: 0x9a8a70, tick: 3},
   strength: {el: "earth", name: "Strength of Earth Totem", dur: 120, color: 0xb88a50, tick: 3},
-  hstream: {el: "water", name: "Healing Stream Totem", dur: 60, color: 0x4aa0e0, tick: 2}
+  hstream: {el: "water", name: "Healing Stream Totem", dur: 60, color: 0x4aa0e0, tick: 2},
+  graceair: {el: "air", name: "Grace of Air Totem", dur: 120, color: 0xbfe8ff, tick: 3}
 };
+export const TOTEM_OF = {searing: "searing", magma: "magma", stoneskin: "stoneskin", strengthtotem: "strength", hstream: "hstream", graceair: "graceair"};   // ability → totem
+export const TOTEM_EL = {fire: "Fire", earth: "Earth", water: "Water", air: "Air"};
 const totems = [];
+// where each element's totem goes, in a square around you: [ahead, to the left] in yards — Earth front left, Fire front right, Water back left, Air back right
+const TOTEM_SPOT = {earth: [1.1, 1.1], fire: [1.1, -1.1], water: [-1.1, 1.1], air: [-1.1, -1.1]};
 const TOTEM_R = 8;                                   // how close you (and friends) must stand to an Earth or Water totem
 function dropTotem(o){ scene.remove(o.mesh); o.gone = true; }
 export function clearTotems(){ for(const o of totems) dropTotem(o); totems.length = 0; }
 export function totem(kind){ const d = TOTEMS[kind];
   for(const o of totems) if(o.el === d.el) dropTotem(o);
-  const x = P.x + Math.sin(P.rot) * 1.2, z = P.z + Math.cos(P.rot) * 1.2, mesh = makeTotem(d.color); mesh.position.set(x, height(x, z), z); scene.add(mesh);
+  const [f, sd] = TOTEM_SPOT[d.el], fx = Math.sin(P.rot), fz = Math.cos(P.rot);   // ahead and to the left of where you face
+  const x = P.x + fx * f + fz * sd, z = P.z + fz * f - fx * sd, mesh = makeTotem(d.color); mesh.position.set(x, height(x, z), z); scene.add(mesh);
   totems.push({kind, el: d.el, x, z, left: d.dur, t: 0.3, mesh}); ring(x * PXU, z * PXU, 40, "#" + d.color.toString(16).padStart(6, "0"));
   for(let i = totems.length - 1; i >= 0; i--) if(totems[i].gone) totems.splice(i, 1); }
-export const totemList = () => totems.map(o => ({kind: o.kind, name: TOTEMS[o.kind].name, left: o.left}));
+export const totemList = () => totems.filter(o => !o.gone).map(o => ({kind: o.kind, el: o.el, name: TOTEMS[o.kind].name, left: o.left}));
+export function cancelTotem(kind){ for(const o of totems) if(o.kind === kind) dropTotem(o); for(let i = totems.length - 1; i >= 0; i--) if(totems[i].gone) totems.splice(i, 1); }
 function updTotems(dt){ if(!totems.length) return;
   for(const o of totems){ o.left -= dt; o.t -= dt;
     if(o.left <= 0 || P.dead || Math.hypot(P.x - o.x, P.z - o.z) > 40 || regionOf(P.x) !== regionOf(o.x)){ dropTotem(o); continue; }
     const near = Math.hypot(P.x - o.x, P.z - o.z) < TOTEM_R, d = TOTEMS[o.kind];
-    if(o.kind === "stoneskin" && near) P.buffs.stskin = 1; if(o.kind === "strength" && near) P.buffs.earthstr = 1;
+    if(o.kind === "stoneskin" && near) P.buffs.stskin = 1; if(o.kind === "strength" && near) P.buffs.earthstr = 1; if(o.kind === "graceair" && near) P.buffs.airgrace = 1;
     if(o.t > 0) continue; o.t += d.tick;
     if(o.kind === "searing"){ let best = null, bd = 9; for(const m of mobs){ if(m.dead || m.state === "return" || m.polyT > 0) continue; const dd = Math.hypot(m.x - o.x, m.z - o.z) - m.r; if(dd < bd && los(o.x, height(o.x, o.z) + 1.2, o.z, m.x, height(m.x, m.z) + 1, m.z)){ bd = dd; best = m; } }
       if(best){ const m = best; proj(m, "#ff7a2a", 4, () => hit(m, spow() * 0.55, "fire", "searing"), null, 520, {x: o.x, z: o.z, y: 1.1}); } }
     else if(o.kind === "magma"){ ring(o.x * PXU, o.z * PXU, 92, "#ff6a1a"); aoe(o.x * PXU, o.z * PXU, 92, m => hit(m, spow() * 0.6, "fire", "magma")); }
     else if(o.kind === "hstream"){ if(near) healP(P.maxHp * 0.03); CO.groupFx(TOTEM_R * PXU, [["healPct", 0.03]], d.name); }
     else if(o.kind === "stoneskin") CO.groupFx(TOTEM_R * PXU, [["buff", "stskin", 3.5]], d.name);
-    else if(o.kind === "strength") CO.groupFx(TOTEM_R * PXU, [["buff", "earthstr", 3.5]], d.name); }
+    else if(o.kind === "strength") CO.groupFx(TOTEM_R * PXU, [["buff", "earthstr", 3.5]], d.name);
+    else if(o.kind === "graceair") CO.groupFx(TOTEM_R * PXU, [["buff", "airgrace", 3.5]], d.name); }
   for(let i = totems.length - 1; i >= 0; i--) if(totems[i].gone) totems.splice(i, 1); }
 
 // who a monster goes after: you, or your pet (highest threat wins; Growl forces the pet for a few seconds)

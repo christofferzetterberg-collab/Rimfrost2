@@ -133,14 +133,21 @@ export function sellJunk(){ const g = junkValue(); if(!g) return;
 export function sellGear(id){ const it = C().gear.find(x => x.id === id); if(!it) return; const p = gearSell(it);
   C().gear = C().gear.filter(x => x !== it); C().gold += p; H.log(`You sold ${it.n} for ${p} gold.`, "#d9e3e7"); H.save(); H.refresh(); }
 // the smith's stock: one plain item for every slot, plus three better ones; the same for everyone of your class and level band
+// a smith's stock: a few pieces, new every 10 minutes (the same for everyone at the same time); what you buy is gone until the next delivery
+export const STOCK_TIME = 600000;
+export const stockWindow = () => Math.floor(Date.now() / STOCK_TIME);
+export const stockLeft = () => STOCK_TIME - Date.now() % STOCK_TIME;
 export function smithStock(npc){
-  const top = npc && npc.maxIl === null ? C().level : (npc && npc.maxIl) || 6, il = Math.max(1, Math.min(top, Math.max(C().level, 3))), cls = C().cls, id = (npc && npc.id) || "brokk", r = mulberry(hashStr(id + cls + il)), out = [];
-  for(const slot of SLOT_ORDER){ if(slot === "offhand" && !CLASS_OFF[cls].length) continue; out.push(makeGear({slot, cls, q: 1, il, r})); }
-  for(let i = 0; i < 3; i++) out.push(makeGear({cls, q: 2, il, r}));
-  out.forEach((it, i) => it.id = id + "_" + cls + il + "_" + i);
-  return out;
+  const top = npc && npc.maxIl === null ? C().level : (npc && npc.maxIl) || 6, il = Math.max(1, Math.min(top, Math.max(C().level, 3))), cls = C().cls, id = (npc && npc.id) || "brokk", win = stockWindow();
+  const r = mulberry(hashStr(id + cls + il + ":" + win)), out = [], pool = SLOT_ORDER.filter(s => s !== "offhand" || CLASS_OFF[cls].length);
+  for(let i = 0; i < 5; i++) out.push(makeGear({slot: pool[Math.floor(r() * pool.length)], cls, q: 1, il, r}));
+  for(let i = 0; i < 2; i++) out.push(makeGear({cls, q: 2, il, r}));
+  if(r() < 0.15) out.push(makeGear({cls, q: 3, il, r}));                                  // now and then something rare
+  out.forEach((it, i) => it.id = id + "_" + cls + il + "_" + win + "_" + i);
+  const b = C().bought; return b && b.win === win ? out.filter(it => !b.ids.includes(it.id)) : out;
 }
 export function buyGear(it){ const p = gearPrice(it); if(C().gold < p) return H.err("You don't have enough gold"); if(C().gear.length >= GEAR_MAX) return H.err("Your bag is full");
+  const win = stockWindow(); if(!C().bought || C().bought.win !== win) C().bought = {win, ids: []}; C().bought.ids.push(it.id);
   C().gold -= p; G.gainGear({...it, st: {...it.st}, id: Math.random().toString(36).slice(2, 10)}, "You bought"); H.save(); }
 export {trainCost, respecCost, gearPrice, gearSell};
 export const QUESTS_LIST = () => QUESTS;

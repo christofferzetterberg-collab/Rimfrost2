@@ -4,7 +4,7 @@ import * as THREE from "three";
 import {load, build} from "./glb.js";
 
 const A = "./assets/animals/";
-const FILES = ["wolf2", "cat", "fox", "deer", "stag", "bear", "boar", "beetle", "hare", "scorpion", "spider", "rat", "dragon", "goblin"];
+const FILES = ["wolf2", "cat", "fox", "deer", "stag", "bear", "boar", "beetle", "hare", "scorpion", "spider", "rat", "dragon", "goblin", "horse"];
 const FACE_Z = new Set(["spider", "dragon", "goblin"]);                    // models whose nose already points to +z (wide legs or wings)
 const assets = {}; let READY = false;
 export async function preloadBeasts(){ const got = await Promise.all(FILES.map(n => load(A + n + ".gltf"))); FILES.forEach((n, i) => assets[n] = got[i]); READY = true; }
@@ -16,7 +16,7 @@ const CLIPS = {wolf2: {idle: "Idle", move: "Gallop", hit: "Attack", death: "Deat
   beetle: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1.3}, hare: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1},
   scorpion: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1.2}, spider: {idle: "Spider_Idle", move: "Spider_Walk", hit: "Spider_Attack", death: "Spider_Death", speed: 1.3},
   rat: {idle: "Rat_Idle", move: "Rat_Run", hit: "Rat_Attack", death: "Rat_Death", speed: 1}, dragon: {idle: "Dragon_Flying", move: "Dragon_Flying", hit: "Dragon_Attack", death: "Dragon_Death", speed: 1},
-  goblin: {idle: "Idle", move: "Run", hit: "Attack", death: "Death", speed: 1}};
+  goblin: {idle: "Idle", move: "Run", hit: "Attack", death: "Death", speed: 1}, horse: {idle: "Idle", move: "Gallop", speed: 1}};
 // file, length in the world (nose to tail), and colours per material (by race for the druid forms)
 const KINDS = {
   petWolf:  {file: "wolf2", len: 2.2, col: {Main: 0x7a6650, Main_Light: 0xb8a68a}},
@@ -46,7 +46,8 @@ export function makeAnimal(kind, race){
     const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
     if(dieA && !!o.dead !== dead){ dead = !!o.dead; if(dead){ dieA.reset(); dieA.setEffectiveWeight(1); dieA.fadeIn(0.1); dieA.play(); } else dieA.stop(); }
     if(dead){ mixer.update(dt); return; }
-    w += ((moving ? 1 : 0) - w) * Math.min(1, dt * 8); moveA.setEffectiveWeight(w); idle.setEffectiveWeight(1 - w);
+    w += ((moving ? 1 : 0) - w) * Math.min(1, dt * 8); if(moveA !== idle){ moveA.setEffectiveWeight(w); idle.setEffectiveWeight(1 - w); }   // (the drake flies with the same animation standing or moving)
+    else { idle.setEffectiveWeight(1); idle.timeScale = moving ? 1.25 : 1; }
     if(hitA && attack > 0.9 && prevAtk < 0.5){ hitA.reset(); hitA.setEffectiveWeight(1); hitA.fadeIn(0.05); hitA.play(); }
     prevAtk = attack; mixer.update(dt);
     const a = attack > 0 ? Math.sin(attack * Math.PI) : 0;                                         // lunge forward
@@ -67,3 +68,15 @@ export function makeMobAnimal(file, len, color, opts = {}){
     : file === "dragon" ? {Main: c, Belly: lighter(c, 0.45), Wings: darker(c, 0.55)} : file === "wolf2" ? {Main: c, Main_Light: lighter(c, 0.45)} : {"*": opts.flat ? c : lighter(c, 0.35)};
   return makeAnimal({file, len, col, height: opts.height, flat: opts.flat});
 }
+
+// mounts (Quaternius, CC0): the horse in brown or gray, the stag and the wolf; saddle = how high you sit (share of the model's height)
+const MOUNT_LOOK = {
+  horse: {file: "horse", len: 3.5, saddle: 0.6},
+  gray:  {file: "horse", len: 3.5, saddle: 0.6, col: {Main: 0x8e959c, Main_Dark: 0x5e656c, Main_Light: 0xc4c9ce, Hair: 0xeef2f4, Muzzle: 0x4e5257}},
+  ram:   {file: "stag", len: 3.3, saddle: 0.55},
+  wolf:  {file: "wolf2", len: 3.4, saddle: 0.68, back: 0.7, col: {Main: 0x3a3a44, Main_Light: 0x74747e}},
+  drake: {file: "dragon", len: 5.2, saddle: 0.5, col: {Main: 0x8a5a32, Belly: 0xe0c08a, Wings: 0x5a3420}}       // the flight masters' drakes
+};
+export function makeMountModel(id){ const L = MOUNT_LOOK[id]; if(!L) return null; const g = makeAnimal({file: L.file, len: L.len, col: L.col || {}}); if(!g) return null;
+  g.userData.saddle = (g.userData.height - 0.3) * L.saddle; if(!L.back) return g;
+  const o = new THREE.Group(); g.position.z = -L.back; o.add(g); o.userData = g.userData; return o; }   // the animal moved back, so you sit over its shoulders (the wolf's long tail pushes its middle backwards)

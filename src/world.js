@@ -5,9 +5,9 @@ import {clamp, lerp, smooth, rng, fbm} from "./util.js";
 import {dgLos} from "./dungeon.js";
 import {natureReady, natureInstances} from "./nature.js";
 import {buildingsReady, buildingModel, stretchedModel, LOOKS, PROPS} from "./buildings.js";
-import {TS, ZONES, HUBS, ROADS, LAIRS, EXPLORE, DG_DOORS, CITY_SIGNS} from "./worlddata.js";
+import {TS, ZONES, HUBS, ROADS, LAIRS, EXPLORE, DG_DOORS, CITY_SIGNS, SEA, continentOf} from "./worlddata.js";
 
-export const B = {x0: -308, x1: 308, z0: -250, z1: 250};        // the edges of the world (1 unit ≈ 1 metre)
+export const B = {x0: -308, x1: 308, z0: -250, z1: 560};        // the edges of the world (1 unit ≈ 1 metre): Rimfrost in the north, the sea, the Southern Reaches
 export const WATER = 0;                                           // everything lower than this is water (or lava)
 const NX = B.x1 - B.x0 + 1, NZ = B.z1 - B.z0 + 1;
 const ZIDS = Object.keys(ZONES), ZL = ZIDS.map(id => ZONES[id]);
@@ -29,7 +29,13 @@ export const LAND = {
   ash:      {base: 2.4, amp: 3.5, g: [0x4a4440, 0x55504a], lava: 0.655, wc: 0xff5a1a},
   snow:     {base: 4, amp: 5, g: [0xe8f0f4, 0xf6fbfd], ice: 0.64},
   blight:   {base: 2.2, amp: 2.5, g: [0x6e7058, 0x787a60]},
-  gloom:    {base: 1.9, amp: 2.5, g: [0x3e3e48, 0x484852], lake: 0.629, wc: 0x2a3a3a}
+  gloom:    {base: 1.9, amp: 2.5, g: [0x3e3e48, 0x484852], lake: 0.629, wc: 0x2a3a3a},
+  // the Southern Reaches
+  coast:    {base: 2, amp: 3, g: [0x86a85e, 0x93b468], lake: 0.66, wc: 0x3f9fc8},
+  jungle:   {base: 2.4, amp: 4, g: [0x2f6e34, 0x37783c], lake: 0.62, wc: 0x3a7a62},
+  desert:   {base: 2.6, amp: 4.5, g: [0xdcc28a, 0xe6cc96], cliff: 0.7, ch: 7, cg: [0xc4985e, 0xcea468]},
+  badlands: {base: 3, amp: 4, g: [0xa4644a, 0xb07052], cliff: 0.615, ch: 9, cg: [0x763c2e, 0x824838]},
+  dread:    {base: 3.6, amp: 6, g: [0x4a4256, 0x544c60], cliff: 0.64, ch: 9, cg: [0x2e2a38, 0x383444], lake: 0.66, wc: 0x7a3aaa}
 };
 const ZT = ZL.map(z => LAND[z.t]);
 // ground colours (two shades each, picked at random per triangle)
@@ -42,12 +48,13 @@ const ZG = new Uint8Array(NX * NZ);                 // zone index
 const RD = new Float32Array(NX * NZ).fill(99);      // distance to the nearest road
 const KP = new Float32Array(NX * NZ).fill(1);       // 1 = wild land, 0 = must stay open (roads, towns, lairs…)
 const HB = new Int8Array(NX * NZ).fill(-1);         // which town / camp this point is in
-const FT = new Uint8Array(NX * NZ), FA = new Float32Array(NX * NZ);   // feature type (1 cliff, 2 lake, 3 lava, 4 ice) and how much
+const FT = new Uint8Array(NX * NZ), FA = new Float32Array(NX * NZ);   // feature type (1 cliff, 2 lake, 3 lava, 4 ice, 5 sea) and how much
 const H = new Float32Array(NX * NZ);                // height
 const gi = (x, z) => clamp(Math.round(z - B.z0), 0, NZ - 1) * NX + clamp(Math.round(x - B.x0), 0, NX - 1);
 // zones: the nearest zone centre, measured on slightly bent ground so the borders wiggle
-function zoneRaw(x, z){ const wx = x + (fbm(x * 0.03 + 3.1, z * 0.03 + 7.7) - 0.5) * 70, wz = z + (fbm(x * 0.03 + 9.4, z * 0.03 + 1.3) - 0.5) * 70;
-  let best = 0, bd = 1e9; for(let k = 0; k < ZL.length; k++){ const Z = ZL[k], d = Math.hypot(wx - Z.cx, wz - Z.cz) - Z.wu; if(d < bd){ bd = d; best = k; } } return best; }
+// (each continent only has its own zones)
+function zoneRaw(x, z){ const wx = x + (fbm(x * 0.03 + 3.1, z * 0.03 + 7.7) - 0.5) * 70, wz = z + (fbm(x * 0.03 + 9.4, z * 0.03 + 1.3) - 0.5) * 70, sc = continentOf(z);
+  let best = 0, bd = 1e9; for(let k = 0; k < ZL.length; k++){ const Z = ZL[k]; if((Z.s ? 1 : 0) !== sc) continue; const d = Math.hypot(wx - Z.cx, wz - Z.cz) - Z.wu; if(d < bd){ bd = d; best = k; } } return best; }
 for(let j = 0; j < NZ; j++) for(let i = 0; i < NX; i++) ZG[j * NX + i] = zoneRaw(B.x0 + i, B.z0 + j);
 // roads: wavy lines between towns (as in Rimfrost 1), to the lairs and to the dungeon doors
 export const ROAD_LINES = [];
@@ -67,6 +74,10 @@ for(const o of OPEN) for(let z = Math.floor(o.z - o.r - 7); z <= o.z + o.r + 7; 
   if(x < B.x0 || x > B.x1 || z < B.z0 || z > B.z1) continue; const k = gi(x, z); KP[k] = Math.min(KP[k], smooth(o.r, o.r + 6, Math.hypot(x - o.x, z - o.z))); }
 HL.forEach((h, n) => { for(let z = Math.floor(h.z - h.R - 1); z <= h.z + h.R + 1; z++) for(let x = Math.floor(h.x - h.R - 1); x <= h.x + h.R + 1; x++)
   if(Math.hypot(x - h.x, z - h.z) < h.R + 0.5) HB[gi(x, z)] = n; });
+// the coasts: where the north continent ends and the south one begins (world z at this x)
+function coastN(x){ return SEA.n + (fbm(x * 0.018 + 41, 3.3) - 0.5) * 18; }
+function coastS(x){ return SEA.s + (fbm(x * 0.018 - 13, 8.1) - 0.5) * 18; }
+export const seaAt = (x, z) => z > coastN(x) && z < coastS(x);
 // height: each zone's base height and roughness, blended across zone borders
 { const BA = new Float32Array(NX * NZ), AM = new Float32Array(NX * NZ);
   for(let k = 0; k < BA.length; k++){ BA[k] = ZT[ZG[k]].base; AM[k] = ZT[ZG[k]].amp; }
@@ -87,8 +98,10 @@ HL.forEach((h, n) => { for(let z = Math.floor(h.z - h.R - 1); z <= h.z + h.R + 1
     if(L.lake){ const l = fbm(x / 34 + 17, z / 34 - 9), w = smooth(L.lake, L.lake + 0.03, l) * kp; if(w > 0.01){ h = lerp(h, -1.6, w); ft = 2; fa = w; } }
     if(ft !== 2 && ft !== 3) h = Math.max(h, 0.45);                                       // only ponds and lava go below the water line
     const rd = RD[k]; if(rd < 4) h = lerp(BA[k] + (h - BA[k]) * 0.35, h, smooth(1.5, 4, rd));   // roads run smoother
+    { const dn = z - coastN(x), ds = coastS(x) - z, sea = Math.min(dn, ds);                    // the sea between the continents, with sandy beaches
+      if(sea > -10){ const beach = smooth(-10, 0, sea); h = lerp(h, 0.5, beach * 0.85); if(sea > 0){ h = lerp(0.5, -3.5, smooth(0, 9, sea)); ft = 5; fa = 1; } else if(sea > -5 && ft !== 2){ ft = 5; fa = 0.15; } } }
     OPEN.forEach((o, n) => { const d = Math.hypot(x - o.x, z - o.z); if(d < o.r + 7) h = lerp(flatAt[n], h, smooth(o.r - 2, o.r + 7, d)); });   // flat towns and camps
-    const edge = Math.min(x - B.x0, B.x1 - x, z - B.z0, B.z1 - z); h += (1 - smooth(4, 26, edge)) * (16 + fbm(x * 0.08, z * 0.08) * 16);   // mountains all around
+    const edge = Math.min(x - B.x0, B.x1 - x, continentOf(z) ? B.z1 - z : z - B.z0); h += (1 - smooth(4, 26, edge)) * (16 + fbm(x * 0.08, z * 0.08) * 16);   // mountains all around (but not along the sea)
     H[k] = h; FT[k] = ft; FA[k] = fa; } }
 
 export function height(x, z){
@@ -114,10 +127,11 @@ export function ground(x, z){
   if(f === 4 && a > 0.35) return "ice";
   if(f === 3 && a > 0.2) return "scorch";
   if(f === 2 && a > 0.2) return t === "swamp" ? "mud" : "shore";
+  if(f === 5) return "shore";
   return t;
 }
 // the colour of the water (or lava) here
-export const waterColor = (x, z) => ZT[ZG[gi(x, z)]].wc || 0x3f8fbf;
+export const waterColor = (x, z) => { const k = gi(x, z); return FT[k] === 5 ? 0x2f7fb4 : ZT[ZG[k]].wc || 0x3f8fbf; };
 
 export const colliders = [];                       // circles you cannot walk through: {x, z, r, los}
 // colliders sorted into 8×8 unit buckets, so collision and sight checks only look at what is close by
@@ -133,21 +147,23 @@ export const SIGNS = [];                           // names shown over sign post
 
 // ---------------------------------------------------------------- terrain (flat-shaded low-poly)
 const STEP = 1.5;
-function buildTerrain(){
-  const NXs = Math.ceil((B.x1 - B.x0) / STEP), NZs = Math.ceil((B.z1 - B.z0) / STEP), tris = NXs * NZs * 2;
-  const pos = new Float32Array(tris * 9), col = new Float32Array(tris * 9), c = new THREE.Color(), r = rng(3);
+function buildTerrain(){                                                          // in square pieces, so only what the camera sees is drawn
+  const NXs = Math.ceil((B.x1 - B.x0) / STEP), NZs = Math.ceil((B.z1 - B.z0) / STEP), c = new THREE.Color(), r = rng(3), CH = 64, grp = new THREE.Group();
   const hv = new Float32Array((NXs + 1) * (NZs + 1)); for(let j = 0; j <= NZs; j++) for(let i = 0; i <= NXs; i++) hv[j * (NXs + 1) + i] = height(B.x0 + i * STEP, B.z0 + j * STEP);
-  let p = 0;
-  for(let j = 0; j < NZs; j++) for(let i = 0; i < NXs; i++){
-    const V = (a, b) => [B.x0 + (i + a) * STEP, hv[(j + b) * (NXs + 1) + i + a], B.z0 + (j + b) * STEP];
-    const A = V(0, 0), Bv = V(1, 0), D = V(0, 1), E = V(1, 1);
-    for(const tri of [[A, D, Bv], [Bv, D, E]]){
-      const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cz = (tri[0][2] + tri[1][2] + tri[2][2]) / 3;
-      c.setHex(GROUND[ground(cx, cz)][r() < 0.5 ? 0 : 1]); c.offsetHSL(0, 0, (r() - 0.5) * 0.04);
-      for(const v of tri){ pos[p] = v[0]; pos[p + 1] = v[1]; pos[p + 2] = v[2]; col[p] = c.r; col[p + 1] = c.g; col[p + 2] = c.b; p += 3; } } }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
-  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({vertexColors: true, flatShading: true})); m.receiveShadow = true; return m;
+  const mat = new THREE.MeshLambertMaterial({vertexColors: true, flatShading: true});
+  for(let cj = 0; cj < NZs; cj += CH) for(let ci = 0; ci < NXs; ci += CH){
+    const nj = Math.min(CH, NZs - cj), ni = Math.min(CH, NXs - ci), tris = ni * nj * 2, pos = new Float32Array(tris * 9), col = new Float32Array(tris * 9); let p = 0;
+    for(let j = cj; j < cj + nj; j++) for(let i = ci; i < ci + ni; i++){
+      const V = (a, b) => [B.x0 + (i + a) * STEP, hv[(j + b) * (NXs + 1) + i + a], B.z0 + (j + b) * STEP];
+      const A = V(0, 0), Bv = V(1, 0), D = V(0, 1), E = V(1, 1);
+      for(const tri of [[A, D, Bv], [Bv, D, E]]){
+        const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cz = (tri[0][2] + tri[1][2] + tri[2][2]) / 3;
+        c.setHex(GROUND[ground(cx, cz)][r() < 0.5 ? 0 : 1]); c.offsetHSL(0, 0, (r() - 0.5) * 0.04);
+        for(const v of tri){ pos[p] = v[0]; pos[p + 1] = v[1]; pos[p + 2] = v[2]; col[p] = c.r; col[p + 1] = c.g; col[p + 2] = c.b; p += 3; } } }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.computeVertexNormals(); g.computeBoundingSphere();
+    const m = new THREE.Mesh(g, mat); m.receiveShadow = true; grp.add(m); }
+  return grp;
 }
 // one water surface for the whole world, coloured by zone (blue lakes, murky marsh, glowing lava)
 function buildWater(){
@@ -235,8 +251,23 @@ function ringSpots(c, rad, n, avoid = []){ const out = [];
     if(roadDist(x, z) < 4.2 || out.some(o => Math.hypot(o.x - x, o.z - z) < 7) || avoid.some(o => Math.hypot(o.x - x, o.z - z) < o.r)) continue;
     out.push({x, z, rot: Math.atan2(c.x - x, c.z - z)}); }
   return out; }
+// a harbour: a pier out into the sea, a ship at anchor and boats on the beach; h.dock is where the captain stands, h.berth where the ship to the other continent waits
+function harbour(h){
+  const dir = h.port === "s" ? 1 : -1; let sz = h.z; while(height(h.x, sz) > -1.2 && Math.abs(sz - h.z) < 80) sz += dir;
+  const shore = sz - dir * 4;                                                       // the last bit of beach
+  h.dock = {x: h.x + 1.6, z: shore - dir * 6}; h.berth = {x: h.x + 6, z: sz + dir * 9}; h.dockRot = dir > 0 ? 0 : Math.PI;
+  if(!buildingsReady()) return;
+  const pier = buildingModel(b2("docks", "red"), {width: 16}); if(pier){ const k = pier.userData.size.x / 2; pier.position.set(h.x, 0.75, shore + dir * 7.5); pier.rotation.y = Math.PI / 2; SCENE.add(pier); }
+  const ship = buildingModel("ship_blue_accent", {width: 11}); if(ship){ ship.position.set(h.x - 9, -1.1, sz + dir * 12); ship.rotation.y = dir > 0 ? 0.35 : Math.PI + 0.35; SCENE.add(ship); h.anchored = ship; }
+  const r = rng(h.tx); for(let i = 0; i < 3; i++){ const bx = h.x + 8 + i * 4 + r() * 2, bz = shore - dir * (1 + r() * 2); if(height(bx, bz) < 0.2) continue;
+    const boat = buildingModel("boat", {width: 3.4}); if(boat){ place(boat, bx, bz, r() * 6); soft(bx, bz, 1.2); } }
+}
+const b2 = (n, c) => "building_" + n + "_" + c;
 function buildTown(h){
   const L = TOWN_LOOK[h.race], spots = ringSpots(h, h.R + 2.6, 6);
+  if(h.port){ const dir = h.port === "s" ? 1 : -1; ringSpots(h, h.R + 2.6, 6, [{x: h.x + 2, z: h.z + dir * (h.R + 2.6), r: 9}]).forEach((s, i) => { if(building(s.x, s.z, s.rot, pick("port", i), 4.8, 2.7)) props(s.x, s.z, s.rot, 4.8, i); else house(s.x, s.z, s.rot, 4.6, 4, L.walls[i % 3], L.roofs[i % 3]); });
+    const wl = buildingsReady() && buildingModel(b2("well", "blue"), {width: 2.6}); if(wl){ place(wl, h.x, h.z); solid(h.x, h.z, 1.2); } else fountain(h.x, h.z, L.water, L.stone);
+    harbour(h); return; }
   spots.forEach((s, i) => {
     const w = h.race === "dwarf" ? 5.2 : h.race === "orc" ? 4.6 : 4.6;
     if(building(s.x, s.z, s.rot, pick(h.race, i), w, w * 0.56, h.race === "undead" ? [0xd8d4e0, 0xc4c0cc][i % 2] : null, h.race === "undead")){ if(h.race !== "orc" && h.race !== "undead") props(s.x, s.z, s.rot, w, i); }
@@ -351,6 +382,30 @@ function buildPlace(id, e){
     for(let i = 0; i < 4; i++){ const l = mesh(new THREE.BoxGeometry(0.8, 0.12, 0.12), 0x2a2420, 0, 0.08, 1.2); l.rotation.y = i * 1.6; add(l); } }
   else if(id === "giantprint"){ const fp = new THREE.Mesh(new THREE.CircleGeometry(2.4, 18), new THREE.MeshLambertMaterial({color: 0x9fb8c8})); fp.rotation.x = -Math.PI / 2; fp.scale.set(0.8, 1.8, 1); fp.position.y = 0.06; add(fp);
     for(let k = 0; k < 5; k++){ const t = new THREE.Mesh(new THREE.CircleGeometry(0.55, 10), new THREE.MeshLambertMaterial({color: 0x9fb8c8})); t.rotation.x = -Math.PI / 2; t.position.set(-1.6 + k * 0.8, 0.06, -4.9 + Math.abs(k - 2) * 0.3); add(t); } }
+  // the Southern Reaches
+  else if(id === "oldlighthouse"){ for(let k = 0; k < 5; k++) add(mesh(new THREE.CylinderGeometry(1.75 - k * 0.2, 1.95 - k * 0.2, 2, 10), k % 2 ? 0xb8402e : 0xeae4d8, 0, 1 + k * 2, 0));
+    add(mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 10), 0x3a3a40, 0, 10.15, 0), mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.3, 8), glowMat(0xffe08a), 0, 10.95, 0), mesh(new THREE.ConeGeometry(1.15, 1.2, 10), 0x2a2a30, 0, 12.2, 0));
+    add(mesh(new THREE.BoxGeometry(0.9, 1.6, 0.2), 0x4a3220, 0, 0.8, 1.9)); for(let k = 0; k < 4; k++) add(mesh(new THREE.DodecahedronGeometry(0.6 + k * 0.15, 0), 0x8a8d91, Math.cos(k * 1.9) * 3, 0.2, Math.sin(k * 1.9) * 3));
+    solid(x, z, 2.1, true); }
+  else if(id === "wreck"){ const sh = buildingsReady() && buildingModel("ship_blue_accent", {width: 11}); if(sh){ sh.position.set(0, -1.6, -1); sh.rotation.set(0.12, 0.6, 0.55); add(sh); }
+    else add(mesh(new THREE.BoxGeometry(3.4, 1.6, 9), 0x6a4a2a, 0, 0.3, -1));
+    for(let k = 0; k < 6; k++){ const pl = mesh(new THREE.BoxGeometry(0.3, 0.12, 1.8 + (k % 3) * 0.6), 0x7a5a3a, Math.cos(k * 2.1) * 4.2, 0.08, Math.sin(k * 2.1) * 3.6 + 2); pl.rotation.y = k * 0.9; add(pl); }
+    add(mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), 0x8a6a42, 3.4, 0.4, 2.6), mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.9, 8), 0x6a4a2a, -3.2, 0.45, 2.2)); solid(x, z - 1, 3.4, true); }
+  else if(id === "sunkenidol"){ const st = 0x7a8a72, moss = 0x4a7a3a; add(mesh(new THREE.BoxGeometry(2.6, 3.4, 2.2), st, 0, 1.4, 0), mesh(new THREE.BoxGeometry(2.9, 0.5, 2.5), moss, 0, 3.2, 0));
+    for(const s of [-0.6, 0.6]) add(mesh(new THREE.BoxGeometry(0.5, 0.35, 0.2), glowMat(0x9aff6a), s, 2.2, 1.12)); add(mesh(new THREE.BoxGeometry(1.4, 0.3, 0.2), 0x2a3428, 0, 1.2, 1.12));
+    for(let k = 0; k < 6; k++){ const v = mesh(new THREE.CylinderGeometry(0.08, 0.1, 3.4, 5), moss, Math.cos(k) * 1.35, 1.6, Math.sin(k) * 1.15); v.rotation.z = (k % 2 - 0.5) * 0.4; add(v); } solid(x, z, 1.9, true); }
+  else if(id === "sunspire"){ const sp2 = mesh(new THREE.CylinderGeometry(0.5, 1.9, 13, 6), 0xd8b880, 0, 5.5, 0); sp2.rotation.z = 0.22; add(sp2);
+    add(mesh(new THREE.OctahedronGeometry(0.8, 0), glowMat(0xffd060), -1.4, 12, 0)); for(let k = 0; k < 5; k++){ const b = mesh(new THREE.BoxGeometry(1.2, 0.8, 1), 0xc8a470, Math.cos(k * 1.3) * 3.6, 0.3, Math.sin(k * 1.3) * 3.6); b.rotation.y = k; add(b); }
+    solid(x, z, 2, true); }
+  else if(id === "bonepit"){ const bone = 0xeae2cc; for(let k = 0; k < 7; k++){ const rib = new THREE.Mesh(new THREE.TorusGeometry(2.6 - Math.abs(k - 3) * 0.25, 0.16, 5, 12, Math.PI), new THREE.MeshLambertMaterial({color: bone, flatShading: true}));
+      rib.position.set(0, 0, -4.2 + k * 1.3); rib.castShadow = true; add(rib); }
+    add(mesh(new THREE.CylinderGeometry(0.25, 0.25, 9, 6), bone, 0, 0.25, 0)); g.children[g.children.length - 1].rotation.x = Math.PI / 2;
+    const sk = mesh(new THREE.BoxGeometry(2, 1.4, 2.8), bone, 0, 0.7, 5.8); add(sk); for(const s of [-0.5, 0.5]) add(mesh(new THREE.BoxGeometry(0.4, 0.4, 0.2), 0x2a2420, s, 0.9, 7.2));
+    solid(x, z + 5.8, 1.5, true); solid(x - 2.4, z, 0.4); solid(x + 2.4, z, 0.4); }
+  else if(id === "voidrift"){ const rift = new THREE.Mesh(new THREE.TorusGeometry(2.4, 0.35, 8, 24), glowMat(0xa04aff)); rift.position.y = 3; add(rift);
+    const core = new THREE.Mesh(new THREE.CircleGeometry(2.1, 24), new THREE.MeshBasicMaterial({color: 0x14061e, side: THREE.DoubleSide})); core.position.y = 3; add(core);
+    for(let k = 0; k < 7; k++){ const sh2 = mesh(new THREE.OctahedronGeometry(0.35 + (k % 3) * 0.15, 0), glowMat(0xc890ff), Math.cos(k * 0.9) * 3.4, 1 + (k % 4) * 1.4, Math.sin(k * 0.9) * 1.4); add(sh2); }
+    const scorch = new THREE.Mesh(new THREE.CircleGeometry(4, 18), new THREE.MeshLambertMaterial({color: 0x2a2234})); scorch.rotation.x = -Math.PI / 2; scorch.position.y = 0.05; add(scorch); solid(x, z, 1.4, true); }
   place(g, x, z);
 }
 // dungeon doors: built facing the road from their camp. Returns where the way in is.
@@ -372,11 +427,12 @@ function buildDoor(id, D){
 // ---------------------------------------------------------------- trees, rocks and the rest, by zone
 const DENS = {   // per 100 square units: trees, rocks, spikes (ice / obsidian)
   meadow: [0.5, 0.12], forest: [3.6, 0.08], elfwood: [1.5, 0.06], moonwood: [2.6, 0.08], highland: [0.5, 0.35], snowhigh: [0.35, 0.2, 0.15],
-  steppe: [0.18, 0.2], canyon: [0.15, 0.3], rock: [0.4, 0.5], swamp: [0.9, 0.05], ash: [0.2, 0.2, 0.3], snow: [0.2, 0.1, 0.35], blight: [0.7, 0.25], gloom: [1.5, 0.1]};
+  steppe: [0.18, 0.2], canyon: [0.15, 0.3], rock: [0.4, 0.5], swamp: [0.9, 0.05], ash: [0.2, 0.2, 0.3], snow: [0.2, 0.1, 0.35], blight: [0.7, 0.25], gloom: [1.5, 0.1],
+  coast: [0.35, 0.12], jungle: [4.2, 0.06], desert: [0.1, 0.14], badlands: [0.22, 0.4], dread: [0.7, 0.4, 0.22]};
 const TREE = {meadow: "oak", forest: "pine", elfwood: "birch", moonwood: "violet", highland: "pine", snowhigh: "snowpine", steppe: "cactus", canyon: "cactus", rock: "pine",
-  swamp: "dead", ash: "charred", snow: "snowpine", blight: "dead", gloom: "dead"};
-const BUSH = {meadow: 0.1, forest: 0.12, elfwood: 0.12, moonwood: 0.08, highland: 0.05, swamp: 0.06, rock: 0.03};    // bushes (chance per spot, only with the new models)
-const ROCK_COL = {steppe: 0x9a5a40, canyon: 0xa86a48, snowhigh: 0xdde6ea, snow: 0xdde6ea, ash: 0x3a3634, gloom: 0x4a4a52, blight: 0x6a6a5e};
+  swamp: "dead", ash: "charred", snow: "snowpine", blight: "dead", gloom: "dead", coast: "oak", jungle: "jungle", desert: "cactus", badlands: "dead", dread: "dreadwood"};
+const BUSH = {meadow: 0.1, forest: 0.12, elfwood: 0.12, moonwood: 0.08, highland: 0.05, swamp: 0.06, rock: 0.03, coast: 0.08, jungle: 0.3};    // bushes (chance per spot, only with the new models)
+const ROCK_COL = {steppe: 0x9a5a40, canyon: 0xa86a48, snowhigh: 0xdde6ea, snow: 0xdde6ea, ash: 0x3a3634, gloom: 0x4a4a52, blight: 0x6a6a5e, desert: 0xd8b880, badlands: 0x9a4a36, dread: 0x3a3446};
 function buildProps(){
   const r = rng(5), T = {trunk: [], crown: [], cone: [], dead: [], cactus: [], rock: [], spike: [], reed: []}, c = new THREE.Color(), K = {};          // K: the new tree models, by kind
   const ok = (x, z, pad) => openAt(x, z) > 0.95 && roadDist(x, z) > pad && !hubAt(x, z) && !featureAt(x, z) && height(x, z) > 0.55;
@@ -392,7 +448,7 @@ function buildProps(){
         else T.crown.push([px, y, pz, sc, kind === "birch" ? 0x9ac860 : kind === "violet" ? 0x7a5aa8 : 0x4f8f3a]); }
       solid(px, pz, 0.45 * sc); continue; }
     if(r() < D[1] * area && ok(px, pz, 2.5)){ const sc = 0.6 + s; T.rock.push([px, height(px, pz) + 0.2, pz, sc, ROCK_COL[t] || 0x8a8d91]); solid(px, pz, 0.75 * sc, s > 0.55, 1.05 * sc); continue; }   // (a rock only blocks sight where it is taller than the line of sight)
-    if(D[2] && r() < D[2] * area && ok(px, pz, 2.5)){ const sc = 0.7 + s * 0.8; T.spike.push([px, height(px, pz), pz, sc, t === "ash" ? 0x1a1420 : 0xbfe6ff]); solid(px, pz, 0.45 * sc); continue; }
+    if(D[2] && r() < D[2] * area && ok(px, pz, 2.5)){ const sc = 0.7 + s * 0.8; T.spike.push([px, height(px, pz), pz, sc, t === "ash" ? 0x1a1420 : t === "dread" ? 0x7a4aaa : 0xbfe6ff]); solid(px, pz, 0.45 * sc); continue; }
     if(t === "swamp"){ const h = height(px, pz); if(h > 0.05 && h < 0.7 && r() < 0.5) T.reed.push([px, h, pz, 0.7 + s * 0.8, 0x8a8a4a]); }
   }
   const pineGeo = new THREE.ConeGeometry(1.3, 3.6, 7); pineGeo.translate(0, 3.1, 0);
@@ -411,7 +467,7 @@ function buildProps(){
     natureInstances(SCENE, "rock", T.rock.map(p => [p[0], p[1] - 0.25, p[2], p[3], new THREE.Color(p[4]).getHex() === 0x8a8d91 ? null : p[4]]), {size: 1.9, byWidth: true, bright: 1.25});
     const rb = rng(9), bush = [];
     for(let z = B.z0 + 6; z < B.z1 - 6; z += 3.1) for(let x = B.x0 + 6; x < B.x1 - 6; x += 3.1){ const px = x + (rb() - 0.5) * 3, pz = z + (rb() - 0.5) * 3, t = landAt(px, pz), dn = BUSH[t] || 0;
-      if(dn && rb() < dn && ok(px, pz, 2.2)) bush.push([px, height(px, pz) - 0.05, pz, 0.7 + rb() * 0.6, t === "elfwood" ? 0xd8f0a0 : t === "moonwood" ? 0xb8a0e0 : t === "swamp" ? 0xa0a070 : null]); }
+      if(dn && rb() < dn && ok(px, pz, 2.2)) bush.push([px, height(px, pz) - 0.05, pz, 0.7 + rb() * 0.6, t === "elfwood" ? 0xd8f0a0 : t === "moonwood" ? 0xb8a0e0 : t === "swamp" ? 0xa0a070 : t === "jungle" ? 0x70c070 : null]); }
     natureInstances(SCENE, "bush", bush, {size: 1.3, byWidth: true, shadow: false});
     inst(cactusGeo, T.cactus); inst(spikeGeo, T.spike, (o, p) => o.rotation.set((p[0] % 1) * 0.3, p[2], 0)); inst(reedGeo, T.reed, null, false);
     return; }

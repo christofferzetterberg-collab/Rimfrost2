@@ -114,8 +114,8 @@ function lookKey(){ const eq = S.cur.eq || {}, o = {}; for(const k of ["head", "
 function state(){
   const pet = G.getPet();
   return {t: "st", id: COOP.peer.id, name: S.cur.name, race: S.cur.race, cls: S.cur.cls, lvl: S.cur.level, x: +P.x.toFixed(2), z: +P.z.toFixed(2), rot: +P.rot.toFixed(2), mv: !!P.moving,
-    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!P.buffs.meld, st: !!P.buffs.stealth, mt: P.mount || null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
-    pet: pet ? {k: pet.kind, x: +pet.x.toFixed(2), z: +pet.z.toFixed(2), rot: +pet.rot.toFixed(2), hp: Math.round(pet.hp), mhp: pet.maxHp, dead: !!pet.dead, mv: !!pet.moving, atk: +(pet.attackAnim || 0).toFixed(2), res: Math.round(pet.res || 0)} : null};
+    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!P.buffs.meld, st: !!P.buffs.stealth, mt: P.flying ? (P.flying.ship ? "ship" : "drake") : P.mount || null, fy: P.flying ? +P.fy.toFixed(2) : null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
+    pet: pet && !P.flying ? {k: pet.kind, x: +pet.x.toFixed(2), z: +pet.z.toFixed(2), rot: +pet.rot.toFixed(2), hp: Math.round(pet.hp), mhp: pet.maxHp, dead: !!pet.dead, mv: !!pet.moving, atk: +(pet.attackAnim || 0).toFixed(2), res: Math.round(pet.res || 0)} : null};
 }
 function sendState(){ if(!on() || !COOP.peer || !S.cur) return; broadcast(state()); }
 export function update(dt){
@@ -153,11 +153,12 @@ export function render(){
     { const fade = !!(r.meld || r.st); if(fade !== !!r.mesh.userData.faded){ r.mesh.userData.faded = fade;   // a friend in Stealth or Shadowmeld looks faded
       r.mesh.traverse(o => { if(!o.isMesh) return; if(fade){ o.userData.m0 = o.material; o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.4; o.material.depthWrite = false; } else if(o.userData.m0){ o.material = o.userData.m0; o.userData.m0 = null; } }); } }
     if((r.mt || null) !== (r.mtShown || null)){ if(r.mtMesh) H.scene.remove(r.mtMesh); r.mtMesh = r.mt && H.mountMesh ? H.mountMesh(r.mt) : null; if(r.mtMesh) H.scene.add(r.mtMesh); r.mtShown = r.mt || null; }
-    r.mesh.userData.animate(r.walk, r.mv, r.ak === "cast" ? 0 : r.atk || 0, r.sit || r.mt ? "sit" : r.pose || null);
-    r.mesh.position.set(r.x, height(r.x, r.z) + (r.dead ? 0.3 : 0), r.z); r.mesh.rotation.set(r.dead ? -1.4 : 0, r.rot, 0);
-    if(r.mtMesh){ r.mtMesh.visible = vis; r.mtMesh.position.set(r.x, height(r.x, r.z), r.z); r.mtMesh.rotation.y = r.rot; r.mtMesh.userData.animate(r.walk * 0.75, r.mv, 0); r.mesh.position.y += r.mtMesh.userData.saddle - 0.38; }
+    r.mesh.userData.animate(r.walk, r.mv, r.ak === "cast" ? 0 : r.atk || 0, r.sit || (r.mt && r.mt !== "ship") ? "sit" : r.pose || null);
+    const gy = r.fy != null ? (r.fyS = r.fyS == null ? r.fy : r.fyS + (r.fy - r.fyS) * 0.25) : (r.fyS = null, height(r.x, r.z));   // a friend on a flight is up in the air
+    r.mesh.position.set(r.x, gy + (r.dead ? 0.3 : 0), r.z); r.mesh.rotation.set(r.dead ? -1.4 : 0, r.rot, 0);
+    if(r.mtMesh){ r.mtMesh.visible = vis; r.mtMesh.position.set(r.x, gy, r.z); r.mtMesh.rotation.y = r.rot; r.mtMesh.userData.animate(r.walk * 0.75, r.mv, 0); if(r.mt !== "ship") r.mesh.position.y += r.mtMesh.userData.saddle - 0.38; }
     if(!r.plate){ r.plate = document.createElement("div"); r.plate.className = "plate friend"; r.plate.innerHTML = `<span></span><div class="hb"><i></i></div>`; H.hud.appendChild(r.plate); }
-    const s = vis ? H.toScreen(r.x, height(r.x, r.z) + r.mesh.userData.height + 0.35, r.z) : {on: false};
+    const s = vis ? H.toScreen(r.x, gy + r.mesh.userData.height + 0.35 + (r.mtMesh ? r.mtMesh.userData.saddle : 0), r.z) : {on: false};
     if(!s.on){ r.plate.style.display = "none"; } else { r.plate.style.display = ""; r.plate.style.left = s.x + "px"; r.plate.style.top = s.y + "px";
       r.plate.firstChild.textContent = `${r.name} (${r.lvl})`; r.plate.lastChild.firstChild.style.width = Math.max(0, Math.min(100, r.hp / (r.mhp || 1) * 100)) + "%"; r.plate.classList.toggle("sel", P.ftarget === r.id); }
     const po = r.petObj;
@@ -200,10 +201,10 @@ export function taunt(m){ if(COOP.role === "guest") op("taunt", m, []); else hos
 // everyone a monster could go after: you, your pet, friends and their pets in the same place
 export function cands(m){
   const L = [], inC = reg(m.x), pet = G.getPet();
-  if(H.running() && !P.dead && !P.buffs.meld && reg(P.x) === inC) L.push({id: myId(), e: P, me: true, lvl: S.cur.level, stealth: !!P.buffs.stealth});
-  if(pet && !pet.dead && reg(pet.x) === inC) L.push({id: on() ? myId() + ":pet" : "pet", e: pet, pet: true, mine: true});
+  if(H.running() && !P.dead && !P.flying && !P.buffs.meld && reg(P.x) === inC) L.push({id: myId(), e: P, me: true, lvl: S.cur.level, stealth: !!P.buffs.stealth});
+  if(pet && !pet.dead && !P.flying && reg(pet.x) === inC) L.push({id: on() ? myId() + ":pet" : "pet", e: pet, pet: true, mine: true});
   if(coopMob(m)) for(const r of Object.values(COOP.remotes)){
-    if(!r.dead && !r.meld && reg(r.x) === inC) L.push({id: r.id, e: r, lvl: r.lvl, stealth: !!r.st});
+    if(!r.dead && !r.meld && r.fy == null && reg(r.x) === inC) L.push({id: r.id, e: r, lvl: r.lvl, stealth: !!r.st});
     const po = r.petObj; if(po && !po.dead && reg(po.x) === inC) L.push({id: r.id + ":pet", e: po, pet: true, owner: r.id}); }
   return L; }
 export function mobTarget(m){
