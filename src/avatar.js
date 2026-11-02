@@ -143,6 +143,8 @@ export function makeAvatar(race, cls, eq = {}, look = null){
     else if(pose === "sit") setBase(o.mount ? "Sit_Chair_Idle" : "Sit_Floor_Idle", null, 0.3);
     else if(pose === "cast") setBase("Ranged_Magic_Spellcasting", moving ? "upper" : null, 0.15);
     else if(pose === "bow") setBase("Ranged_Bow_Aiming_Idle", moving ? "upper" : null, 0.15);
+    else if(moving && (o.gait === "left" || o.gait === "right") && act("Running_Strafe_" + (o.gait === "left" ? "Left" : "Right"))) setBase("Running_Strafe_" + (o.gait === "left" ? "Left" : "Right"), busy ? "legs" : null, 0.15);
+    else if(moving && o.gait === "back" && act("Walking_Backwards")){ act("Walking_Backwards").timeScale = 1.5; setBase("Walking_Backwards", busy ? "legs" : null, 0.15); }
     else if(moving) setBase(spec.bow && !busy ? "Running_HoldingBow" : o.speed > 9 ? "Running_B" : "Running_A", busy ? "legs" : null, 0.15);
     else setBase(spec.bow && !busy ? "Ranged_Bow_Idle" : "Idle_A", busy ? "legs" : null, 0.25);
     mixer.update(dt);

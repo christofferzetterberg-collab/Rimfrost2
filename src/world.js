@@ -174,6 +174,9 @@ let SCENE = null;
 function place(g, x, z, rot = 0, dy = 0){ g.position.set(x, height(x, z) + dy, z); g.rotation.y = rot; SCENE.add(g); return g; }
 const turn = (x, z, rot, dx, dz) => ({x: x + dx * Math.cos(rot) + dz * Math.sin(rot), z: z - dx * Math.sin(rot) + dz * Math.cos(rot)});
 function solid(x, z, r, los = false){ colliders.push({x, z, r, los}); }
+// small things you walk through (campfires, braziers, props, poles): kept only so nothing is placed on top of them
+export const decor = [];
+function soft(x, z, r){ decor.push({x, z, r}); }
 function house(x, z, rot, w, d, wallC, roofC){
   const g = new THREE.Group(), hh = 2.6;
   const roofGeo = new THREE.ConeGeometry(Math.hypot(w, d) / 2 * 1.05, 2.2, 4); roofGeo.rotateY(Math.PI / 4);
@@ -195,10 +198,10 @@ function hut(x, z, rot, rad, wallC, roofC){                                     
 function tent(x, z, rot, color, s = 1){ if(buildingsReady()){ const g = buildingModel(pick("camp", (color >> 12) & 1), {width: 3.6 * s}); place(g, x, z, rot); solid(x, z, 1.3 * s, true); return g; }
   const t = mesh(new THREE.ConeGeometry(1.6 * s, 2.1 * s, 5), color, 0, 1.05 * s, 0); const g = new THREE.Group(); g.add(t); place(g, x, z, rot); solid(x, z, 1.3 * s, true); return g; }
 function fire(x, z){ const g = new THREE.Group(); for(let i = 0; i < 5; i++){ const l = mesh(new THREE.BoxGeometry(0.9, 0.14, 0.14), 0x4a3220, 0, 0.1, 0); l.rotation.y = i * 1.25; g.add(l); }
-  g.add(mesh(new THREE.ConeGeometry(0.35, 0.8, 6), glowMat(0xff9a3a), 0, 0.5, 0)); place(g, x, z); solid(x, z, 0.6); return g; }
+  g.add(mesh(new THREE.ConeGeometry(0.35, 0.8, 6), glowMat(0xff9a3a), 0, 0.5, 0)); place(g, x, z); soft(x, z, 0.6); return g; }
 function brazier(x, z, color = 0xff8a3a){ const g = new THREE.Group();
   g.add(mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.9, 6), 0x2a2420, 0, 0.45, 0), mesh(new THREE.CylinderGeometry(0.35, 0.2, 0.4, 8), 0x3a3430, 0, 1.0, 0), mesh(new THREE.ConeGeometry(0.25, 0.6, 6), glowMat(color), 0, 1.45, 0));
-  place(g, x, z); solid(x, z, 0.4); return g; }
+  place(g, x, z); soft(x, z, 0.4); return g; }
 function fountain(x, z, water = 0x3f8fbf, stone = 0x8b8780){ const g = new THREE.Group();
   g.add(mesh(new THREE.CylinderGeometry(2, 2.2, 0.6, 10), stone, 0, 0.3, 0), mesh(new THREE.CylinderGeometry(1.7, 1.7, 0.1, 10), new THREE.MeshLambertMaterial({color: water, emissive: water, emissiveIntensity: 0.15}), 0, 0.6, 0),
     mesh(new THREE.CylinderGeometry(0.25, 0.3, 1.6, 8), stone, 0, 1.2, 0)); place(g, x, z); solid(x, z, 2.2); return g; }
@@ -216,7 +219,7 @@ function props(x, z, rot, w, i){
   if(!buildingsReady()) return;
   for(let k = 0; k < 2; k++){ const side = (i + k) % 2 ? 1 : -1, p = turn(x, z, rot, side * (w / 2 + 0.6), -k * 1.4);
     if(roadDist(p.x, p.z) < 2.6) continue; const g = buildingModel(PROPS[(i * 3 + k * 5) % PROPS.length], {scale: 4.2}); if(!g) continue;
-    place(g, p.x, p.z, rot + i * 0.9 + k); solid(p.x, p.z, Math.max(g.userData.size.x, g.userData.size.z) * 0.5); } }
+    place(g, p.x, p.z, rot + i * 0.9 + k); soft(p.x, p.z, Math.max(g.userData.size.x, g.userData.size.z) * 0.5); } }
 
 // ---------------------------------------------------------------- towns, camps and Rimhaven
 const TOWN_LOOK = {
@@ -241,7 +244,7 @@ function buildTown(h){
     else if(h.race === "orc") hut(s.x, s.z, s.rot, 2.2, L.walls[i % 2], L.roofs[i % 2]);
     else house(s.x, s.z, s.rot, 4.6, 4, L.walls[i % L.walls.length], L.roofs[i % L.roofs.length]); });
   if(h.race === "orc"){ fire(h.x, h.z); for(const a of [0.8, 2.4, 4.0, 5.6]){ const x = h.x + Math.cos(a) * 3.2, z = h.z + Math.sin(a) * 3.2;
-      const g = new THREE.Group(); g.add(mesh(new THREE.CylinderGeometry(0.18, 0.22, 2.6, 6), 0x6a4a2e, 0, 1.3, 0), mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), 0xd8d0b8, 0, 2.7, 0)); place(g, x, z); solid(x, z, 0.3); } }
+      const g = new THREE.Group(); g.add(mesh(new THREE.CylinderGeometry(0.18, 0.22, 2.6, 6), 0x6a4a2e, 0, 1.3, 0), mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), 0xd8d0b8, 0, 2.7, 0)); place(g, x, z); soft(x, z, 0.3); } }
   else if(h.race === "dwarf"){ const f = new THREE.Group();                         // a great forge in the middle of the square
     f.add(mesh(new THREE.BoxGeometry(3.2, 1.2, 3.2), 0x4a4a50, 0, 0.6, 0), mesh(new THREE.BoxGeometry(2.4, 0.3, 2.4), glowMat(0xff7a2a), 0, 1.25, 0), mesh(new THREE.BoxGeometry(0.9, 3.6, 0.9), 0x5a5a60, 0, 2.6, -1.1),
       mesh(new THREE.BoxGeometry(1.2, 0.5, 0.6), 0x2a2a2e, 0, 0.25, 2.2)); place(f, h.x, h.z); solid(h.x, h.z, 2.2); }
@@ -306,7 +309,7 @@ function buildLair(id, l){
   if(id === "snorre"){ for(const [dx, dz] of [[-3, -2], [3, -3], [0, 3]]){ const p = at(dx, dz); tent(p.x, p.z, 0.5, 0x8a7a5a, 0.85); }
     for(let k = 0; k < 5; k++){ const p = at(Math.cos(k * 1.3) * 4.5, Math.sin(k * 1.3) * 4.5); const o = new THREE.Group(); o.add(mesh(new THREE.DodecahedronGeometry(0.55, 0), 0x9fb8c8, 0, 0.3, 0)); place(o, p.x, p.z); } }
   if(id === "garuk"){ for(const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]){ const p = at(dx, dz), g = new THREE.Group();
-      g.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, 3.6, 6), 0x4a3220, 0, 1.8, 0), mesh(new THREE.BoxGeometry(0.06, 1.4, 1), 0x8a1a1a, 0, 2.8, 0.5)); place(g, p.x, p.z); solid(p.x, p.z, 0.3); }
+      g.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, 3.6, 6), 0x4a3220, 0, 1.8, 0), mesh(new THREE.BoxGeometry(0.06, 1.4, 1), 0x8a1a1a, 0, 2.8, 0.5)); place(g, p.x, p.z); soft(p.x, p.z, 0.3); }
     fire(l.x - 2.5, l.z + 2.5); }
   if(id === "magma"){ for(const [dx, dz] of [[-4, -3], [4, -3], [-4, 3], [4, 3]]){ const p = at(dx, dz); brazier(p.x, p.z, 0xff5a1a); }
     for(let k = 0; k < 6; k++){ const p = at(Math.cos(k) * 5.5, Math.sin(k) * 5.5), o = new THREE.Group(); o.add(mesh(new THREE.ConeGeometry(0.5, 2 + (k % 3), 5), 0x1a1420, 0, 1, 0)); place(o, p.x, p.z); solid(p.x, p.z, 0.5); } }

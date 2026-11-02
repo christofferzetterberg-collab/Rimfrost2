@@ -554,20 +554,20 @@ export const PETS = {
 const TANK_SK = {bear: {taunt: "growl", aoe: "sweep", one: "maul"}, voidwalker: {taunt: "torment", aoe: "suffering", one: "voidstrike"}};
 const petRole = () => pet ? PETS[pet.kind].role : null;
 // the pet's own skills (shown on the pet bar): each can be switched off so the pet doesn't use it
-export const PET_SKILLS = {
-  bear: [{id: "growl", name: "Growl", icon: "horn", color: "#e6bd5c", desc: "Taunts the target, forcing it to attack your bear for 3 sec. 12 sec cooldown."},
-         {id: "sweep", name: "Sweep", icon: "whirl", color: "#d84a42", desc: "Costs 40 rage. Strikes all nearby enemies. Used when two or more enemies are close."},
-         {id: "maul", name: "Maul", icon: "claw", color: "#c8783a", desc: "Costs 25 rage. A heavy strike against a single target that causes a high amount of threat."}],
-  wolf: [{id: "claw", name: "Claw", icon: "claw", color: "#e8c84a", desc: "Costs 40 energy. A powerful strike."}],
-  imp: [{id: "scorch", name: "Scorch", icon: "flame", color: "#ff7a2a", desc: "Costs 15 mana. Hurls a blast of fire at the target."}],
-  voidwalker: [{id: "torment", name: "Torment", icon: "horn", color: "#8a6ad0", desc: "Taunts the target, forcing it to attack your Voidwalker for 3 sec. 12 sec cooldown."},
-         {id: "suffering", name: "Suffering", icon: "whirl", color: "#6a4ab0", desc: "Costs 20 mana. Strikes all nearby enemies. Used when two or more enemies are close. 8 sec cooldown."},
-         {id: "voidstrike", name: "Void Strike", icon: "claw", color: "#8a5ad0", desc: "Costs 10 mana. A heavy strike against a single target that causes a high amount of threat. 5 sec cooldown."}]
+export const PET_SKILLS = {     // m: the cost, cast and cooldown line of the tooltip
+  bear: [{id: "growl", name: "Growl", icon: "horn", color: "#e6bd5c", m: "12 sec cooldown", desc: "Taunts the target, forcing it to attack your bear for 3 sec."},
+         {id: "sweep", name: "Sweep", icon: "whirl", color: "#d84a42", m: "40 rage", desc: "Strikes all nearby enemies."},
+         {id: "maul", name: "Maul", icon: "claw", color: "#c8783a", m: "25 rage", desc: "A heavy strike that causes a high amount of threat."}],
+  wolf: [{id: "claw", name: "Claw", icon: "claw", color: "#e8c84a", m: "40 energy", desc: "A powerful strike."}],
+  imp: [{id: "firebolt", name: "Firebolt", icon: "flame", color: "#ff7a2a", m: "12 mana · 1.5 sec cast", desc: "Hurls a fiery bolt at the target."}],
+  voidwalker: [{id: "torment", name: "Torment", icon: "horn", color: "#8a6ad0", m: "12 sec cooldown", desc: "Taunts the target, forcing it to attack your Voidwalker for 3 sec."},
+         {id: "suffering", name: "Suffering", icon: "whirl", color: "#6a4ab0", m: "20 mana · 8 sec cooldown", desc: "Strikes all nearby enemies."},
+         {id: "voidstrike", name: "Void Strike", icon: "claw", color: "#8a5ad0", m: "10 mana · 5 sec cooldown", desc: "A heavy strike that causes a high amount of threat."}]
 };
 export const PET_CLASSES = new Set(["hunter", "warlock"]);
 export const petSkillOn = id => !(C().petOff && C().petOff[id]);
-export function togglePetSkill(id){ const o = C().petOff || (C().petOff = {}); if(o[id]) delete o[id]; else o[id] = true;
-  const sk = Object.values(PET_SKILLS).flat().find(x => x.id === id); H.log(`${sk ? sk.name : id} is now ${o[id] ? "off" : "on"}.`, "#e6bd5c"); H.save(); }
+// switching a pet ability on or off (a glowing ring on the pet bar shows which are on)
+export function togglePetSkill(id){ const o = C().petOff || (C().petOff = {}); if(o[id]) delete o[id]; else o[id] = true; H.save(); }
 // pet orders: "assist" (helps you when you fight), "attack" (goes for the target you gave it), "follow" (stops fighting and stays with you until the fight is over or you order an attack)
 export function petAttackCmd(){ if(!pet || pet.dead) return H.err("You have no pet"); const t = P.target;
   if(!t || t.dead || t.state === "return") return H.err("You have no target");
@@ -596,7 +596,7 @@ export function petDamage(raw, src){ if(!pet || pet.dead) return; const amt = Ma
 export const petAtk = () => PET_ATK;
 function petStrike(t, coef, thm = 1){ if(!t || t.dead) return; const amt = Math.max(1, Math.round((C().cls === "warlock" ? spow() : pow()) * coef * genMult() * (1 + teff("petdmg")) * (pet && pet.wrathT > 0 ? 1.5 : 1) * rand(0.92, 1.08) * lvlPenalty(t)));
   PET_ATK = true; TH_MULT = thm; try{ damageMob(t, amt, false, PETS[pet.kind].school || "phys"); } finally{ PET_ATK = false; TH_MULT = 1; } }
-// the Imp's Firebolt (and Scorch): a fire bolt from the pet
+// the Imp's Firebolt: a fire bolt from the pet (its damage follows your spell power, which grows with your Intellect)
 function petBolt(t, coef, size){ if(!t || t.dead) return; proj(t, "#ff7a2a", size, () => petStrike(t, coef), null, 520, {x: pet.x, z: pet.z, y: 0.9}); }
 // selecting your pet: heals you cast then go to it (scaled to its health)
 export const petSelected = () => !!(P.petSel && pet && !pet.dead);
@@ -659,17 +659,17 @@ export function updPet(dt, blockedFn, tryMoveFn, turnTo){
     if(near.length >= 2){ pet.res -= demon ? 20 : 40; pet.sweepT = demon ? 8 : 1.5; pet.attackAnim = 1; ring(pet.px, pet.py, 50, "#d84a42"); H.floatText(pet, pet.kind === "bear" ? "Sweep" : "Suffering", "#ff8a7a"); for(const m of near) petStrike(m, 0.5); } }
   const sp = (t ? d.sp : null);
   if(pet.casting && (!t || t !== pet.casting.t || t.dead || distU(pet, t) > pet.r + t.r + d.range + 0.5)) pet.casting = null;   // the Imp stops casting when its target is gone or out of range
-  if(t && d.role === "caster" && pet.casting){ turnTo(pet, t.x - pet.x, t.z - pet.z, dt, 12); pet.casting.left -= dt;           // Firebolt: 1.6 sec cast, 12 mana; it stands still while casting
+  if(t && d.role === "caster" && pet.casting){ turnTo(pet, t.x - pet.x, t.z - pet.z, dt, 12); pet.casting.left -= dt;           // Firebolt: 1.5 sec cast, 12 mana; it stands still while casting
     if(pet.casting.left <= 0){ pet.casting = null; pet.res -= IMP_BOLT; pet.attackAnim = 1; petBolt(t, d.coef, 5); pet.atkT = 0.3; } }
   else if(t){
     const reach = pet.r + t.r + (d.range ? d.range : 0.5);
-    if(d.role === "caster" && distU(pet, t) <= reach && pet.atkT <= 0 && pet.res >= IMP_BOLT && !pet.casting) { const ct = 1.6 / (pet.wrathT > 0 ? 1.3 : 1); pet.casting = {t, left: ct, total: ct}; }
+    // the Imp starts casting Firebolt when it is ready (and Firebolt is switched on)
+    if(d.role === "caster" && petSkillOn("firebolt") && distU(pet, t) <= reach && pet.atkT <= 0 && pet.res >= IMP_BOLT && !pet.casting && !t.dead){ const ct = 1.5 / (pet.wrathT > 0 ? 1.3 : 1); pet.casting = {t, left: ct, total: ct}; }
     if(distU(pet, t) > reach){ const dir = steer(pet, t.x, t.z, dt, blockedFn); if(dir && tryMoveFn(pet, dir.dx * sp / PXU * dt, dir.dz * sp / PXU * dt)){ pet.moving = true; turnTo(pet, dir.dx, dir.dz, dt, 12); } }
     else { turnTo(pet, t.x - pet.x, t.z - pet.z, dt, 12);
-      if(pet.atkT <= 0){ pet.atkT = d.atk / ((1 + 0.07 * T("h_frenzy")) * (pet.wrathT > 0 ? 1.3 : 1)); pet.attackAnim = 1; if(d.role !== "caster"){ petStrike(t, d.coef); if(tank && !demon) pet.res = Math.min(100, pet.res + 8); } }
+      if(pet.atkT <= 0 && d.role !== "caster"){ pet.atkT = d.atk / ((1 + 0.07 * T("h_frenzy")) * (pet.wrathT > 0 ? 1.3 : 1)); pet.attackAnim = 1; petStrike(t, d.coef); if(tank && !demon) pet.res = Math.min(100, pet.res + 8); }   // (the Imp's shooting animation plays when its bolt leaves)
       if(tank && petSkillOn(SK.one) && pet.res >= (demon ? 10 : MAUL_COST) && pet.maulT <= 0 && !t.dead && !(petSkillOn(SK.aoe) && pet.sweepT <= 0 && mobs.filter(m => !m.dead && m.state === "chase" && distU(m, pet) < 3.9).length >= 2)){   // Maul (25 rage) / Void Strike (10 mana, 5 sec cooldown): single target, extra threat; Sweep goes first when several enemies are close
         pet.res -= demon ? 10 : MAUL_COST; pet.maulT = demon ? 5 : MAUL_CD; pet.attackAnim = 1; H.floatText(pet, pet.kind === "bear" ? "Maul" : "Void Strike", "#e8a060"); petStrike(t, MAUL_COEF, MAUL_THREAT); }
-      if(pet.kind === "imp" && !pet.casting && petSkillOn("scorch") && pet.res >= 15 && pet.clawT <= 0 && !t.dead){ pet.res -= 15; pet.clawT = 4; pet.attackAnim = 1; H.floatText(pet, "Scorch", "#ff9a4a"); petBolt(t, 1.2, 8); }
       if(pet.kind === "wolf" && petSkillOn("claw") && pet.res >= 40 && pet.clawT <= 0 && !t.dead){ pet.res -= 40; pet.clawT = 1.2; pet.attackAnim = 1; H.floatText(pet, "Claw", "#e8c84a"); petStrike(t, 0.55); } }
   } else if(distU(pet, P) > 3){                                              // follow you at your speed (faster when far behind)
     const gx = P.x - Math.sin(P.rot) * 1.6, gz = P.z - Math.cos(P.rot) * 1.6, spd = playerSpeed() * (distU(pet, P) > 9 ? 1.3 : 1);

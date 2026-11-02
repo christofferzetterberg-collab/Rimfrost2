@@ -1,7 +1,7 @@
 // Rimfrost 2 – stage 3: races, classes and Rimfrost's abilities in a low-poly 3D world, seen from an angled top-down camera.
 import * as THREE from "three";
 import {clamp, lerp, rng} from "./util.js";
-import {B, WATER, height, ground, houses, colliders, buildWorld, zoneAt, landAt, hubAt, placeName, openAt, featureAt, roadDist, GROUND, waterColor, SIGNS, DOORS, STABLE_HORSES} from "./world.js";
+import {B, WATER, height, ground, houses, colliders, decor, buildWorld, zoneAt, landAt, hubAt, placeName, openAt, featureAt, roadDist, GROUND, waterColor, SIGNS, DOORS, STABLE_HORSES} from "./world.js";
 import {HUBS, ZONES, LAIRS, EXPLORE, RACE_HUB, DG_DOORS} from "./worlddata.js";
 import {KINDS, SPAWNS, ZONE_MOB_MULT, FIXED} from "./mobs.js";
 import {DUNGEONS, DG_VER, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
@@ -24,6 +24,8 @@ import * as CO from "./coop.js";
 import {DEV, initDev, toggle as toggleDev} from "./dev.js";
 import {gameHour, isNight, daylight, clockText, minutesToNight, minutesToDay, NIGHT_KINDS} from "./clock.js";
 import {NPCS, QOBJECTS, QITEMS, GOODS, GOODS_BASIC, MOUNTS, RIDING_LVL, RIDING_COST} from "./content.js";
+// is something (solid or walk-through) here? Used when placing things, so nothing ends up on top of a campfire or a person
+const nearAny = f => colliders.some(f) || decor.some(f);
 const {blocked, tryMove, distU, sees, withPx} = G;
 
 // ---------------------------------------------------------------- renderer, scene, lights
@@ -75,7 +77,7 @@ function npcModel(d){ if(d.trains) return makeHero(d.race, d.trains, RACES);    
   if(/Alchem|Apothec|Shaman|Brewer|Herb/.test(d.title + d.name)) o.robe = true; if(d.id === "aldric"){ o.cape = 0x7a1a1a; o.shoulders = 0xd8b04a; }
   return makeHumanoid(o); }
 const npcs = NPCS.map(d => { const mesh = npcModel(d); mesh.position.set(d.x, height(d.x, d.z), d.z); mesh.rotation.y = d.rot; scene.add(mesh);
-  const n = {...d, mesh, rot0: d.rot, r: 0.45}; mesh.traverse(o => { if(o.isMesh) o.userData.npc = n; }); colliders.push({x: d.x, z: d.z, r: 0.45}); return n; });
+  const n = {...d, mesh, rot0: d.rot, r: 0.45}; mesh.traverse(o => { if(o.isMesh) o.userData.npc = n; }); decor.push({x: d.x, z: d.z, r: 0.45}); return n; });   // people can be walked through
 // things you can pick up for quests (placed further down, once we know where you can walk)
 const nodes = [];
 // ---------------------------------------------------------------- dungeons (each its own small map) and the doors in and out
@@ -94,7 +96,7 @@ buildNav();
 const spotCache = new Map();
 const hubSpot = h => { if(spotCache.has(h)) return spotCache.get(h); const rad = h.kind === "camp" ? 2.1 : 4.4; let best = null;
   for(let k = 0; k < 16 && !best; k++){ const a = 0.785 + k * 0.39, x = h.x + Math.cos(a) * rad, z = h.z + Math.sin(a) * rad;
-    if(!npcs.some(n => Math.hypot(n.x - x, n.z - z) < 1.9) && !colliders.some(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.2)) best = {x, z, name: h.name}; }
+    if(!npcs.some(n => Math.hypot(n.x - x, n.z - z) < 1.9) && !nearAny(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.2)) best = {x, z, name: h.name}; }
   best = best || {x: h.x + rad, z: h.z, name: h.name}; spotCache.set(h, best); return best; };
 const spawnFor = race => hubSpot(HUBS[RACE_HUB[race] || "frostvik"]);
 const SPAWN = spawnFor("human");
@@ -114,7 +116,7 @@ const exploreBeams = new Map(Object.values(EXPLORE).map(e => { const b = questBe
       if(Object.values(HUBS).some(h => Math.hypot(x - h.x, z - h.z) < h.R + (i < 4000 ? 16 : 8))) continue;
       if(spots.some(o => Math.hypot(o.x - x, o.z - z) < gap)) continue;
       if(d.far && Math.hypot(x - HUBS[d.far].x, z - HUBS[d.far].z) < d.d) continue;
-      if(colliders.some(c => Math.abs(c.x - x) < 4 && Math.abs(c.z - z) < 4 && Math.hypot(c.x - x, c.z - z) < c.r + 1) || spots.some(o => Math.hypot(o.x - x, o.z - z) < 6) || !reachable(x, z)) continue;
+      if(nearAny(c => Math.abs(c.x - x) < 4 && Math.abs(c.z - z) < 4 && Math.hypot(c.x - x, c.z - z) < c.r + 1) || spots.some(o => Math.hypot(o.x - x, o.z - z) < 6) || !reachable(x, z)) continue;
       spots.push({x, z}); }
     for(const sp of spots){ const g = new THREE.Group(), k = d.kind;
       if(k === "herb" || k === "glow"){ for(let j = 0; j < 3; j++){ const l = new THREE.Mesh(herbGeo, L(0x3f8f7a)); l.position.set(Math.cos(j * 2.1) * 0.15, 0.3, Math.sin(j * 2.1) * 0.15); l.rotation.z = Math.cos(j * 2.1) * 0.4; g.add(l); }
@@ -201,7 +203,7 @@ function zoneSpot(r, zone, near, far, minTown = 0){
   return null; }
 // the boss of a lair stands near its middle, on a free spot
 function lairSpot(l){ for(let k = 0; k < 24; k++){ const a = 1.57 + k * 0.52, rr = 2.4 + Math.floor(k / 12) * 1.6, x = l.x + Math.cos(a) * rr, z = l.z + Math.sin(a) * rr;
-  if(!colliders.some(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.3) && reachable(x, z)) return {x, z}; } return {x: l.x, z: l.z + 2.6}; }
+  if(!nearAny(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.3) && reachable(x, z)) return {x, z}; } return {x: l.x, z: l.z + 2.6}; }
 // dungeon monsters are tougher than those outside
 const DG_HP = 1.6, DG_DMG = 1.3, GROUP_HP = 0.7, GROUP_DMG = 0.1;
 function makeMob(kind, p, lvl, r){ const K = KINDS[kind];
@@ -416,12 +418,12 @@ function buildPetBar(){ const el = $("petbar"), key = classBarKey(); petBarKind 
   if(key.startsWith("pet:")){ const pt = G.getPet();
     list = [{x: "pa", name: "Attack", icon: "fang", color: "#d84a42", key: "petAttack", desc: "Commands your pet to attack your target."},
       {x: "pf", name: "Follow", icon: "leap", color: "#9ccf8a", key: "petFollow", desc: "Commands your pet to stop attacking and return to you."},
-      ...G.PET_SKILLS[pt.kind].map((sk, i) => ({...sk, x: sk.id, key: "petSkill" + (i + 1), skill: true, desc: sk.desc + "<br><i>Click to toggle.</i>"}))]; }
+      ...G.PET_SKILLS[pt.kind].map((sk, i) => ({...sk, x: sk.id, key: "petSkill" + (i + 1), skill: true}))]; }
   else list = FORMS.filter(([id]) => S.cur.learned.includes(id)).map(([id, key]) => { const [ic, col] = abIcon(id); return {x: "form:" + id, form: id, name: AB[id].name, icon: ic, color: col, key, desc: AB[id].desc()}; });
   for(const it of list){ const s = document.createElement("div"); s.className = "slot"; const cv = document.createElement("canvas"); cv.width = cv.height = 52; drawIcon(cv, it.icon, it.color); s.append(cv);
     s.insertAdjacentHTML("beforeend", `<span class="k">${K.short((K.binds[it.key] || [])[0])}</span><span class="cd"></span>`);
     s.onclick = () => { if(it.form) G.tryUse(it.form); else if(it.x === "pa") G.petAttackCmd(); else if(it.x === "pf") G.petFollowCmd(); else { G.togglePetSkill(it.x); buildPetBar(); } };
-    s.onmouseenter = e => showTip(e, `<h4>${it.name}</h4>${it.desc}`); s.onmouseleave = hideTip;
+    s.onmouseenter = e => showTip(e, `<h4>${it.name}</h4>${it.m ? `<div class="m">${it.m}</div>` : ""}${it.desc}`); s.onmouseleave = hideTip;
     el.appendChild(s); petSlots.push({it, el: s, cd: s.querySelector(".cd")}); } }
 function updPetBar(){ const key = classBarKey(); if(key !== petBarKind) buildPetBar(); if(!key) return;
   const pt = G.getPet();
@@ -723,7 +725,7 @@ const graveyards = [];
     for(let k = 0; k < 900 && !spot; k++){ const rr = 8 + r() * 46, a = r() * 6.283, x = Z.cx + Math.cos(a) * rr, z = Z.cz + Math.sin(a) * rr;
       if(zoneAt(x, z) !== zid || hubAt(x, z) || roadDist(x, z) < 3 || featureAt(x, z) || !reachable(x, z) || height(x, z) < 0.6) continue;
       if(Object.values(HUBS).some(h => Math.hypot(x - h.x, z - h.z) < h.R + 6) || Object.values(LAIRS).some(l => Math.hypot(x - l.x, z - l.z) < l.R + 8)) continue;
-      if(colliders.some(c => Math.abs(c.x - x) < 5 && Math.abs(c.z - z) < 5 && Math.hypot(c.x - x, c.z - z) < c.r + 3.2)) continue;
+      if(nearAny(c => Math.abs(c.x - x) < 5 && Math.abs(c.z - z) < 5 && Math.hypot(c.x - x, c.z - z) < c.r + 3.2)) continue;
       if(Math.abs(height(x + 2, z) - height(x - 2, z)) > 1.2 || Math.abs(height(x, z + 2) - height(x, z - 2)) > 1.2) continue;
       spot = {x, z}; }
     if(!spot) continue;
@@ -953,8 +955,10 @@ function pick(e){ mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerH
   for(let k = 0; k < 12; k++){ const m = (a + b) / 2; if(under(m)) b = m; else a = m; }
   return {point: new THREE.Vector3(o.x + dv.x * b, o.y + dv.y * b, o.z + dv.z * b)}; }
 renderer.domElement.addEventListener("contextmenu", e => e.preventDefault());
-// mouse: left click targets, right click attacks / talks / picks up, hold the right button and move the mouse to turn the camera
+// mouse: left click targets, right click attacks / talks / picks up, hold the right button and move the mouse to turn the camera and your character
 const rmb = {down: false, moved: 0, x: 0, y: 0};
+// while you turn with the right button, your character faces where the camera looks (as in WoW)
+const mouseTurn = () => rmb.down && rmb.moved > 4 && running && !(P.dead && !P.ghost) && !P.dash && !P.leap;
 renderer.domElement.addEventListener("pointerdown", e => {
   if(!running) return;
   if(e.button === 2){ rmb.down = true; rmb.moved = 0; rmb.x = e.clientX; rmb.y = e.clientY; renderer.domElement.setPointerCapture(e.pointerId); return; }
@@ -966,7 +970,7 @@ renderer.domElement.addEventListener("pointerdown", e => {
 });
 renderer.domElement.addEventListener("pointermove", e => {
   if(!rmb.down) return; const dx = e.clientX - rmb.x, dy = e.clientY - rmb.y; rmb.x = e.clientX; rmb.y = e.clientY; rmb.moved += Math.abs(dx) + Math.abs(dy);
-  if(rmb.moved > 4){ cam.yaw = cam.yawT = cam.yaw - dx * 0.008; cam.pitch = clamp(cam.pitch + dy * 0.004, 0.45, 1.35); renderer.domElement.style.cursor = "grabbing"; }
+  if(rmb.moved > 4){ cam.yaw = cam.yawT = cam.yaw - dx * 0.008; cam.pitch = clamp(cam.pitch + dy * 0.004, 0.45, 1.35); renderer.domElement.style.cursor = "grabbing"; if(mouseTurn()) P.rot = cam.yawT + Math.PI; }
 });
 renderer.domElement.addEventListener("pointerup", e => {
   if(e.button !== 2 || !rmb.down) return; rmb.down = false; renderer.domElement.style.cursor = "";
@@ -1119,6 +1123,13 @@ function updMovement(dt){
   if(!dir && P.slide && !onIce(P.x, P.z)) P.slide = null;
   else if(P.auto && P.target && G.inMeleeOrRange(P.target)) turnTo(P, P.target.x - P.x, P.target.z - P.z, dt);
   else if(P.casting && P.casting.t) turnTo(P, P.casting.t.x - P.x, P.casting.t.z - P.z, dt);
+  // turning with the right button (as in WoW): face the camera's way and strafe sideways, run diagonally forward facing where you go, back off facing forward
+  P.gait = null;
+  if(mouseTurn()){ const yawF = cam.yawT + Math.PI;
+    if(!(ix || iz) || !P.moving) P.rot = yawF;
+    else if(iz < 0) P.rot = Math.atan2(dir.dx, dir.dz);
+    else if(iz > 0){ P.rot = Math.atan2(-dir.dx, -dir.dz); P.gait = "back"; }
+    else { P.rot = yawF; P.gait = ix > 0 ? "right" : "left"; } }
   return voluntary && P.moving;
 }
 
@@ -1276,6 +1287,11 @@ function drawMinimap(){
   mm.font = "800 14px 'Alegreya Sans', sans-serif"; mm.textAlign = "center";
   for(const n of npcs){ const mk = Q.npcMarker(n.id), [px, py] = to(n.x, n.z); if(Math.hypot(px - c, py - c) > c - 6 || !seen(n.x, n.z)) continue;
     if(mk && mk !== "…"){ mm.fillStyle = "#000"; mm.fillText(mk, px + 1, py + 6); mm.fillStyle = "#ffd84a"; mm.fillText(mk, px, py + 5); } else dot(n.x, n.z, 2, "#e8e0a0"); }
+  // N, E, S and W round the edge, turning with the camera (north is up on the world map)
+  mm.font = "800 12px 'Alegreya Sans', sans-serif"; mm.textBaseline = "middle"; mm.lineWidth = 3; mm.strokeStyle = "rgba(0,0,0,.85)";
+  for(const [t, x, z] of [["N", 0, -1], ["E", 1, 0], ["S", 0, 1], ["W", -1, 0]]){ const r = c - 9, px = c + r * (x * cy - z * sy), py = c + r * (x * sy + z * cy);
+    mm.strokeText(t, px, py); mm.fillStyle = t === "N" ? "#ffd84a" : "#e8e0c8"; mm.fillText(t, px, py); }
+  mm.textBaseline = "alphabetic";
   // you: an arrow pointing the way you face
   mm.translate(c, c); mm.rotate(cam.yaw - P.rot); mm.fillStyle = "#fff"; mm.strokeStyle = "#000"; mm.lineWidth = 1.5;
   mm.beginPath(); mm.moveTo(0, 7); mm.lineTo(5, -5); mm.lineTo(0, -2); mm.lineTo(-5, -5); mm.closePath(); mm.stroke(); mm.fill();
@@ -1372,7 +1388,7 @@ function update(dt){
   if(hero){ P.walk = P.moving ? P.walk + dt * 9 : P.walk * 0.85;
     const pose = P.sitting ? "sit" : P.pose || (P.attackAnim > 0 && P.attackKind === "cast" ? "cast" : null);
     const sk = hero.userData.skinned, lying = P.dead && !P.ghost;
-    hero.userData.animate(P.walk, P.moving, sk || P.attackKind !== "cast" ? P.attackAnim : 0, pose, {kind: P.attackKind, dead: lying, mount: !!P.mount, speed: G.playerSpeed()});
+    hero.userData.animate(P.walk, P.moving, sk || P.attackKind !== "cast" ? P.attackAnim : 0, pose, {kind: P.attackKind, dead: lying, mount: !!P.mount, speed: G.playerSpeed(), gait: P.mount ? null : P.gait});
     hero.position.set(P.x, height(P.x, P.z) + (P.moving && !sk ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(lying && !sk ? -1.4 : 0, P.rot, 0); if(lying && !sk) hero.position.y += 0.3;
   updRaceFx(dt);
     if(P.ghost) hero.position.y += 0.25 + Math.sin(now * 2) * 0.08;                            // a spirit floats

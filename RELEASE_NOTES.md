@@ -7,6 +7,20 @@
   - **Forgot password?** on the login screen sends a link for choosing a new password.
   - Accounts made with only a name still log in with that name. Choose **Add e-mail** on the character screen and click the link in the mail. After that, you log in with the e-mail, and your characters stay the same.
 
+### Changed
+- **Turning with the mouse:** holding the right mouse button and moving the mouse now turns your character as well as the camera, as in WoW. Your arrow on the world map turns with it.
+  - While turning this way, A and D strafe sideways with a side-step run, W with A or D runs diagonally, and S backs off facing forward.
+- **Minimap:** N, E, S and W round the edge show the directions and turn with the camera.
+
+- **Warlock – Imp:** Scorch is gone. The Imp's ability on the pet bar is now **Firebolt**, which you can switch on or off.
+  - Firebolt has a 1.5 sec cast (was 1.6) and deals the same damage as before. Its damage grows with your Intellect.
+- **Pet bar:** pet abilities that are switched on have a glowing ring. The "OFF" label and the "is now on/off" message are gone.
+- **Walking through things:** you can now walk through people, campfires, braziers, poles and small props like barrels and crates. Buildings, tents, walls, fountains, rocks and trees still block the way.
+- **Tooltips:** shorter and cleaner. Pet abilities show their cost, cast time and cooldown on their own line, like other abilities, and instructions such as "Select the friend first" and "Use again to return to normal form" are removed.
+
+### Fixed
+- **Warlock – Imp:** the Imp no longer looks like it shoots twice. Its shooting animation now plays only when the Firebolt leaves.
+
 ## v0.31.0
 
 ### New
