@@ -242,7 +242,7 @@ export const BOSS_MECH = {
 export const KINDS = {};
 for(const [id, d] of Object.entries(MOBS)){ const ru = d.r / 20;
   KINDS[id] = {id, name: d.name, lv: d.lv, make: () => makeModel(id, d), hp: (d.elite ? d.elite * ELITE_HP : 1) * (d.boss ? BOSS_HP : 1) * (d.hpm || 1), dmg: (d.elite ? 1.25 : 1) * (d.passive ? 0.6 : 1) * (d.dmm || 1),
-    speed: d.sp * 0.068, r: ru, reach: 1.4 + ru, elite: !!d.elite, boss: !!d.boss, passive: !!d.passive, dg: !!d.dg,
+    speed: d.sp * 0.068, r: ru, reach: 1.4 + ru, elite: !!d.elite, boss: !!d.boss, passive: !!d.passive, dg: !!d.dg, shape: d.shape,
     ranged: d.ranged ? {range: d.ranged >= 220 ? 12 : 11, color: d.color} : null,
     nova: d.special ? {every: d.special.every, r: d.special.r / 23, warn: d.special.windup, dmg: d.special.mult, name: d.special.name, she: /Queen|Witch/.test(d.name)} : null, mech: BOSS_MECH[id] || null}; }
 // how many of each live in each zone (Rimfrost 1's numbers; the big end zones get more)

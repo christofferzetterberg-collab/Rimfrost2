@@ -1,7 +1,7 @@
 // Key bindings: every action can have two keys. Each character has its own bindings (saved with the character).
 // A key is written like "KeyW", "Digit1" or "Shift+Digit1" (the browser's name for the physical key, plus Shift / Ctrl / Alt).
 export const ACTIONS = [
-  ["Movement", [["up", "Move forward"], ["down", "Move back"], ["left", "Move left"], ["right", "Move right"]]],
+  ["Movement", [["up", "Move forward"], ["down", "Move back"], ["left", "Move left"], ["right", "Move right"], ["jump", "Jump"]]],
   ["Camera", [["zoomIn", "Zoom in"], ["zoomOut", "Zoom out"]]],
   ["Combat", [["attack", "Start / stop attacking"], ["target", "Target nearest enemy"], ["interact", "Talk / pick up"], ["rest", "Rest (sit down)"], ["potHp", "Healing potion"], ["potMana", "Mana potion"], ["mount", "Mount / dismount"], ["chat", "Co-op chat"]]],
   ["Pet", [["petAttack", "Pet: attack your target"], ["petFollow", "Pet: stop attacking and follow"], ["petSkill1", "Pet: switch skill 1 on / off"], ["petSkill2", "Pet: switch skill 2 on / off"], ["petSkill3", "Pet: switch skill 3 on / off"]], ["hunter", "warlock"]],
@@ -15,7 +15,7 @@ export const ACTIONS = [
 const digit = i => "Digit" + ((i + 1) % 10);
 export const DEFAULTS = {
   up: ["KeyW", "ArrowUp"], down: ["KeyS", "ArrowDown"], left: ["KeyA", "ArrowLeft"], right: ["KeyD", "ArrowRight"],
-  zoomIn: ["Equal"], zoomOut: ["Minus"],
+  jump: ["Space"], zoomIn: ["Equal"], zoomOut: ["Minus"],
   attack: ["KeyT"], target: ["Tab"], interact: ["KeyF"], rest: ["KeyX"], potHp: ["KeyH"], potMana: ["KeyG"],
   mount: ["KeyY"], chat: ["Enter"],
   map: ["KeyM"], quests: ["KeyL"], char: ["KeyC"], bag: ["KeyB"], spells: ["KeyP"], tal: ["KeyN"], keys: ["KeyK"], coop: ["KeyO"]

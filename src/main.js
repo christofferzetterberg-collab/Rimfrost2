@@ -291,10 +291,15 @@ function roomySpot(p){ const zone = zoneAt(p.x, p.z);
   for(let rr = 1; rr <= 24; rr++) for(let k = 0; k < 16; k++){ const a = k * Math.PI / 8, x = p.x + Math.cos(a) * rr, z = p.z + Math.sin(a) * rr;
     if(zoneAt(x, z) === zone && !hubAt(x, z) && roomy(x, z) && !blocked(x, z, x, z, 0.7)) return {x, z}; }
   return p; }
+// neutral monsters only fight back when attacked (yellow): peaceful animals everywhere, and every low-level animal in the starting zones
+const NEUTRAL_KINDS = new Set(["boar", "rocksvin", "bristle", "lynx", "beetle", "rat", "tidecrab"]);
+function isNeutral(K, p, lvl){ if(K.boss || K.elite || K.dg || K.passive) return false; if(NEUTRAL_KINDS.has(K.id)) return true;
+  const z = ZONES[zoneAt(p.x, p.z)]; return !!(z && z.race && z.lv[0] === 1 && lvl <= 5 && ["wolf", "boar", "spider", "critter"].includes(K.shape)); }
 function makeMob(kind, p, lvl, r){ const K = KINDS[kind]; if(!roomy(p.x, p.z)) p = roomySpot(p);
   const m = withPx({kind, K, name: K.name, lvl, elite: K.elite, boss: K.boss, dg: K.dg, novaT: K.nova ? K.nova.every : 0, nova: null, x: p.x, z: p.z, hx: p.x, hz: p.z, rot: r() * 6.28, r: K.r, mesh: K.make(), walk: 0, moving: false,
     maxHp: Math.round((30 + lvl * 18 + lvl * lvl * 1.2) * K.hp * (K.dg ? DG_HP : 1)), dmg: (3 + lvl * 2.4) * K.dmg * (K.dg ? DG_DMG : 1), state: "idle", dead: false, wanderT: r() * 4, wx: null, wz: null, atkT: 1, attackAnim: 0, lastHit: 0, deadT: 0, flash: 0,
     dots: [], slowT: 0, slowPct: 0, rootT: 0, stunT: 0, path: null, inScene: false});
+  m.neutral = isNeutral(K, p, lvl);
   m.nid = mobs.length; m.hp = m.maxHp; m.baseHp = m.maxHp; m.baseDmg = m.dmg; m.scaleN = 1; m.mesh.traverse(o => { if(o.isMesh) o.userData.mob = m; }); mobs.push(m); return m; }   // nid: the same number on every computer in co-op
 { const r = rng(99), lvlOf = K => K.lv[0] + Math.floor(r() * (K.lv[1] - K.lv[0] + 1));
   // in the starting zones a monster's level grows with its distance from the town, so the lowest ones are closest
@@ -1035,6 +1040,7 @@ function doAction(a, e){
     const n = nearestUsable(USE_RANGE); if(n) useThing(n); else err("Nothing to interact with"); }
   else if(a === "potHp") G.usePotion("hp"); else if(a === "potMana") G.usePotion("mana");
   else if(a === "map") toggleMap();
+  else if(a === "jump") G.jump();
   else if(a === "petAttack"){ if(G.PET_CLASSES.has(S.cur.cls)) G.petAttackCmd(); } else if(a === "petFollow"){ if(G.PET_CLASSES.has(S.cur.cls)) G.petFollowCmd(); }
   else if(a === "formBear" || a === "formCat" || a === "formTravel"){ const f = FORMS.find(x => x[1] === a); if(S.cur.cls === "druid" && f && S.cur.learned.includes(f[0])) G.tryUse(f[0]); }
   else if(a === "mount") toggleMount();
@@ -1112,7 +1118,26 @@ function endAim(){ if(!aim) return; scene.remove(aim.mesh); aim.mesh.traverse(o 
 function moveAim(cx, cy){ if(!aim) return; const p = groundAt(cx, cy); if(!p){ aim.mesh.visible = false; return; } aim.mesh.visible = true; aim.p = p;
   aim.mesh.position.set(p.x, height(p.x, p.z) + 0.15, p.z); const far = Math.hypot(p.x - P.x, p.z - P.z) * PXU > AB[aim.id].range;
   aim.mesh.children.forEach(m => m.material.color.set(far ? "#ff5a4f" : (SCHOOL_COLOR[AB[aim.id].school] || "#ffffff"))); }
-renderer.domElement.addEventListener("pointermove", e => { aimMouse = {x: e.clientX, y: e.clientY}; moveAim(e.clientX, e.clientY); });
+renderer.domElement.addEventListener("pointermove", e => { aimMouse = {x: e.clientX, y: e.clientY}; moveAim(e.clientX, e.clientY); hovMouse = aimMouse; if(performance.now() - hovPickT > 60) hoverPick(); else if(hov) updHover(); });
+renderer.domElement.addEventListener("pointerleave", () => { hovMouse = null; setHover(null); });
+// hovering over a monster or a person: a short tooltip (name, level, health / title), and a sword cursor on enemies
+const SWORD_CURSOR = `url("data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><g stroke-linecap="round"><path d="M3 3 L17 17" stroke="#140d06" stroke-width="5"/><path d="M3 3 L17 17" stroke="#eef0f2" stroke-width="2.6"/><path d="M13 20 L20 13" stroke="#140d06" stroke-width="5"/><path d="M13 20 L20 13" stroke="#d8a84a" stroke-width="2.6"/><path d="M18 18 L25 25" stroke="#140d06" stroke-width="5"/><path d="M18 18 L25 25" stroke="#7a5230" stroke-width="2.6"/></g></svg>')}") 3 3, pointer`;
+let hov = null, hovMouse = null, hovPickT = 0, hovTick = 0;
+function hoverPick(){ hovPickT = performance.now();
+  if(!hovMouse || !running || aim || rmb.down || lmb.down) return setHover(null);
+  const h = pick({clientX: hovMouse.x, clientY: hovMouse.y});
+  setHover(h && h.mob && !h.mob.dead ? {mob: h.mob} : h && h.use && npcs.includes(h.use) && !P.ghost ? {npc: h.use} : null); }
+function setHover(h){ const was = hov; hov = h; const el = $("htip"); const cv = renderer.domElement;
+  if(!h){ el.hidden = true; if(was && !aim && !rmb.down && !lmb.down) cv.style.cursor = ""; return; }
+  el.hidden = false; if(!aim && !rmb.down && !lmb.down) cv.style.cursor = h.mob ? SWORD_CURSOR : "pointer"; updHover(); }
+function updHover(){ if(!hov || !hovMouse) return; const el = $("htip");
+  if(hov.mob){ const m = hov.mob; if(m.dead) return setHover(null); const pct = Math.max(0, Math.min(100, m.hp / m.maxHp * 100));
+    const neu = m.neutral || m.K.passive;
+    el.innerHTML = `<b style="color:${neu ? "#f3dc55" : "#ff6b5e"}">${esc(m.name)}</b><div><span style="color:${lvlColor(m.lvl)}">Level ${m.lvl}${m.boss ? " · Boss" : m.elite ? " · Elite" : ""}</span> <span class="muted">· ${neu ? "Neutral" : "Hostile"}</span></div><div class="hb"><i style="width:${pct}%"></i></div><small>${Math.max(0, Math.ceil(m.hp))} / ${m.maxHp}</small>`; }
+  else { const n = hov.npc; el.innerHTML = `<b style="color:#7be08a">${esc(n.name)}</b>${n.title ? `<div class="muted">&lt;${esc(n.title)}&gt;</div>` : ""}`; }
+  el.style.left = Math.min(innerWidth - el.offsetWidth - 8, hovMouse.x + 18) + "px"; el.style.top = Math.min(innerHeight - el.offsetHeight - 8, hovMouse.y + 20) + "px"; }
+// (every frame: keep the health up to date; now and then look again, in case the monster walked away from under the mouse)
+function hoverFrame(dt){ if(hov) updHover(); if((hovTick += dt) > 0.25){ hovTick = 0; if(hovMouse) hoverPick(); } }
 // mouse: left click targets, right click attacks / talks / picks up, hold the right button and move the mouse to turn the camera and your character
 const rmb = {down: false, moved: 0, x: 0, y: 0}, lmb = {down: false, moved: 0, x: 0, y: 0};   // right button: turns you and the camera; left button: only the camera
 // while you turn with the right button, your character faces where the camera looks (as in WoW)
@@ -1162,7 +1187,8 @@ function updMob(m, dt){
   if(m.state === "idle"){
     m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.1 * dt);
     if(m.far) return;                                                                        // nobody near: it just stands there
-    if(!m.K.passive) for(const c of CO.cands(m)){ const range = clamp(9 + (m.lvl - (c.pet ? S.cur.level : c.lvl)) * 1.2, 5, 13) * (c.pet ? 0.7 : 1) * (nightNow ? 0.85 : 1) * (c.stealth ? 0.4 : 1);   // harder to see you at night, much harder in Stealth
+    if(!m.K.passive && !m.neutral) for(const c of CO.cands(m)){ if(!m.dg && (c.pet ? S.cur.level : c.lvl) - m.lvl >= 6) continue;   // (grey monsters, far below you, leave you alone)
+      const range = clamp(9 + (m.lvl - (c.pet ? S.cur.level : c.lvl)) * 1.2, 5, 13) * (c.pet ? 0.7 : 1) * (nightNow ? 0.85 : 1) * (c.stealth ? 0.4 : 1);   // harder to see you at night, much harder in Stealth
       if(distU(m, c.e) < range && sees(m, c.e)){ if(c.me && P.buffs.stealth){ G.breakStealth(); log(`${m.name} has discovered you!`, "#ff9a7a"); } G.aggro(m); G.social(m); if(CO.coopMob(m)){ m.threat = m.threat || {}; m.threat[c.id] = (m.threat[c.id] || 0) + 1; } if(c.me) log(`${m.name} attacks you!`, "#ff9a7a"); return; } }
     m.wanderT -= dt; if(m.wanderT <= 0){ m.wanderT = 3 + Math.random() * 5; const a = Math.random() * 6.28, d = Math.random() * 5; m.wx = m.hx + Math.cos(a) * d; m.wz = m.hz + Math.sin(a) * d; }
     if(m.wx != null){ const dx = m.wx - m.x, dz = m.wz - m.z, d = Math.hypot(dx, dz); if(d < 0.3) m.wx = null; else { if(tryMove(m, dx / d * 1.6 * dt, dz / d * 1.6 * dt)) m.moving = true; else m.wx = null; turnTo(m, dx, dz, dt, 6); } }
@@ -1270,7 +1296,7 @@ function separate(){ const act = mobs.filter(m => m.state === "chase");
 
 // ---------------------------------------------------------------- the player moving
 function updMovement(dt){
-  P.moving = false; let voluntary = false;
+  P.moving = false; let voluntary = false; G.updJump(dt);
   if(P.flying){ flyStep(dt); return false; }
   if(P.ghost) P.combatT = 0;                                                                // a spirit is never in combat
   if(P.dead && !P.ghost) return false;                                                       // (a spirit can walk)
@@ -1452,7 +1478,7 @@ function updHUD(dt){
   for(const m of mobs){ const p = plateFor(m), qm = questMob(m), near = !m.dead && distU(P, m) < (P.ghost ? GHOST_SIGHT : qm ? 40 : 26);
     if(!near){ p.style.display = "none"; continue; } const s = toScreen(m.x, height(m.x, m.z) + m.mesh.userData.height + 0.3, m.z); if(!s.on){ p.style.display = "none"; continue; }
     p.style.display = ""; p.style.left = s.x + "px"; p.style.top = s.y + "px"; const sp = p.firstChild; sp.textContent = `${m.name} (${m.lvl}${m.boss ? " Boss" : m.elite ? " Elite" : ""})`; sp.style.color = lvlColor(m.lvl);
-    p.lastChild.style.display = (m.hp < m.maxHp || m === P.target) ? "" : "none"; p.lastChild.firstChild.style.width = (m.hp / m.maxHp * 100) + "%"; p.classList.toggle("sel", m === P.target); p.classList.toggle("q", qm); }
+    p.lastChild.style.display = (m.hp < m.maxHp || m === P.target) ? "" : "none"; p.lastChild.firstChild.style.width = (m.hp / m.maxHp * 100) + "%"; p.classList.toggle("neutral", !!(m.neutral || m.K.passive)); p.classList.toggle("sel", m === P.target); p.classList.toggle("q", qm); }
 }
 
 // ---------------------------------------------------------------- minimap: turns with the camera, so up is always the way W walks
@@ -1604,10 +1630,10 @@ function update(dt){
   }
   // the hero
   if(hero){ P.walk = P.moving ? P.walk + dt * 9 : P.walk * 0.85;
-    const pose = P.sitting || (P.flying && !P.flying.ship) ? "sit" : P.pose || (P.attackAnim > 0 && P.attackKind === "cast" ? "cast" : null);
+    const pose = P.sitting || (P.flying && !P.flying.ship) ? "sit" : P.jumpY > 0.05 && !P.mount && !P.flying && !P.dead ? "jump" : P.pose || (P.attackAnim > 0 && P.attackKind === "cast" ? "cast" : null);
     const sk = hero.userData.skinned, lying = P.dead && !P.ghost;
     hero.userData.animate(P.walk, P.moving, sk || P.attackKind !== "cast" ? P.attackAnim : 0, pose, {kind: P.attackKind, dead: lying, mount: !!P.mount || (!!P.flying && !P.flying.ship), speed: G.playerSpeed(), gait: P.mount ? null : P.gait});
-    hero.position.set(P.x, height(P.x, P.z) + (P.moving && !sk ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(lying && !sk ? -1.4 : 0, P.mount ? mountYaw() : P.rot, 0); if(lying && !sk) hero.position.y += 0.3;
+    hero.position.set(P.x, height(P.x, P.z) + (P.moving && !sk ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(lying && !sk ? -1.4 : 0, P.mount ? mountYaw() : P.rot, 0); if(lying && !sk) hero.position.y += 0.3; hero.position.y += P.jumpY || 0;
   updRaceFx(dt); updProcs(dt);
     if(P.ghost) hero.position.y += 0.25 + Math.sin(now * 2) * 0.08;                            // a spirit floats
     if(flightMesh && P.flying && P.flying.ship){ const t = P.flying.t || 0, bob = Math.sin(t * 1.3) * 0.12, roll = Math.sin(t * 0.9) * 0.05 + P.flying.bank * 0.4, pitch = Math.sin(t * 1.1 + 1) * 0.03;
@@ -1615,7 +1641,7 @@ function update(dt){
       hero.position.set(P.x - Math.sin(P.rot) * 1.5, P.fy + bob, P.z - Math.cos(P.rot) * 1.5); hero.rotation.set(0, P.rot, roll, "YXZ"); }
     else if(flightMesh && P.flying){ flightMesh.position.set(P.x, P.fy, P.z); flightMesh.rotation.set(FLY_PITCH, P.rot, P.flying.bank, "YXZ"); flightMesh.userData.animate(0, true, 0);
       const sd = flightMesh.userData.saddle; hero.position.set(P.x + Math.sin(P.rot) * FLY_SEAT, P.fy + sd - 0.5, P.z + Math.cos(P.rot) * FLY_SEAT); hero.rotation.set(FLY_PITCH * 0.6, P.rot, P.flying.bank * 0.8, "YXZ"); }
-    else if(mountMesh){ const gy = height(P.x, P.z); mountMesh.position.set(P.x, gy, P.z); mountMesh.rotation.y = hero.rotation.y; mountMesh.userData.animate(P.walk * 0.75, P.moving, 0); hero.position.y = gy + mountMesh.userData.saddle - 0.38 + (P.moving ? Math.abs(Math.sin(P.walk * 0.75)) * 0.08 : 0); } }
+    else if(mountMesh){ const gy = height(P.x, P.z); mountMesh.position.set(P.x, gy + (P.jumpY || 0), P.z); mountMesh.rotation.y = hero.rotation.y; mountMesh.userData.animate(P.walk * 0.75, P.moving, 0); hero.position.y = gy + (P.jumpY || 0) + mountMesh.userData.saddle - 0.38 + (P.moving ? Math.abs(Math.sin(P.walk * 0.75)) * 0.08 : 0); } }
   // monsters: only the ones near you (or a friend) are drawn and move about
   { const rs = CO.visible(), reg0 = curDungeon();
     for(const m of mobs){ const d = Math.hypot(m.x - P.x, m.z - P.z), dr = rs.length ? Math.min(...rs.map(r => Math.hypot(m.x - r.x, m.z - r.z))) : 1e9;
@@ -1694,7 +1720,7 @@ function update(dt){
 function loop(t){
   const dt = Math.max(0, Math.min(0.05, (t - last) / 1000)); last = Math.max(last, t);   // (the first frame can report a time from before the world was built)
   if(DEV.sim){ requestAnimationFrame(loop); return; }                       // the balance test runs the game on its own
-  update(dt); updHUD(dt); if(running) drawMinimap(); if(!$("bigmap").hidden) drawBigMap(); { const far = Math.max(60, scene.fog.far + 12); if(Math.abs(camera.far - far) > 2){ camera.far = far; camera.updateProjectionMatrix(); } }   // nothing past the fog is drawn
+  update(dt); updHUD(dt); hoverFrame(dt); if(running) drawMinimap(); if(!$("bigmap").hidden) drawBigMap(); { const far = Math.max(60, scene.fog.far + 12); if(Math.abs(camera.far - far) > 2){ camera.far = far; camera.updateProjectionMatrix(); } }   // nothing past the fog is drawn
   renderer.render(scene, camera);
   frames++; fpsT += dt; if(fpsT > 1){ fpsEl.textContent = frames + " fps"; frames = 0; fpsT = 0; }
   requestAnimationFrame(loop);

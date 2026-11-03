@@ -1,5 +1,15 @@
 # Rimfrost 2 – Release notes
 
+## v0.38.0
+
+### New
+- **Neutral monsters:** some monsters only fight back when you attack them, and don't bring their friends along. Their health bar is yellow and the tooltip says "Neutral".
+  - Peaceful animals are always neutral: boars, Crag Boars, Bristleboars, Forest Foxes, Stone Beetles, Grave Rats and Tidecrawlers.
+  - In the starting zones, every animal up to level 5 is neutral too, so the area around each home town is calmer.
+- **Grey monsters,** six or more levels below you, no longer attack you on sight.
+- **Hover tooltips:** pointing at a monster shows its name, level and health, and the cursor turns into a sword. Pointing at a person shows their name and title.
+- **Jumping:** press Space to jump. In the air you get over low rocks and short, steep bumps. Houses, trees, cliffs and big rocks still block the way. The key can be changed in Key bindings (K).
+
 ## v0.37.1
 
 ### Changed

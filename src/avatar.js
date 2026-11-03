@@ -140,6 +140,7 @@ export function makeAvatar(race, cls, eq = {}, look = null){
     prevAtk = attack;
     const busy = over && t < overEnd;
     if(o.dead) setBase("Death_A", null, 0.2, true);
+    else if(pose === "jump" && act("Jump_Idle")) setBase("Jump_Idle", null, 0.1);
     else if(pose === "sit") setBase(o.mount ? "Sit_Chair_Idle" : "Sit_Floor_Idle", null, 0.3);
     else if(pose === "cast") setBase("Ranged_Magic_Spellcasting", moving ? "upper" : null, 0.15);
     else if(pose === "bow") setBase("Ranged_Bow_Aiming_Idle", moving ? "upper" : null, 0.15);

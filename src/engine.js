@@ -30,18 +30,27 @@ export function withPx(o){ Object.defineProperties(o, {px: {get(){ return this.x
 
 // ---------------------------------------------------------------- moving and colliding (you and the monsters)
 export const MAX_UP = 1.1, MAX_DOWN = 1.8;          // steepest slope you, pets and monsters can walk up / down (height per unit)
-export function blocked(x, z, fromX, fromZ, r){
+export function blocked(x, z, fromX, fromZ, r, hop = 0){                             // hop: how high you are in a jump
+  const air = hop > 0.2;
   if(x > 500) return fromX < 500 || dgBlocked(x, z, r);                                    // inside the crypt: only its walls
   if(x < B.x0 + 4 || x > B.x1 - 4 || z < B.z0 + 4 || z > B.z1 - 4) return true;
   if(height(x, z) < WATER + 0.1) return true;                                              // no swimming yet
-  const step = Math.hypot(x - fromX, z - fromZ); if(step > 0.001){ const sl = (height(x, z) - height(fromX, fromZ)) / step; if(sl > MAX_UP || sl < -MAX_DOWN) return true; }   // too steep to climb (you can go down steeper slopes than up)
-  for(const c of nearColliders(x, z)){ const dx = x - c.x, dz = z - c.z; if(dx*dx + dz*dz < (c.r + r) ** 2) return true; }
+  const step = Math.hypot(x - fromX, z - fromZ); if(step > 0.001){ const sl = (height(x, z) - height(fromX, fromZ)) / step; if(sl > MAX_UP * (air ? 2 : 1) || sl < -MAX_DOWN) return true; }   // (a jump gets you up a short, steeper bump)   // too steep to climb (you can go down steeper slopes than up)
+  for(const c of nearColliders(x, z)){ const dx = x - c.x, dz = z - c.z, rr = (c.r + r) ** 2; if(dx*dx + dz*dz >= rr) continue;
+    if(air && c.h && c.h < hop + 0.5) continue;                                                // jumping over a low rock
+    const ox = fromX - c.x, oz = fromZ - c.z; if(ox*ox + oz*oz < rr && dx*dx + dz*dz >= ox*ox + oz*oz) continue;   // already inside it (landed on it): you can always step out
+    return true; }
   return false;
 }
-export function tryMove(e, dx, dz){ const nx = e.x + dx, nz = e.z + dz;
-  if(!blocked(nx, nz, e.x, e.z, e.r)){ e.x = nx; e.z = nz; return true; }
-  if(!blocked(nx, e.z, e.x, e.z, e.r)){ e.x = nx; return true; }                          // slide along walls
-  if(!blocked(e.x, nz, e.x, e.z, e.r)){ e.z = nz; return true; }
+// jumping (Space): up and down again in about 0.7 sec; in the air you get over low rocks and short steep bumps
+export function jump(){ if((P.dead && !P.ghost) || P.flying || P.jumpY > 0) return;
+  if(P.sitting) standUp(); if(P.casting && P.casting.kind !== "mount") cancelCast("Interrupted – you jumped");
+  P.jumpV = 5.6; P.jumpY = 0.001; }
+export function updJump(dt){ if(!(P.jumpY > 0)) return; P.jumpY += P.jumpV * dt; P.jumpV -= 16 * dt; if(P.jumpY <= 0){ P.jumpY = 0; P.jumpV = 0; } }
+export function tryMove(e, dx, dz){ const nx = e.x + dx, nz = e.z + dz, hop = e.jumpY || 0;
+  if(!blocked(nx, nz, e.x, e.z, e.r, hop)){ e.x = nx; e.z = nz; return true; }
+  if(!blocked(nx, e.z, e.x, e.z, e.r, hop)){ e.x = nx; return true; }                    // slide along walls
+  if(!blocked(e.x, nz, e.x, e.z, e.r, hop)){ e.z = nz; return true; }
   return false; }
 
 // ---------------------------------------------------------------- stats
@@ -218,7 +227,7 @@ export function resetPlayer(x, z){
 export const aggroRange = m => clamp(9 + (m.lvl - C().level) * 1.2, 5, 13);
 export function aggro(m){ if(m.state !== "chase"){ m.state = "chase"; m.path = null; } m.lastHit = H.now(); }
 export function engage(m){ if(CO.guestMob(m)){ P.combatT = 6; return; } if(m && !m.dead && m.state === "idle"){ aggro(m); social(m); } if(CO.isMe()) P.combatT = 6; }
-export function social(m){ if(m.K && (m.K.passive || m.boss)) return; for(const o of mobs) if(o !== m && !(o.K && o.K.passive) && !o.dead && o.state === "idle" && (o.kind === m.kind || (m.dg && o.dg && !o.boss)) && distU(o, m) < 7) aggro(o); }   // (in dungeons a whole pack joins in, whatever its kinds)
+export function social(m){ if(m.K && (m.K.passive || m.boss) || m.neutral) return; for(const o of mobs) if(o !== m && !(o.K && o.K.passive) && !o.neutral && !o.dead && o.state === "idle" && (o.kind === m.kind || (m.dg && o.dg && !o.boss)) && distU(o, m) < 7) aggro(o); }   // (in dungeons a whole pack joins in, whatever its kinds)
 const lvlPenalty = m => { const d = m.lvl - C().level; return d > 0 ? Math.max(0.5, 1 - 0.06 * d) : 1; };
 export function hit(m, base, school, ab){
   if(!m || m.dead) return null;
