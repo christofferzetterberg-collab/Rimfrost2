@@ -3,6 +3,8 @@
 ## v0.38.0
 
 ### New
+- Druids learn Feral Charge at level 12: in Bear Form, charge an enemy, stun it for 1 sec and gain 15 rage.
+- New bear model with its own walk, run, attack and death animations, used for Bear Form, the bear pet, the Ice Bear and the Plague Bear.
 - Druids learn Thorns at level 8: melee attackers take Nature damage each time they hit you. Lasts 10 min.
 - **Auto-logout:** after 10 minutes without using the keyboard or mouse, your characters are saved and you are logged out. A warning comes one minute before.
 - **Remember my e-mail:** a box on the login screen fills in your e-mail next time, so you only type your password.

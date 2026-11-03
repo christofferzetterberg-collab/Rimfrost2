@@ -5,14 +5,15 @@ import {load, build} from "./glb.js";
 
 const A = "./assets/animals/";
 const FILES = ["wolf2", "cat", "fox", "deer", "stag", "bear", "boar", "beetle", "hare", "scorpion", "spider", "rat", "dragon", "goblin", "horse"];
+const GLB = new Set(["bear"]);                                              // our own models, saved as .glb
 const FACE_Z = new Set(["spider", "dragon", "goblin"]);                    // models whose nose already points to +z (wide legs or wings)
 const assets = {}; let READY = false;
-export async function preloadBeasts(){ const got = await Promise.all(FILES.map(n => load(A + n + ".gltf"))); FILES.forEach((n, i) => assets[n] = got[i]); READY = true; }
+export async function preloadBeasts(){ const got = await Promise.all(FILES.map(n => load(A + n + (GLB.has(n) ? ".glb" : ".gltf")))); FILES.forEach((n, i) => assets[n] = got[i]); READY = true; }
 
 // the animations each file has (move: when walking or running, hit: an attack, played once)
 const CLIPS = {wolf2: {idle: "Idle", move: "Gallop", hit: "Attack", death: "Death", speed: 1.1}, fox: {idle: "Idle", move: "Gallop", hit: "Attack", death: "Death", speed: 1.1},
   deer: {idle: "Idle", move: "Gallop", hit: "Attack_Headbutt", death: "Death", speed: 1}, stag: {idle: "Idle", move: "Gallop", hit: "Attack_Headbutt", death: "Death", speed: 1}, cat: {idle: "Idle", move: "Walking", speed: 1.7},
-  bear: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1}, boar: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1.2},
+  bear: {idle: "Idle", move: "Walk", run: "Run", hit: "Attack", death: "Death", speed: 1}, boar: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1.2},
   beetle: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1.3}, hare: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1},
   scorpion: {idle: "Idle", move: "Walk", hit: "Attack", death: "Death", speed: 1.2}, spider: {idle: "Spider_Idle", move: "Spider_Walk", hit: "Spider_Attack", death: "Spider_Death", speed: 1.3},
   rat: {idle: "Rat_Idle", move: "Rat_Run", hit: "Rat_Attack", death: "Rat_Death", speed: 1}, dragon: {idle: "Dragon_Flying", move: "Dragon_Flying", hit: "Dragon_Attack", death: "Dragon_Death", speed: 1},
@@ -21,7 +22,7 @@ const CLIPS = {wolf2: {idle: "Idle", move: "Gallop", hit: "Attack", death: "Deat
 const KINDS = {
   petWolf:  {file: "wolf2", len: 2.2, col: {Main: 0x7a6650, Main_Light: 0xb8a68a}},
   wolfForm: {file: "wolf2", len: 2.5, col: {Main: 0x4c5662, Main_Light: 0x8e99a4}, race: {elf: {Main: 0xc9cfd8, Main_Light: 0xf2f4f7}}},
-  bearForm: {file: "bear", len: 2.7}, petBear: {file: "bear", len: 2.4},
+  bearForm: {file: "bear", len: 2.7, run: true}, petBear: {file: "bear", len: 2.4, run: true},
   leopard:  {file: "cat", len: 2.6, col: {Grey: 0xc99a3c, White: 0xefe0b8, Pink: 0x4a3226}, race: {elf: {Grey: 0xdedad0, White: 0xf6f3ec, Pink: 0x5a5660}}},
 };
 const matCache = new Map();
@@ -43,7 +44,7 @@ export function makeAnimal(kind, race){
   model.scale.setScalar(s); model.position.set(-(b.min.x + b.max.x) / 2 * s, -b.min.y * s, -(b.min.z + b.max.z) / 2 * s);
   inner.add(model); inner.rotation.y = alongX ? -Math.PI / 2 : 0; g.add(inner);
   const mixer = new THREE.AnimationMixer(model), clip = n => asset.clips.find(c => c.name === n);
-  const idle = mixer.clipAction(clip(C.idle)), moveA = mixer.clipAction(clip(C.move)), hitA = C.hit && clip(C.hit) ? mixer.clipAction(clip(C.hit)) : null, dieA = C.death && clip(C.death) ? mixer.clipAction(clip(C.death)) : null;
+  const idle = mixer.clipAction(clip(C.idle)), moveA = mixer.clipAction(clip(K.run && C.run ? C.run : C.move)), hitA = C.hit && clip(C.hit) ? mixer.clipAction(clip(C.hit)) : null, dieA = C.death && clip(C.death) ? mixer.clipAction(clip(C.death)) : null;
   idle.play(); moveA.play(); moveA.setEffectiveWeight(0); moveA.timeScale = C.speed;
   if(hitA){ hitA.setLoop(THREE.LoopOnce); hitA.clampWhenFinished = false; } if(dieA){ dieA.setLoop(THREE.LoopOnce); dieA.clampWhenFinished = true; }
   let w = 0, last = performance.now(), prevAtk = 0, dead = false;
@@ -70,7 +71,7 @@ const darker = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();
 export function makeMobAnimal(file, len, color, opts = {}){
   if(!READY || !assets[file]) return null;
   const c = color, col = c == null ? {} : file === "fox" ? {Main: c, Main_Light: lighter(c, 0.5)} : file === "spider" ? {Material: darker(c, 0.7)} : file === "scorpion" ? {"1A1A1A": c}
-    : file === "dragon" ? {Main: c, Belly: lighter(c, 0.45), Wings: darker(c, 0.55)} : file === "wolf2" ? {Main: c, Main_Light: lighter(c, 0.45)} : {"*": opts.flat ? c : lighter(c, 0.35)};
+    : file === "dragon" ? {Main: c, Belly: lighter(c, 0.45), Wings: darker(c, 0.55)} : file === "wolf2" ? {Main: c, Main_Light: lighter(c, 0.45)} : file === "bear" ? {Fur: c, FurDark: darker(c, 0.8), Muzzle: lighter(c, 0.4), EarInner: darker(c, 0.9)} : {"*": opts.flat ? c : lighter(c, 0.35)};
   return makeAnimal({file, len, col, height: opts.height, flat: opts.flat});
 }
 
