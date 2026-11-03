@@ -15,6 +15,7 @@
 - **Jumping:** press Space to jump. A running jump carries you forward in the direction you ran (you can't steer in the air); a jump from standing goes straight up, and pressing a direction key while in the air drifts you a little that way. In the air you get over low rocks and short, steep bumps. Houses, trees, cliffs and big rocks still block the way. The key can be changed in Key bindings (K).
 
 ### Fixed
+- The rogue's right-hand dagger is no longer held upside down.
 - The boar's snout no longer flaps up and down when it walks.
 - The loading bar now follows the real download size of the models and keeps moving while the world is built.
 - Quest objects that look like herbs (and other quest pick-ups) only appear while one of your quests needs them, so you no longer find things you can't pick up.
