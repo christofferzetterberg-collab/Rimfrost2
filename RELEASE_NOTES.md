@@ -8,7 +8,12 @@
   - In the starting zones, every animal up to level 5 is neutral too, so the area around each home town is calmer.
 - **Grey monsters,** six or more levels below you, no longer attack you on sight.
 - **Hover tooltips:** pointing at a monster shows its name, level and health, and the cursor turns into a sword. Pointing at a person shows their name and title.
-- **Jumping:** press Space to jump. In the air you get over low rocks and short, steep bumps. Houses, trees, cliffs and big rocks still block the way. The key can be changed in Key bindings (K).
+- **Both mouse buttons:** holding the left and right mouse buttons together walks you forward, as in WoW.
+- **Jumping:** press Space to jump. A running jump carries you forward in the direction you ran (you can't steer in the air); a jump from standing goes straight up, and pressing a direction key while in the air drifts you a little that way. In the air you get over low rocks and short, steep bumps. Houses, trees, cliffs and big rocks still block the way. The key can be changed in Key bindings (K).
+
+### Fixed
+- **Only one browser at a time:** logging in on a new browser now logs out any other browser that is still open, so an old window can no longer overwrite your characters with older progress.
+- Pressing the left and right mouse buttons at the same time no longer leaves the camera stuck turning.
 
 ## v0.37.1
 

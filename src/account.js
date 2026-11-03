@@ -43,17 +43,26 @@ export async function addEmail(newEmail){ const t = await token(); await post(AU
 // log back in with the session saved in this browser
 export async function resume(){ let s = null; try{ s = JSON.parse(localStorage.getItem(SESSION)); }catch(e){} if(!s || !s.refresh) return false;
   try{ await refresh(s.refresh, s.name, s.email || toMail(s.name || "")); return true; }catch(e){ try{ localStorage.removeItem(SESSION); }catch(_){} return false; } }
-export function logOut(){ sess = null; try{ localStorage.removeItem(SESSION); }catch(e){} }
+export function logOut(){ sess = null; SID = null; kicked = false; try{ localStorage.removeItem(SESSION); }catch(e){} }
 async function token(){ const s = sess; if(s && Date.now() / 1000 > s.exp - 60) await refresh(s.refresh, s.name, s.email); return s ? s.token : (sess && sess.token); }
 // the save is one document per player (saves/<player id>) holding {chars, world} as text
 const DOC = (uid = sess.uid) => `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents/saves/${uid}`;
 export async function loadCloud(){ const t = await token(), r = await fetch(DOC(), {headers: {Authorization: "Bearer " + t}});
   if(r.status === 404) return null; if(!r.ok) throw new Error("Could not load your characters");
   const j = await r.json(); try{ return JSON.parse(j.fields.data.stringValue); }catch(e){ return null; } }
-// saves go out one after another, in order
+// one browser at a time: logging in writes a new session code to the save; a browser whose code has been replaced stops saving and is logged out
+let SID = null, kicked = false, onKick = null;
+export const setOnKick = f => { onKick = f; };
+export async function claimSession(){ SID = Math.random().toString(36).slice(2) + Date.now().toString(36); kicked = false; const t = await token();
+  await fetch(DOC() + "?updateMask.fieldPaths=sid", {method: "PATCH", headers: {Authorization: "Bearer " + t, "Content-Type": "application/json"}, body: JSON.stringify({fields: {sid: {stringValue: SID}}})}); }
+// is this still the browser that logged in last? (if the server can't be reached, carry on)
+export async function checkSession(){ if(!sess || !SID || kicked) return !kicked; try{ const t = await token(), r = await fetch(DOC() + "?mask.fieldPaths=sid", {headers: {Authorization: "Bearer " + t}});
+    if(!r.ok) return true; const j = await r.json(), cur = j.fields && j.fields.sid && j.fields.sid.stringValue;
+    if(cur && cur !== SID){ kicked = true; if(onKick) onKick(); return false; } }catch(e){} return true; }
+// saves go out one after another, in order (only the fields they change, so the session code stays)
 let chain = Promise.resolve();
-export function saveCloud(data, keepalive = false){ if(!sess) return chain; const uid = sess.uid;
-  chain = chain.then(async () => { try{ const t = await token(); const r = await fetch(DOC(uid), {method: "PATCH", keepalive, headers: {Authorization: "Bearer " + t, "Content-Type": "application/json"},
+export function saveCloud(data, keepalive = false){ if(!sess || kicked) return chain; const uid = sess.uid;
+  chain = chain.then(async () => { try{ if(!keepalive && !(await checkSession())) return; const t = await token(); const r = await fetch(DOC(uid) + "?updateMask.fieldPaths=data&updateMask.fieldPaths=at", {method: "PATCH", keepalive, headers: {Authorization: "Bearer " + t, "Content-Type": "application/json"},
       body: JSON.stringify({fields: {data: {stringValue: JSON.stringify(data)}, at: {timestampValue: new Date().toISOString()}}})}); if(!r.ok) console.warn("Cloud save failed:", r.status); }
     catch(e){ console.warn("Cloud save failed:", e); } });
   return chain; }

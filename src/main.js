@@ -339,9 +339,13 @@ const cloudData = () => { let w = null; try{ w = JSON.parse(localStorage.getItem
 let cloudT = 0;
 function cloudSoon(){ if(!ACC.accountId()) return; const now = Date.now(); if(now - cloudT > 15000){ cloudT = now; ACC.saveCloud(cloudData()); } else if(!cloudSoon.t) cloudSoon.t = setTimeout(() => { cloudSoon.t = null; cloudT = Date.now(); ACC.saveCloud(cloudData()); }, 15000 - (now - cloudT)); }
 addEventListener("pagehide", () => { if(ACC.accountId()){ save(); ACC.saveCloud(cloudData(), true); } });
+// logged in from another browser: this one stops at once, without saving, so it can't overwrite the newer progress
+ACC.setOnKick(() => { try{ CO.leave(true); }catch(e){} running = false; ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin();
+  $("lerr").textContent = "You logged in from another browser, so you were logged out here. Nothing was saved from this window."; });
+setInterval(() => { if(ACC.accountId()) ACC.checkSession(); }, 20000);
 // each account has its own place in this browser; its save comes from the server when you log in
 async function afterLogin(){ const uid = ACC.accountId(); KEY = "rimfrost2-chars:" + uid; WKEY = "rimfrost2-world:" + uid;
-  const data = await ACC.loadCloud();
+  const data = await ACC.loadCloud(); await ACC.claimSession();                            // this browser is now the one that plays (any other is logged out)
   if(data){ saveChars(data.chars || []); try{ if(data.world) localStorage.setItem(WKEY, JSON.stringify(data.world)); else localStorage.removeItem(WKEY); }catch(e){} }
   else { let claimed = null; try{ claimed = localStorage.getItem("rimfrost2-claimed"); }catch(e){}           // a new account takes over the characters already in this browser (once)
     if(!claimed){ let old = [], ow = null; try{ old = JSON.parse(localStorage.getItem("rimfrost2-chars")) || []; ow = localStorage.getItem("rimfrost2-world"); localStorage.setItem("rimfrost2-claimed", uid); }catch(e){}
@@ -1040,7 +1044,7 @@ function doAction(a, e){
     const n = nearestUsable(USE_RANGE); if(n) useThing(n); else err("Nothing to interact with"); }
   else if(a === "potHp") G.usePotion("hp"); else if(a === "potMana") G.usePotion("mana");
   else if(a === "map") toggleMap();
-  else if(a === "jump") G.jump();
+  else if(a === "jump"){ const v = P.moving && P.slide ? {x: P.slide.x, z: P.slide.z} : null; G.jump(); if(P.jumpY > 0 && P.jumpV > 5) P.jumpVel = v; }   // (the jump keeps the speed you ran with)
   else if(a === "petAttack"){ if(G.PET_CLASSES.has(S.cur.cls)) G.petAttackCmd(); } else if(a === "petFollow"){ if(G.PET_CLASSES.has(S.cur.cls)) G.petFollowCmd(); }
   else if(a === "formBear" || a === "formCat" || a === "formTravel"){ const f = FORMS.find(x => x[1] === a); if(S.cur.cls === "druid" && f && S.cur.learned.includes(f[0])) G.tryUse(f[0]); }
   else if(a === "mount") toggleMount();
@@ -1154,7 +1158,17 @@ function leftClick(e){ if(P.dead || P.flying) return; const h = pick(e);
   else if(h && h.friend) CO.select(h.friend.id);                                                         // a friend: your heals go to them
   else if(!h || h.point){ P.target = null; P.auto = false; CO.select(null); P.selfT = false; }                           // clicking nothing clears your target
 }
+// with both buttons the browser reports the second button only as a "move" (not as a press or release), so follow which buttons are held from e.buttons
+function syncButtons(e){ const l = !!(e.buttons & 1), r = !!(e.buttons & 2);
+  if(r && !rmb.down){ rmb.down = true; rmb.moved = 5; rmb.x = e.clientX; rmb.y = e.clientY; }                 // (pressed together with the other: a turn, never a click)
+  if(l && !lmb.down){ lmb.down = true; lmb.moved = 5; lmb.x = e.clientX; lmb.y = e.clientY; }
+  if(rmb.down && !r) rmb.down = false; if(lmb.down && !l) lmb.down = false;
+  if(!rmb.down && !lmb.down && renderer.domElement.style.cursor === "grabbing") renderer.domElement.style.cursor = ""; }
+const releaseButtons = () => { rmb.down = false; lmb.down = false; if(renderer.domElement.style.cursor === "grabbing") renderer.domElement.style.cursor = ""; };
+renderer.domElement.addEventListener("lostpointercapture", e => { if(!e.buttons) releaseButtons(); });
+addEventListener("blur", releaseButtons);
 renderer.domElement.addEventListener("pointermove", e => {
+  if(running && !aim) syncButtons(e);
   if(lmb.down && !rmb.down){ const dx = e.clientX - lmb.x, dy = e.clientY - lmb.y; lmb.x = e.clientX; lmb.y = e.clientY; lmb.moved += Math.abs(dx) + Math.abs(dy);
     if(lmb.moved > 4){ cam.yaw = cam.yawT = cam.yaw - dx * 0.008; cam.pitch = clamp(cam.pitch + dy * 0.004, 0.45, 1.35); renderer.domElement.style.cursor = "grabbing"; } return; }
   if(!rmb.down) return; const dx = e.clientX - rmb.x, dy = e.clientY - rmb.y; rmb.x = e.clientX; rmb.y = e.clientY; rmb.moved += Math.abs(dx) + Math.abs(dy);
@@ -1313,10 +1327,16 @@ function updMovement(dt){
   let dir = null;
   // camera-relative keys: W is always "up" on the screen
   let ix = 0, iz = 0;
-  if(K.held("up", down)) iz -= 1; if(K.held("down", down)) iz += 1;
+  if(K.held("up", down) || (rmb.down && lmb.down)) iz -= 1; if(K.held("down", down)) iz += 1;   // (both mouse buttons: forward, as in WoW)
   if(K.held("left", down)) ix -= 1; if(K.held("right", down)) ix += 1;
   if(ix || iz){ const l = Math.hypot(ix, iz), s = Math.sin(cam.yaw), c = Math.cos(cam.yaw); dir = {dx: (ix * c + iz * s) / l, dz: (-ix * s + iz * c) / l}; voluntary = true; }
   else if(P.dest){ dir = Math.hypot(P.dest.x - P.x, P.dest.z - P.z) < 0.3 ? null : steer(P, P.dest.x, P.dest.z, dt, blocked); if(!dir){ P.dest = null; marker.visible = false; } else voluntary = true; }
+  // in the air: a running jump keeps its direction and speed (no steering); a standing jump only drifts a little the way you press
+  if(!(P.jumpY > 0)) P.jumpVel = null;
+  else if(!onIce(P.x, P.z) || P.ghost){
+    if(P.jumpVel){ if(tryMove(P, P.jumpVel.x * dt, P.jumpVel.z * dt)) P.moving = true; }
+    else if(dir && voluntary){ const sp = G.playerSpeed() * 0.3; if(tryMove(P, dir.dx * sp * dt, dir.dz * sp * dt)) P.moving = true; turnTo(P, dir.dx, dir.dz, dt); }
+    return false; }
    // walk up to what you attack
   if(onIce(P.x, P.z) && !P.ghost){                                                           // ice (Frost Vault): you keep sliding and turn slowly
     const sp = G.playerSpeed(), S2 = P.slide || (P.slide = {x: 0, z: 0}), k = 1 - Math.exp(-dt * (dir ? 1.6 : 0.5));
