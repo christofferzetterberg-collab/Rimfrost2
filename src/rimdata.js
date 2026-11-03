@@ -238,6 +238,9 @@ export const AB = {
   roots:{name:"Entangling Roots", lvl:6, cost:20, cd:20, cast:1.2, range:290, school:"nature", icon:"roots", tgt:"enemy",
     desc:()=>`Roots the target in place for 8 sec and deals ${fmt(spow()*0.6)} Nature damage.`,
     run:t=>{root(t,8);dot(t,"roots",spow()*0.6,8,"nature");burst(t.px,t.py,"#6a9a3a",10);}},
+  thorns:{name:"Thorns", lvl:8, cost:30, range:0, school:"nature", icon:"thorns", tgt:"self",
+    desc:()=>`Thorns sprout from your skin. Melee attackers take ${fmt(spow()*0.2)} Nature damage each time they hit you. Lasts 10 min.`,
+    run:()=>{buff("thorns",600);ring(P.px,P.py,34,"#9ab84a");}},
   starfire:{name:"Starfall", lvl:12, cost:40, cast:3.0, range:300, school:"arcane", icon:"star", tgt:"enemy",
     desc:()=>`Calls down starlight that deals ${fmt(spow()*3.8)} Arcane damage.`,
     run:t=>{burst(t.px,t.py,"#e6b3ff",18);hit(t,spow()*3.8,"arcane","starfire");}},
@@ -591,7 +594,7 @@ export const BARS = {
   warrior:["heroic","charge","shout","rend","whirlwind","execute","shieldbash","secondwind","quake","sweeping","mortalstrike","recklessness","laststand","shieldwall","shoot"],
   hunter:["steady","raptor","wingclip","firearrow","icearrow","disengage","multishot","aimed","poison","snare","stormarrow","callbear","dismisspet","mendpet","callwolf","intimidate","bestialwrath","rapidfire","chimera","counter","explosive"],
   priest:["smite","heal","swp","pws","mindblast","holynova","renew","darkpulse","judgment","resurrection","innerfocus","powerinf","painsupp","desperate","guardian","voideruption","wand"],
-  druid:["wrath","touch","moonfire","rejuv","roots","starfire","hurricane","bark","bloom","bear","cat","leopard","revive","starsurge","nswift","tranquility"],
+  druid:["wrath","touch","moonfire","rejuv","roots","thorns","starfire","hurricane","bark","bloom","bear","cat","leopard","revive","starsurge","nswift","tranquility"],
   druid_bear:["maul","swipe","frenzy","bash","roar","bear","cat","leopard","berserk"],
   druid_cat:["claw","rake","bite","dash","pounce","bear","cat","leopard","berserk"],
   druid_leopard:["leopard","bear","cat"],
@@ -891,7 +894,7 @@ export const AB_ICON = {
   aimed:["aim","#e8d070"], poison:["poison","#8fd04a"], snare:["trap","#a8946a"], stormarrow:["bolt","#7fb8ff"],
   resurrection:["halo","#fff2b0"], revive:["halo","#9cf07a"], redemption:["halo","#ffd890"], smite:["sun","#ffe37a"], heal:["cross","#fff2b0"], swp:["skull","#a77bff"], pws:["shield","#f2ecc8"], mindblast:["mind","#c08cff"],
   holynova:["nova","#ffd84a"], renew:["halo","#f0dc90"], darkpulse:["pulse","#7a4ad0"], judgment:["eye","#ffbf3a"],
-  wrath:["leaf","#7fdc5a"], touch:["heart","#5fd890"], moonfire:["moon","#d38cff"], rejuv:["sprout","#9cf07a"], roots:["roots","#a0b860"],
+  wrath:["leaf","#7fdc5a"], touch:["heart","#5fd890"], moonfire:["moon","#d38cff"], rejuv:["sprout","#9cf07a"], roots:["roots","#a0b860"], thorns:["thorns","#9ab84a"],
   starfire:["star","#e6b8ff"], hurricane:["tornado","#8fd8c8"], bark:["tree","#b08a58"], bloom:["bloom","#ff9ad0"],
   bear:["bear","#c89a68"], cat:["cat","#9cb0c0"], leopard:["paw","#ffd36b"],
   maul:["maul","#d08050"], swipe:["swipe","#c8a070"], frenzy:["plus","#e06060"], bash:["fist","#b89070"], roar:["roar","#e0b050"],
@@ -943,6 +946,7 @@ export function drawIcon(cv, icon, color){
     case "moon": C(0,0,13,true); g.globalCompositeOperation = "destination-out"; C(7,-4,11,true); g.globalCompositeOperation = "source-over"; break;
     case "bloom": for(let i=0;i<5;i++){ const a=i*Math.PI*0.4; C(Math.cos(a)*8,Math.sin(a)*8,6,true); } g.fillStyle = "#f2e86b"; C(0,0,4,true); break;
     case "roots": for(let i=-1;i<=1;i++){ g.beginPath(); g.moveTo(i*9,16); g.quadraticCurveTo(i*9+8,0,i*9-2,-15); g.stroke(); } break;
+    case "thorns": g.beginPath(); g.moveTo(-14,14); g.bezierCurveTo(-14,-2,14,2,12,-14); g.stroke(); for(const [x,y,dx,dy] of [[-11,5,-6,-3],[-4,1,-2,-7],[3,-1,7,3],[9,-7,4,-6]]) P_([[x,y],[x+dx,y+dy]]); break;
     case "star": { g.beginPath(); for(let i=0;i<10;i++){ const r=i%2?6:16, a=i*Math.PI/5-Math.PI/2; const x=Math.cos(a)*r, y=Math.sin(a)*r; i?g.lineTo(x,y):g.moveTo(x,y);} g.closePath(); g.fill(); } break;
     case "dismiss":   // a small bear and a small wolf side by side
       g.save(); g.translate(-9,2); g.scale(0.55,0.55); C(-10,-9,5.5,true); C(10,-9,5.5,true); C(0,2,13,true); g.fillStyle="#3a3f45"; C(-5,-1,2.2,true); C(5,-1,2.2,true); g.beginPath(); g.ellipse(0,7,5,3.5,0,0,7); g.fill(); g.restore();

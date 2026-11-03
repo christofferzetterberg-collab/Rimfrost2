@@ -27,10 +27,15 @@ const KINDS = {
 const matCache = new Map();
 const matFor = (base, hex, flat) => { if(hex == null) return base; const k = base.uuid + hex + (flat ? "f" : ""); if(!matCache.has(k)){ const m = base.clone(); m.color.setHex(hex); if(flat){ m.map = null; m.needsUpdate = true; } matCache.set(k, m); } return matCache.get(k); };
 
+// the boar's snout is skinned to the front legs in the file, so it flaps when walking: give it to the head
+function fixSnout(model){ model.traverse(m => { if(!m.isSkinnedMesh || m.geometry.userData.snoutFixed) return; const g = m.geometry, head = m.skeleton.bones.findIndex(b => b.name === "head"); if(head < 0) return;
+  const P = g.attributes.position, I = g.attributes.skinIndex, W = g.attributes.skinWeight;
+  for(let i = 0; i < P.count; i++) if(P.getZ(i) > 0.28){ I.setXYZW(i, head, 0, 0, 0); W.setXYZW(i, 1, 0, 0, 0); }
+  I.needsUpdate = W.needsUpdate = true; g.userData.snoutFixed = true; }); return true; }
 // kind: one of KINDS, or a monster: {file, len, col}
 export function makeAnimal(kind, race){
   const K = typeof kind === "object" ? kind : KINDS[kind]; if(!READY || !K || !assets[K.file]) return null;
-  const asset = assets[K.file], C = CLIPS[K.file], model = build(asset), col = Object.assign({}, K.col, (K.race || {})[race] || {});
+  const asset = assets[K.file], C = CLIPS[K.file], model = build(asset), _f = K.file === "boar" && fixSnout(model), col = Object.assign({}, K.col, (K.race || {})[race] || {});
   for(const m of model.userData.meshes) m.material = matFor(m.material, col[m.material.name] ?? col["*"], K.flat);
   // size and facing: measured once in the rest pose, then centred with the nose towards +z
   model.updateMatrixWorld(true); const b = new THREE.Box3(); for(const m of model.userData.meshes) b.expandByObject(m);

@@ -3,15 +3,23 @@
 ## v0.38.0
 
 ### New
+- Druids learn Thorns at level 8: melee attackers take Nature damage each time they hit you. Lasts 10 min.
+- **Auto-logout:** after 10 minutes without using the keyboard or mouse, your characters are saved and you are logged out. A warning comes one minute before.
+- **Remember my e-mail:** a box on the login screen fills in your e-mail next time, so you only type your password.
 - **Neutral monsters:** some monsters only fight back when you attack them, and don't bring their friends along. Their health bar is yellow and the tooltip says "Neutral".
   - Peaceful animals are always neutral: boars, Crag Boars, Bristleboars, Forest Foxes, Stone Beetles, Grave Rats and Tidecrawlers.
   - In the starting zones, every animal up to level 5 is neutral too, so the area around each home town is calmer.
 - **Grey monsters,** six or more levels below you, no longer attack you on sight.
-- **Hover tooltips:** pointing at a monster shows its name, level and health, and the cursor turns into a sword. Pointing at a person shows their name and title.
+- **Hover tooltips:** pointing at a monster shows its name, level and health, and the cursor turns into a sword. Pointing at a person shows their name and title. Herbs and ore show the skill they need (in red if yours is too low), quest items say "Quest item", and dungeon doors show the dungeon's name.
 - **Both mouse buttons:** holding the left and right mouse buttons together walks you forward, as in WoW.
 - **Jumping:** press Space to jump. A running jump carries you forward in the direction you ran (you can't steer in the air); a jump from standing goes straight up, and pressing a direction key while in the air drifts you a little that way. In the air you get over low rocks and short, steep bumps. Houses, trees, cliffs and big rocks still block the way. The key can be changed in Key bindings (K).
 
 ### Fixed
+- The boar's snout no longer flaps up and down when it walks.
+- The loading bar now follows the real download size of the models and keeps moving while the world is built.
+- Quest objects that look like herbs (and other quest pick-ups) only appear while one of your quests needs them, so you no longer find things you can't pick up.
+- Staffs (Mage, Priest, Warlock, Druid and caster monsters) are held pointing forward at an angle, and keep that angle when running instead of tipping back or spinning in the hand.
+- One-handed axes are no longer held upside down (Canyon Raiders, Ironclan Warriors, and Warriors and Shamans with an axe).
 - **Only one browser at a time:** logging in on a new browser now logs out any other browser that is still open, so an old window can no longer overwrite your characters with older progress.
 - Pressing the left and right mouse buttons at the same time no longer leaves the camera stuck turning.
 

@@ -7,6 +7,7 @@ import {KINDS, SPAWNS, ZONE_MOB_MULT, FIXED} from "./mobs.js";
 import {DUNGEONS, DG_VER, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
 import {initMech, updMech, envSpeed, onIce} from "./dgmech.js";
 import {preloadAvatars, makeAvatar} from "./avatar.js";
+import {setLoad} from "./glb.js";
 import {preloadNature} from "./nature.js";
 import {preloadBuildings, buildingModel} from "./buildings.js";
 import {preloadKit} from "./dgkit.js";
@@ -23,7 +24,7 @@ import * as K from "./keys.js";
 import * as CO from "./coop.js";
 import {DEV, initDev, toggle as toggleDev} from "./dev.js";
 import {gameHour, isNight, daylight, clockText, minutesToNight, minutesToDay, NIGHT_KINDS} from "./clock.js";
-import {NPCS, QOBJECTS, QITEMS, GOODS, GOODS_BASIC, MOUNTS, RIDING_LVL, RIDING_COST} from "./content.js";
+import {NPCS, QOBJECTS, QITEMS, GOODS, GOODS_BASIC, MOUNTS, RIDING_LVL, RIDING_COST, PROF} from "./content.js";
 // is something (solid or walk-through) here? Used when placing things, so nothing ends up on top of a campfire or a person
 const nearAny = f => colliders.some(f) || decor.some(f);
 const {blocked, tryMove, distU, sees, withPx} = G;
@@ -55,7 +56,9 @@ function applyGfx(id){ GFX = GFX_LEVELS[id] || GFX_LEVELS.medium; GFX.id = GFX_L
 addEventListener("resize", () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 const avatarsP = preloadAvatars().catch(e => console.warn("New character models not loaded:", e)), beastsP = preloadBeasts().catch(e => console.warn("New animal models not loaded:", e));   // (all models load at the same time)
 await Promise.all([preloadNature().catch(e => console.warn("New nature models not loaded:", e)), preloadBuildings().catch(e => console.warn("Building models not loaded:", e)), preloadKit().catch(e => console.warn("Dungeon models not loaded:", e))]);      /* KayKit trees and rocks (else the old shapes) */
+await setLoad(0.78, "Building the world…");
 const {terrain, water} = buildWorld(scene);
+await setLoad(0.86, "Bringing the people to town…");
 // ---------------------------------------------------------------- the people in the towns and camps
 const hexc = s => parseInt(s.slice(1), 16);
 await avatarsP;
@@ -104,6 +107,7 @@ const torch = new THREE.PointLight(0xffb070, 0, 32, 1.1); scene.add(torch);
 const townLight = new THREE.PointLight(0xffa860, 0, 40, 1.2); scene.add(townLight);
 const GHOST_SKY = new THREE.Color(0x26323e), NIGHT_SKY = new THREE.Color(0x0c1424), MOON_COL = new THREE.Color(0x8fa8ff), DUSK_COL = new THREE.Color(0xff9a50);
 let sunAng = 1.2, nightNow = false, NIGHT_EXTRA = null, nightT = 0, scaleT = 0;
+await setLoad(0.9, "Finding paths…");
 buildNav();
 // where a character starts (and wakes up): next to the square of a town, the fire of a camp, or Rimhaven's fountain
 const spotCache = new Map();
@@ -301,6 +305,7 @@ function makeMob(kind, p, lvl, r){ const K = KINDS[kind]; if(!roomy(p.x, p.z)) p
     dots: [], slowT: 0, slowPct: 0, rootT: 0, stunT: 0, path: null, inScene: false});
   m.neutral = isNeutral(K, p, lvl);
   m.nid = mobs.length; m.hp = m.maxHp; m.baseHp = m.maxHp; m.baseDmg = m.dmg; m.scaleN = 1; m.mesh.traverse(o => { if(o.isMesh) o.userData.mob = m; }); mobs.push(m); return m; }   // nid: the same number on every computer in co-op
+await setLoad(0.94, "Waking the monsters…");
 { const r = rng(99), lvlOf = K => K.lv[0] + Math.floor(r() * (K.lv[1] - K.lv[0] + 1));
   // in the starting zones a monster's level grows with its distance from the town, so the lowest ones are closest
   const lvlAt = (K, p, zone) => { if(!(ZONES[zone].race && ZONES[zone].lv[0] === 1) || K.passive) return lvlOf(K); const d0 = minTownDist(K), t = clamp((townDist(p.x, p.z) - d0) / 30 + (r() - 0.5) * 0.3, 0, 0.999);
@@ -339,6 +344,17 @@ const cloudData = () => { let w = null; try{ w = JSON.parse(localStorage.getItem
 let cloudT = 0;
 function cloudSoon(){ if(!ACC.accountId()) return; const now = Date.now(); if(now - cloudT > 15000){ cloudT = now; ACC.saveCloud(cloudData()); } else if(!cloudSoon.t) cloudSoon.t = setTimeout(() => { cloudSoon.t = null; cloudT = Date.now(); ACC.saveCloud(cloudData()); }, 15000 - (now - cloudT)); }
 addEventListener("pagehide", () => { if(ACC.accountId()){ save(); ACC.saveCloud(cloudData(), true); } });
+// auto-logout: after 10 minutes without a key press or mouse use, you are saved and logged out (a warning comes a minute before)
+const IDLE_WARN = 9 * 60e3, IDLE_OUT = 10 * 60e3; let lastInput = Date.now(), idleWarned = false;
+for(const ev of ["keydown", "pointerdown", "pointermove", "wheel"]) addEventListener(ev, () => { lastInput = Date.now(); idleWarned = false; }, {passive: true, capture: true});
+async function idleLogout(){ const inGame = running;
+  if(inGame){ save(); try{ CO.leave(true); }catch(e){} }
+  if(ACC.accountId()){ await ACC.saveCloud(cloudData()); ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); }
+  else if(inGame) showChars(); else return;
+  const m = "You were logged out after 10 minutes without activity."; if(ACC.accountId() === null && !$("login").hidden) $("lerr").textContent = m; else log(m, "#9fd6e8"); }
+setInterval(() => { if(!running && !ACC.accountId()) return; const idle = Date.now() - lastInput;
+  if(idle > IDLE_OUT){ lastInput = Date.now(); idleLogout(); }
+  else if(idle > IDLE_WARN && !idleWarned){ idleWarned = true; if(running) banner("Still there?", "You will be logged out in 1 minute"); log("You will be logged out in 1 minute because you have been inactive.", "#ffb347"); } }, 5000);
 // logged in from another browser: this one stops at once, without saving, so it can't overwrite the newer progress
 ACC.setOnKick(() => { try{ CO.leave(true); }catch(e){} running = false; ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin();
   $("lerr").textContent = "You logged in from another browser, so you were logged out here. Nothing was saved from this window."; });
@@ -364,13 +380,17 @@ function acctBar(){ const old = ACC.needsEmail();
       try{ await ACC.addEmail(m); $("amsg").textContent = `A link has been sent to ${m} (check the spam folder too). Click it, then log in with ${m} and your password from now on.`; }
       catch(e){ $("amsg").textContent = e.message; } finally{ $("asend").disabled = false; } }; }
   $("lout").onclick = async () => { save(); $("lout").disabled = true; await ACC.saveCloud(cloudData()); ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); }; }
-function showLogin(){ running = false; closePanel(); $("chars").hidden = false; $("login").hidden = false; $("clistWrap").hidden = true; $("cform").hidden = true; $("lerr").textContent = ""; $("lname").focus(); }
+// "Remember my e-mail": the login box is filled in for you next time (only the e-mail, never the password)
+const REMEMBER = "rimfrost2-remember";
+function showLogin(){ running = false; closePanel(); $("chars").hidden = false; $("login").hidden = false; $("clistWrap").hidden = true; $("cform").hidden = true; $("lerr").textContent = "";
+  let rem = null; try{ rem = localStorage.getItem(REMEMBER); }catch(e){}
+  $("lrem").checked = !!rem; if(rem && !$("lname").value) $("lname").value = rem; (rem ? $("lpass") : $("lname")).focus(); }
 // log in with an e-mail (or the name of an old account); new accounts always use an e-mail
 async function tryLogin(make){ const name = $("lname").value.trim(), pw = $("lpass").value, isMail = MAILRE.test(name);
   if(!isMail && (make || !/^[\p{L}\p{N}_-]{3,16}$/u.test(name))) return $("lerr").textContent = "Enter your e-mail address";
   if(pw.length < 6) return $("lerr").textContent = "The password must be at least 6 characters";
   $("lerr").textContent = make ? "Creating your account…" : "Logging in…"; $("llogin").disabled = $("lnew").disabled = true;
-  try{ await (make ? ACC.signUp(name, pw) : ACC.logIn(name, pw)); $("lpass").value = ""; $("lerr").textContent = ""; $("login").hidden = true; await afterLogin(); }
+  try{ await (make ? ACC.signUp(name, pw) : ACC.logIn(name, pw)); try{ if($("lrem").checked) localStorage.setItem(REMEMBER, name); else localStorage.removeItem(REMEMBER); }catch(e){} $("lpass").value = ""; $("lerr").textContent = ""; $("login").hidden = true; await afterLogin(); }
   catch(e){ $("lerr").textContent = e.message; } finally{ $("llogin").disabled = $("lnew").disabled = false; } }
 $("llogin").onclick = () => tryLogin(false); $("lnew").onclick = () => tryLogin(true);
 $("lforgot").onclick = async () => { const m = $("lname").value.trim();
@@ -1130,7 +1150,8 @@ let hov = null, hovMouse = null, hovPickT = 0, hovTick = 0;
 function hoverPick(){ hovPickT = performance.now();
   if(!hovMouse || !running || aim || rmb.down || lmb.down) return setHover(null);
   const h = pick({clientX: hovMouse.x, clientY: hovMouse.y});
-  setHover(h && h.mob && !h.mob.dead ? {mob: h.mob} : h && h.use && npcs.includes(h.use) && !P.ghost ? {npc: h.use} : null); }
+  setHover(h && h.mob && !h.mob.dead ? {mob: h.mob} : h && h.use && npcs.includes(h.use) && !P.ghost ? {npc: h.use}
+    : h && h.use && nodes.includes(h.use) && h.use.active && !P.ghost ? {node: h.use} : h && h.use && h.use.portal ? {portal: h.use} : null); }
 function setHover(h){ const was = hov; hov = h; const el = $("htip"); const cv = renderer.domElement;
   if(!h){ el.hidden = true; if(was && !aim && !rmb.down && !lmb.down) cv.style.cursor = ""; return; }
   el.hidden = false; if(!aim && !rmb.down && !lmb.down) cv.style.cursor = h.mob ? SWORD_CURSOR : "pointer"; updHover(); }
@@ -1138,6 +1159,13 @@ function updHover(){ if(!hov || !hovMouse) return; const el = $("htip");
   if(hov.mob){ const m = hov.mob; if(m.dead) return setHover(null); const pct = Math.max(0, Math.min(100, m.hp / m.maxHp * 100));
     const neu = m.neutral || m.K.passive;
     el.innerHTML = `<b style="color:${neu ? "#f3dc55" : "#ff6b5e"}">${esc(m.name)}</b><div><span style="color:${lvlColor(m.lvl)}">Level ${m.lvl}${m.boss ? " · Boss" : m.elite ? " · Elite" : ""}</span> <span class="muted">· ${neu ? "Neutral" : "Hostile"}</span></div><div class="hb"><i style="width:${pct}%"></i></div><small>${Math.max(0, Math.ceil(m.hp))} / ${m.maxHp}</small>`; }
+  else if(hov.node){ const n = hov.node, g = Q.gatherReq(n.item); if(!n.active || !n.mesh.visible) return setHover(null);
+    let lines = "";
+    if(g){ const ok = Q.canGather(n.item) === true; lines += `<div style="color:${ok ? "#d9e3e7" : "#ff6b5e"}">Requires ${PROF[g.skill]} ${g.req}</div><small>Your skill: ${Q.profSkill(g.skill)}</small>`; }
+    if(needSet.has(n.item)) lines += `<div style="color:#ffd84a">Quest item</div>`;
+    if(n.def.night) lines += `<small>${nightNow ? "Can be gathered now" : "Can only be gathered at night"}</small>`;
+    el.innerHTML = `<b>${esc(n.name)}</b>${lines}`; }
+  else if(hov.portal){ const p = hov.portal; el.innerHTML = `<b>${esc(p.name || "Dungeon")}</b><div class="muted">${p.portal === "in" ? "Dungeon entrance" : "Exit"}</div>`; }
   else { const n = hov.npc; el.innerHTML = `<b style="color:#7be08a">${esc(n.name)}</b>${n.title ? `<div class="muted">&lt;${esc(n.title)}&gt;</div>` : ""}`; }
   el.style.left = Math.min(innerWidth - el.offsetWidth - 8, hovMouse.x + 18) + "px"; el.style.top = Math.min(innerHeight - el.offsetHeight - 8, hovMouse.y + 20) + "px"; }
 // (every frame: keep the health up to date; now and then look again, in case the monster walked away from under the mouse)
@@ -1376,7 +1404,7 @@ function npcPlate(n){ let p = npcPlates.get(n); if(!p){ p = document.createEleme
 const AURA = {   // buff key → ability whose icon it uses
   shout: "shout", bark: "bark", avenging: "avenging", bubble: "bubble", dash: "dash", hotstreak: "pyroblast", nightfall: "shadowbolt", backlash: "soulfire",
   ignite: "fireball", deep: "rend", burn: "firearrow", pyro: "pyroblast", sprint: "sprint", bloodrage: "bloodrage", meld: "meld", stoneform: "stoneform",
-  stskin: "stoneskin", earthstr: "strengthtotem", airgrace: "graceair", heroism: "heroism", lshield: "lshield", slice: "slicedice", evasion: "evasion", adren: "adrenaline", stealth: "stealth",
+  stskin: "stoneskin", earthstr: "strengthtotem", airgrace: "graceair", heroism: "heroism", lshield: "lshield", thorns: "thorns", slice: "slicedice", evasion: "evasion", adren: "adrenaline", stealth: "stealth",
   immolate: "immolate", corruption: "corruption", agony: "agony", rupture: "rupture", flameshock: "flameshock",
   // talents
   presence: "presence", arcanepower: "arcanepower", combust: "combustion", clearcast: "sparkrain", archmage: "presence", sweep: "sweeping", sudden: "execute", enrage: "heroic", flurry: "whirlwind",
@@ -1680,7 +1708,7 @@ function update(dt){
   needSet = running ? Q.neededItems() : new Set(); mobNeedSet = running ? Q.neededMobs() : new Set();
   for(const n of nodes){ if(!n.active){ n.respawn -= dt; if(n.respawn <= 0) n.active = true; }
     const need = needSet.has(n.item), gath = running && Q.gatherReq(n.item) && Q.canGather(n.item) === true;
-    n.mesh.visible = n.active && (!!n.glow || need) && (!n.def.night || nightNow);   // Moonbloom only shows at night
+    n.mesh.visible = n.active && (!!Q.gatherReq(n.item) || need) && (!n.def.night || nightNow);   // herbs and ore always show; quest objects only while a quest needs them (Moonbloom only at night)
     n.beam.visible = n.mesh.visible && need && !P.ghost && Math.hypot(n.x - P.x, n.z - P.z) < 70;
     if(n.mesh.visible && n.glow){ const [on, off] = n.glow.userData.glow; n.glow.material.color.setHex(need || gath ? on : off); n.glow.scale.setScalar(need ? 1 + Math.sin(now * 4 + n.x) * 0.2 : gath ? 0.95 : 0.8); } }
   { const ex = new Set(running && !inCrypt() && !P.ghost ? exploreTargets() : []); for(const [e, b] of exploreBeams) b.visible = ex.has(e); }
@@ -1745,7 +1773,7 @@ function loop(t){
   frames++; fpsT += dt; if(fpsT > 1){ fpsEl.textContent = frames + " fps"; frames = 0; fpsT = 0; }
   requestAnimationFrame(loop);
 }
-$("load").hidden = true; updHelp();
+await setLoad(1, "Ready"); $("load").hidden = true; updHelp();
 startScreen();
 // dev tools (?dev): cheats, teleports and the class balance test
 const ARENA = (() => { let a = null; return () => { if(a) return a; const s = hubSpot(HUBS.jarnfastet);

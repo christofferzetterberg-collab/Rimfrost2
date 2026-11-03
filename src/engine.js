@@ -367,6 +367,7 @@ export function playerDamage(raw, src, kind = "melee"){
   if(P.buffs.bubble){ H.floatText(P, "Immune", "#fff2b0"); return; }
   breakStealth();                                                               // any damage ends Stealth, traps too
   if(kind === "melee" && src && !src.dead && P.buffs.lshield && P.lsCharges > 0 && !(P.lsCd > 0)){ P.lsCd = 5; hit(src, spow() * 0.6, "nature", "lshield"); burst(src.px, src.py, "#cfe8ff", 8); if(--P.lsCharges <= 0) delete P.buffs.lshield; }   // Lightning Shield
+  if(kind === "melee" && src && !src.dead && P.buffs.thorns){ hit(src, spow() * 0.2, "nature", "thorns"); burst(src.px, src.py, "#9ab84a", 5); }   // Thorns
   if(kind !== "env"){ const av = avoidChances(), r = Math.random(), mm = mobMiss(src); let txt = null;   /* (dungeon traps can't be dodged) */
     if(r < mm) txt = "Miss"; else if(r < mm + av.dodge) txt = "Dodge"; else if(kind === "melee" && r < mm + av.dodge + av.parry) txt = "Parry";
     if(txt === "Dodge" && T("h_counter")) buff("counter", 5);                                   // Counterattack

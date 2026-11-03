@@ -47,7 +47,8 @@ const CLASS = {
   hunter:  {char: "Ranger", right: null, left: "bow_withString", melee: "1H", bow: true},
   rogue:   {char: "Rogue", right: "dagger", left: "dagger", melee: "DW"}
 };
-const UPRIGHT = {staff: 1, druid_staff: 1, Skeleton_Staff: 1};                             // items held upright, and which end of them goes up                                       // items held upright (a staff stands next to you instead of pointing ahead)
+const UPRIGHT = {staff: 1, druid_staff: 1, Skeleton_Staff: 1};
+const STAFF_DIR = new THREE.Vector3(0, Math.cos(50 * Math.PI / 180), Math.sin(50 * Math.PI / 180));   // a staff points forward, tilted 50° from upright                             // items held upright, and which end of them goes up                                       // items held upright (a staff stands next to you instead of pointing ahead)
 const WEAPON = {sword: "sword_1handed", axe: "axe_1handed", mace: "sword_1handed", dagger: "dagger", staff: "staff", wand: "wand", bow: "bow_withString"};
 function specFor(race, cls, over){ return over ? Object.assign({}, CLASS[cls] || {}, over) : CLASS[cls] || null; }
 // the races: skin and hair colour, build (width, height, depth) and extra parts
@@ -109,6 +110,8 @@ export function makeAvatar(race, cls, eq = {}, look = null){
     if(R.tusks) for(const s2 of [-1, 1]) add(new THREE.ConeGeometry(0.035, 0.14, 5), new THREE.MeshLambertMaterial({color: 0xf0e6cc}), at(s2 * 0.13, -0.28, 0.43), [0.2, 0, 0], hs * 0.9);
     if(R.eyes) for(const s2 of [-1, 1]) add(new THREE.SphereGeometry(0.035, 6, 4), new THREE.MeshBasicMaterial({color: R.eyes}), at(s2 * 0.14, -0.02, 0.45), null, hs * 0.9); }
   const hold = (slot, item) => { if(!item || !assets[item] || !N[slot]) return; const w = build(assets[item]); w.traverse(o => { if(o.isMesh){ o.castShadow = true; } }); N[slot].add(w); if(UPRIGHT[item]){ w.userData.up = UPRIGHT[item]; uprights.push(w); }
+    if(item === "axe_1handed"){ const b = new THREE.Box3(); w.traverse(o => { if(o.isMesh){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); } });   // turned round its handle, so the blade faces down
+      const sz = b.getSize(new THREE.Vector3()); w.rotateOnAxis(sz.x > sz.y && sz.x > sz.z ? new THREE.Vector3(1, 0, 0) : sz.y > sz.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1), Math.PI); }
     if(item === "bow_withString"){ const b = new THREE.Box3(); w.traverse(o => { if(o.isMesh){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); } });      // turned so the string faces you
       const sz = b.getSize(new THREE.Vector3()); w.rotateOnAxis(sz.x > sz.y && sz.x > sz.z ? new THREE.Vector3(1, 0, 0) : sz.y > sz.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1), Math.PI); } };
   const uprights = [];
@@ -149,15 +152,21 @@ export function makeAvatar(race, cls, eq = {}, look = null){
     else if(moving) setBase(spec.bow && !busy ? "Running_HoldingBow" : o.speed > 9 ? "Running_B" : "Running_A", busy ? "legs" : null, 0.15);
     else setBase(spec.bow && !busy ? "Ranged_Bow_Idle" : "Idle_A", busy ? "legs" : null, 0.25);
     mixer.update(dt);
+    if(uprights.length && !o.dead && pose !== "sit") keepUpright();
   };
+  // a staff keeps the same angle to the body whatever the arm does (it follows the hand, but doesn't tip back or spin when you run)
+  const q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
+  function keepUpright(){ const gq = g.getWorldQuaternion(q1); for(const w of uprights){ if(!w.userData.rel) continue;
+    w.parent.getWorldQuaternion(q2).invert(); w.quaternion.copy(q2.multiply(gq.clone().multiply(w.userData.rel))); } }
   g.userData.animate(0, false, 0, null);
   // turn upright items so they point up in the idle pose (worked out once, then they move with the hand)
   if(uprights.length){ g.updateMatrixWorld(true); for(const w of uprights){ const b = new THREE.Box3(); w.traverse(o => { if(o.isMesh){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); } });
     const sz = b.getSize(new THREE.Vector3()), ax = sz.x > sz.y && sz.x > sz.z ? new THREE.Vector3(1, 0, 0) : sz.y > sz.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
     if(Math.abs(b.max.dot(ax)) < Math.abs(b.min.dot(ax))) ax.negate(); if(w.userData.up < 0) ax.negate();                       // towards the long (head) end
     const wq = w.getWorldQuaternion(new THREE.Quaternion()), dir = ax.clone().applyQuaternion(wq).normalize();
-    const turn = new THREE.Quaternion().setFromUnitVectors(dir, new THREE.Vector3(0, 0.97, 0.24).normalize()), pq = w.parent.getWorldQuaternion(new THREE.Quaternion());
-    w.quaternion.copy(pq.invert().multiply(turn.multiply(wq))); } }
+    const turn = new THREE.Quaternion().setFromUnitVectors(dir, STAFF_DIR), pq = w.parent.getWorldQuaternion(new THREE.Quaternion());
+    w.userData.rel = turn.multiply(wq).clone();                                                 // its turn relative to the body (the body faces straight ahead here)
+    w.quaternion.copy(pq.invert().multiply(w.userData.rel.clone())); } }
   g.userData.height = HEIGHT * R.scale[1] * (spec.scale || 1) * (large ? 1.45 : 1); g.userData.skinned = true; g.userData.ownDeath = true;
   return g;
 }

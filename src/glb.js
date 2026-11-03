@@ -7,14 +7,21 @@ const COMP = {5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16A
 const SIZE = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16};
 const san = n => THREE.PropertyBinding.sanitizeNodeName(n || "");
 
+// a file, counted byte by byte for the loading bar (big animation files weigh more than small props)
+async function fetchBuf(url){ const r = await fetch(url); if(/^data:/.test(url) || !r.body) return r.arrayBuffer();
+  const len = +r.headers.get("Content-Length") || 0; if(len){ bytesAll += len; progress(); }
+  const rd = r.body.getReader(), parts = []; let got = 0;
+  for(;;){ const {done: end, value} = await rd.read(); if(end) break; parts.push(value); got += value.length; if(len){ bytesGot += Math.min(value.length, Math.max(0, len - (got - value.length))); progress(); } }
+  if(!len){ bytesAll += got; bytesGot += got; progress(); }
+  const out = new Uint8Array(got); let o = 0; for(const p of parts){ out.set(p, o); o += p.length; } return out.buffer; }
 async function fetchAsset(url){
-  const base = url.slice(0, url.lastIndexOf("/") + 1), buf = await (await fetch(url)).arrayBuffer();
+  const base = url.slice(0, url.lastIndexOf("/") + 1), buf = await fetchBuf(url);
   let json, bins = [];
   const dv = new DataView(buf);
   if(dv.getUint32(0, true) === 0x46546C67){                                   // "glTF": binary
     let off = 12; while(off < buf.byteLength){ const len = dv.getUint32(off, true), type = dv.getUint32(off + 4, true), data = buf.slice(off + 8, off + 8 + len);
       if(type === 0x4E4F534A) json = JSON.parse(new TextDecoder().decode(data)); else if(type === 0x004E4942) bins.push(data); off += 8 + len; } }
-  else { json = JSON.parse(new TextDecoder().decode(buf)); bins = await Promise.all((json.buffers || []).map(b => fetch(/^data:/.test(b.uri) ? b.uri : base + b.uri).then(r => r.arrayBuffer()))); }
+  else { json = JSON.parse(new TextDecoder().decode(buf)); bins = await Promise.all((json.buffers || []).map(b => fetchBuf(/^data:/.test(b.uri) ? b.uri : base + b.uri))); }
   const acc = i => { const a = json.accessors[i], bv = json.bufferViews[a.bufferView], T = COMP[a.componentType], n = SIZE[a.type], stride = bv.byteStride || 0, bin = bins[bv.buffer || 0];
     const off = (bv.byteOffset || 0) + (a.byteOffset || 0), esz = T.BYTES_PER_ELEMENT;
     let arr; if(!stride || stride === n * esz) arr = new T(bin, off, a.count * n);
@@ -24,7 +31,7 @@ async function fetchAsset(url){
   // textures
   const images = await Promise.all((json.images || []).map(async im => { let blob;
     if(im.bufferView != null){ const bv = json.bufferViews[im.bufferView]; blob = new Blob([new Uint8Array(bins[bv.buffer || 0], bv.byteOffset || 0, bv.byteLength)], {type: im.mimeType}); }
-    else blob = await (await fetch(/^data:/.test(im.uri) ? im.uri : base + im.uri)).blob();
+    else blob = new Blob([await fetchBuf(/^data:/.test(im.uri) ? im.uri : base + im.uri)], {type: im.mimeType || "image/png"});
     return createImageBitmap(blob, {imageOrientation: "none"}); }));
   const textures = (json.textures || []).map(t => { const tex = new THREE.Texture(images[t.source]); tex.flipY = false; tex.colorSpace = THREE.SRGBColorSpace; tex.needsUpdate = true; return tex; });
   const materials = (json.materials || []).map(m => { const pb = m.pbrMetallicRoughness || {}, map = pb.baseColorTexture ? textures[pb.baseColorTexture.index] : null;
@@ -43,10 +50,16 @@ async function fetchAsset(url){
     return new THREE.AnimationClip(an.name, -1, tracks); });
   return {json, geoms, materials, skins, clips};
 }
-// the loading bar on the start screen: models asked for and models done
-let asked = 0, done = 0, shown = 0;
-function progress(){ const bar = document.getElementById("loadbar"), txt = document.getElementById("loadtxt"); if(!bar) return;
-  shown = Math.max(shown, asked ? done / asked : 0); bar.firstChild.style.width = Math.round(shown * 100) + "%"; txt.textContent = shown >= 1 ? "Building the world…" : `Loading models… ${Math.round(shown * 100)}%`; }
+// the loading bar on the start screen: the models are the first 75% (by bytes downloaded, and by files done), building the world the rest (setLoad)
+let asked = 0, done = 0, shown = 0, bytesAll = 0, bytesGot = 0, stage = null;
+const MODELS = 0.75;
+function progress(){ if(stage) return; const bar = document.getElementById("loadbar"), txt = document.getElementById("loadtxt"); if(!bar) return;
+  const byBytes = bytesAll ? bytesGot / bytesAll : 0, byFiles = asked ? done / asked : 0, f = Math.min(byBytes, byFiles) * 0.7 + Math.max(byBytes, byFiles) * 0.3;
+  shown = Math.max(shown, f * MODELS); bar.firstChild.style.width = (shown * 100).toFixed(1) + "%"; txt.textContent = `Loading models… ${Math.round(f * 100)}%`; }
+// after the models: steps of building the world, each shown before it starts (the page gets a moment to draw the bar)
+export async function setLoad(frac, text){ const bar = document.getElementById("loadbar"), txt = document.getElementById("loadtxt"); stage = text;
+  if(bar){ shown = Math.max(shown, frac); bar.firstChild.style.width = (shown * 100).toFixed(1) + "%"; txt.textContent = text; }
+  await new Promise(r => requestAnimationFrame(() => setTimeout(r, 0))); }
 export function load(url){ if(!cache.has(url)){ asked++; progress(); cache.set(url, fetchAsset(url).finally(() => { done++; progress(); })); } return cache.get(url); }
 
 // a fresh copy of the model: a Group holding the node tree, with skinned meshes bound to their own bones
