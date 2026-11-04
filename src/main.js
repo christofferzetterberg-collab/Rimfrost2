@@ -155,7 +155,7 @@ function dismissBots(quiet){ botMode = "assist"; botStay = null;  if(bots.length
 function botFx(id, fx, from, label){ const b = bots.find(o => o.id === id); if(!b || b.dead) return;
   for(const f of fx){ if(f[0] === "heal"){ const n = Math.round(Math.min(f[1], b.maxHp - b.hp)); b.hp += n; if(n > 0 && from !== S.cur.name) floatText(b, "+" + n, "#7be08a"); }
     else if(f[0] === "healPct") b.hp = Math.min(b.maxHp, b.hp + b.maxHp * f[1]);
-    else if(f[0] === "hot"){ b.hots = (b.hots || []).filter(h => h.key !== f[1] + from); b.hots.push({key: f[1] + from, per: f[2] / f[3], left: f[3], t: 1}); }
+    else if(f[0] === "hot"){ b.hots = (b.hots || []).filter(h => h.key !== f[1] + from); b.hots.push({key: f[1] + from, ab: f[1], per: f[2] / f[3], left: f[3], t: 1}); }
     else if(f[0] === "shield"){ b.shield = Math.max(b.shield || 0, f[1]); b.shieldT = f[2]; }
     else if(f[0] === "buff") (b.buffs = b.buffs || {})[f[1]] = f[2]; }
   G.burst(b.x * PXU, b.z * PXU, "#9cf07a", 8); }
@@ -216,7 +216,7 @@ function updBots(dt){ const el = $("botparty");
     if(b.role === "healer"){
       if(b.cast && b.cast.heal){ b.cast.t -= dt; const t = b.cast.tg; if(t !== P && t.dead || t === P && P.dead){ b.cast = null; } else if(b.cast.t <= 0){ botHeal(t, (t === P ? P.maxHp : isFriend(t) ? t.mhp : t.maxHp) * b.cast.pct, b, b.cast.name); b.cast = null; b.attackAnim = 1; } continue; }
       const group = [P, ...bots, ...(G.getPet() && !G.getPet().dead ? [G.getPet()] : []), ...friendsHere().filter(r => !r.dead && r.mhp)].filter(t => t === P ? !P.dead : !t.dead && (t.maxHp || t.mhp));
-      const pct = t => (t === P ? P.hp / P.maxHp : isFriend(t) ? t.hp / t.mhp : t.hp / t.maxHp), hurt = group.filter(t => pct(t) < 0.9).sort((a, c) => pct(a) - pct(c))[0];
+      const pct = t => (t === P ? P.hp / P.maxHp : isFriend(t) ? t.hp / t.mhp : t.hp / t.maxHp), near = t => Math.hypot(t.x - b.x, t.z - b.z) < 28, hurt = group.filter(t => pct(t) < 0.9 && near(t)).sort((a, c) => pct(a) - pct(c))[0];
       if(hurt){ const d = Math.hypot(hurt.x - b.x, hurt.z - b.z);
         if(d > 11 || !sees(b, hurt)){ botMoveTo(b, hurt.x, hurt.z, dt); continue; }
         turnTo(b, hurt.x - b.x, hurt.z - b.z, dt, 10); const fast = pct(hurt) < 0.5, cost = fast ? 9 : 6, nm = (HEAL_NAMES[b.cls] || ["Heal", "Flash Heal"])[fast ? 1 : 0];
@@ -1153,6 +1153,7 @@ function setGhost(on){ P.ghost = on; renderer.domElement.style.filter = on ? "gr
   if(on && P.corpse) corpseMark.position.set(P.corpse.x, height(P.corpse.x, P.corpse.z), P.corpse.z);
   buildHero(); updGhostBar(); }
 function releaseSpirit(){ if(!P.dead || P.ghost) return;
+  if(curDungeon() && (CO.on() || bots.length) && mobs.some(m => !m.dead && m.state === "chase" && regionOf(m.x) === regionOf(P.x))) return err("You cannot release your spirit while your group is in combat");
   P.corpse = {x: P.x, z: P.z}; G.petStash(); P.target = null; P.auto = false; P.combatT = 0; CO.select(null);
   const sp = nearestGraveyard(); P.x = sp.x + 1.6; P.z = sp.z + 1.6; P.hp = 0; $("dead").hidden = true; setGhost(true);
   log(`You have released your spirit at ${sp.name}. Return to your corpse to resurrect.`, "#9fd6e8"); save(); }
@@ -1292,7 +1293,7 @@ $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("ch
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
 G.initEngine(scene, {tankMult: () => tankMult(), startAim, floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
-CO.initCoop({scene, hud, log, err, save, floatText, guestBots: list => guestBotsIn(list), botFx: (...a) => botFx(...a), gbotPos: id => { const b = gBots.get(id); return b ? {x: b.x, z: b.z, mesh: b.mesh} : null; }, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, devApply: (a, v) => devApply(a, v), bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
+CO.initCoop({scene, hud, log, err, save, floatText, botAu: b => botAuList(b), guestBots: list => guestBotsIn(list), botFx: (...a) => botFx(...a), gbotPos: id => { const b = gBots.get(id); return b ? {x: b.x, z: b.z, mesh: b.mesh} : null; }, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, devApply: (a, v) => devApply(a, v), bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t), zoneVis: (m, l) => zoneVis(m, l), bossSync: (m, f) => bossSync(m, f),
   someoneEnters: () => {}});
@@ -1545,6 +1546,8 @@ function startNova(m, tg){ const N = m.K.nova, g = new THREE.CircleGeometry(N.r,
   m.nova = {t: N.warn, mesh, x: at.x, z: at.z}; m.attackAnim = 1; const nm = N.name || "Ashen Nova";
   log(N.atTarget ? `${m.name} brings the ceiling down – get out of the red circle!` : `${m.name} begins to cast ${nm} – get away from ${N.she ? "her" : "him"}!`, "#ff8a7a"); floatText(m, nm + "!", "#ff5a2a", true); }
 // ---------------------------------------------------------------- the dungeon bosses' extra mechanics (see BOSS_MECH in mobs.js); the host runs them
+// where someone stands for a boss's circles: a friend's latest reported spot (what they see on their own screen), not the smoothed one
+const at0 = c => c.e.tx != null && !c.pet ? {x: c.e.tx, z: c.e.tz} : c.e;
 function bossReset(m){ m.enraged = false; m.phase = 0; m.zoneT = m.K.mech && m.K.mech.zones ? m.K.mech.zones.every * 0.6 : 0; clearZones(m); }
 function bossMech(m, dt){ const M = m.K.mech, pct = m.hp / m.maxHp;
   if(M.enrage && !m.enraged && pct < M.enrage){ m.enraged = true; bossSay(m, "enrage"); }
@@ -1556,7 +1559,7 @@ function bossMech(m, dt){ const M = m.K.mech, pct = m.hp / m.maxHp;
   const Z = M.zones; if(!Z) return;
   for(const zn of m.zones || []){ zn.t -= dt; zn.mesh.scale.setScalar(1 - Math.max(0, zn.t) / Z.warn * 0.85);
     if(zn.t <= 0){ G.ring(zn.x * PXU, zn.z * PXU, Z.r * PXU, "#" + Z.color.toString(16).padStart(6, "0")); G.burst(zn.x * PXU, zn.z * PXU, "#" + Z.color.toString(16).padStart(6, "0"), 18);
-      for(const c of CO.cands(m)) if(Math.hypot(c.e.x - zn.x, c.e.z - zn.z) < Z.r) CO.mobAttack(m, c, m.dmg * Z.dmg * (m.weakT > 0 ? 0.8 : 1), "spell");
+      for(const c of CO.cands(m)){ const e = at0(c); if(Math.hypot(e.x - zn.x, e.z - zn.z) < Z.r) CO.mobAttack(m, c, m.dmg * Z.dmg * (m.weakT > 0 ? 0.8 : 1), "spell"); }
       scene.remove(zn.mesh); zn.mesh.geometry.dispose(); zn.done = true; } }
   if(m.zones) m.zones = m.zones.filter(z => !z.done);
   if((m.zoneT -= dt) > 0) return; m.zoneT = Z.every * (m.enraged ? 0.7 : 1);
@@ -1587,7 +1590,7 @@ function novaVis(m, nv){ const t = nv ? nv[0] : 0; if(t > 0){ if(!m.nova){ const
 function respawnVis(m){ m.dead = false; m.deadT = 0; m.mesh.visible = true; m.mesh.rotation.z = 0; }
 function clearNova(m){ if(m.nova){ scene.remove(m.nova.mesh); m.nova.mesh.geometry.dispose(); m.nova = null; } }
 function novaBlast(m){ const N = m.K.nova, at = {x: m.nova.x, z: m.nova.z}; G.ring(at.x * PXU, at.z * PXU, N.r * PXU, N.atTarget ? "#a8a08a" : "#ff5a2a"); G.burst(at.x * PXU, at.z * PXU, N.atTarget ? "#8a8070" : "#ff7a3a", 30);
-  for(const c of CO.cands(m)) if(distU(c.e, at) < N.r) CO.mobAttack(m, c, m.dmg * N.dmg * (m.weakT > 0 ? 0.8 : 1), "spell");       // everyone standing in it
+  for(const c of CO.cands(m)) if(distU(at0(c), at) < N.r) CO.mobAttack(m, c, m.dmg * N.dmg * (m.weakT > 0 ? 0.8 : 1), "spell");       // everyone standing in it
   clearNova(m); }
 function separate(){ const act = mobs.filter(m => m.state === "chase");
   for(let i = 0; i < act.length; i++) for(let j = i + 1; j < act.length; j++){ const a = act[i], b = act[j], d = distU(a, b), min = a.r + b.r; if(d < min && d > 0.01){ const p = (min - d) / 2, ux = (a.x - b.x) / d, uz = (a.z - b.z) / d; tryMove(a, ux * p, uz * p); tryMove(b, -ux * p, -uz * p); } } }
@@ -1671,19 +1674,35 @@ const AURA_NAME = {hotstreak: "Hot Streak", nightfall: "Nightfall", backlash: "B
   steadyaim: "Improved Steady Shot", counter: "Counterattack ready", surge: "Surge of Light", borrowed: "Borrowed Time", owlkin: "Owlkin Frenzy", lunar: "Lunar Eclipse", solar: "Solar Eclipse",
   vengeance: "Vengeance", artofwar: "The Art of War", surecrit: "Guaranteed critical strike", efocus: "Elemental Focus", maelstrom: "Maelstrom Weapon"};
 const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir of Ironskin", "#a8b0bc"], keen: ["Elixir of Keenness", "#ff9a4a"], sage: ["Elixir of Wisdom", "#9fd6e8"]};
-function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good}; }
+// what an aura does (tooltip): a talent proc uses its talent's text, anything else the ability's
+const procTalent = nm => { for(const c in TALENTS) for(const t of TALENTS[c]) if(t.name === nm) return t; return null; };
+function auraDesc(id, name){ const tl = name && procTalent(name); if(tl) return tl.d(Math.max(1, G.T(tl.id)));
+  try{ return AB[id] && AB[id].desc ? AB[id].desc() : ""; }catch(e){ return ""; } }
+const ITEM_DESC = {elixir: "Strength increased.", ironskin: "Armor increased.", keen: "Critical strike chance increased.", sage: "Spell power increased by 20%."};
+function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good, desc: auraDesc(id, name)}; }
+// a friend's or companion's buffs and heals over time: [kind, key, seconds left] (b = buff, h = heal over time, s = shield [amount])
+function friendAuras(list){ const L = [];
+  for(const a of list || []){ const [kd, k, left, amt] = a;
+    if(kd === "b"){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], desc: ITEM_DESC[k], left, good: true});
+      else if(k === "ressick") L.push({url: iconURL("skull", "#8a9aa8"), name: "Resurrection Sickness", desc: "Damage, healing, health, mana and stats reduced by 75%.", left, good: false});
+      else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : left, true, AURA_NAME[k] || null)); }
+    else if(kd === "h") L.push(AB[k] ? abAura(k, left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", desc: "Restores health over time.", left, good: true});
+    else if(kd === "s") L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(amt)} left)`, desc: "Absorbs damage.", left, good: true}); }
+  return L; }
+// a companion's auras in that form (the host's own companions)
+const botAuList = b => [...Object.entries(b.buffs || {}).map(([k, v]) => ["b", k, Math.ceil(v)]), ...(b.hots || []).map(h => ["h", h.ab, Math.ceil(h.left)]), ...(b.shield > 0 ? [["s", "shield", Math.ceil(b.shieldT), Math.round(b.shield)]] : [])];
 function playerAuras(){ const L = [];
-  for(const k in P.buffs){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], left: P.buffs[k], good: true});
+  for(const k in P.buffs){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], desc: ITEM_DESC[k], left: P.buffs[k], good: true});
     else if(OWN_TOTEM_BUFF[k] && G.totemList().some(t => t.kind === OWN_TOTEM_BUFF[k])) continue;          // (your own totem is shown instead)
     else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : P.buffs[k], true, AURA_NAME[k] || null)); }   // (Stealth has no time limit)
   for(const t of G.totemList()){ const id = Object.keys(G.TOTEM_OF).find(a => G.TOTEM_OF[a] === t.kind); L.push({...abAura(id, t.left, true, `${t.name} (${G.TOTEM_EL[t.el]}). Right-click to cancel.`), cancel: "totem:" + t.kind}); }
-  for(const h of P.hots) L.push(AB[h.key] ? abAura(h.key, h.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", left: h.left, good: true});
-  if(P.shield > 0) L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(P.shield)} left)`, left: P.shieldT, good: true});
-  if(P.sitting) L.push({url: iconURL("halo", "#7fa8b8"), name: "Resting", left: null, good: true});
-  if(P.buffs.ressick) L.push({url: iconURL("skull", "#8a9aa8"), name: "Resurrection Sickness: damage, healing, health, mana and stats reduced by 75%", left: P.buffs.ressick, good: false});
-  if(P.potCd > 0) L.push({url: iconURL("flask", "#8a8a8a"), name: "Potion cooldown", left: P.potCd, good: false});
-  if(P.buffs.chill) L.push({url: iconURL("snowflake", "#bfe9ff"), name: "Chilled: movement speed reduced by 40%", left: P.buffs.chill, good: false});
-  if(P.envSpeed < 1) L.push({url: iconURL("drop", "#5fa8e0"), name: "Wading: movement speed reduced by 45%", left: null, good: false});
+  for(const h of P.hots){ const k = h.key.split("_")[0]; L.push(AB[k] ? abAura(k, h.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", desc: "Restores health over time.", left: h.left, good: true}); }
+  if(P.shield > 0) L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(P.shield)} left)`, desc: "Absorbs damage.", left: P.shieldT, good: true});
+  if(P.sitting) L.push({url: iconURL("halo", "#7fa8b8"), name: "Resting", desc: "Health and mana recover quickly. Moving or acting ends it.", left: null, good: true});
+  if(P.buffs.ressick) L.push({url: iconURL("skull", "#8a9aa8"), name: "Resurrection Sickness", desc: "Damage, healing, health, mana and stats reduced by 75%.", left: P.buffs.ressick, good: false});
+  if(P.potCd > 0) L.push({url: iconURL("flask", "#8a8a8a"), name: "Potion cooldown", desc: "You cannot drink another potion yet.", left: P.potCd, good: false});
+  if(P.buffs.chill) L.push({url: iconURL("snowflake", "#bfe9ff"), name: "Chilled", desc: "Movement speed reduced by 40%.", left: P.buffs.chill, good: false});
+  if(P.envSpeed < 1) L.push({url: iconURL("drop", "#5fa8e0"), name: "Wading", desc: "Movement speed reduced by 45%.", left: null, good: false});
   return L; }
 function targetAuras(m){ const L = [];
   for(const d of m.dots){ const id = AURA[d.key] || (AB[d.key] ? d.key : null); L.push(id ? abAura(id, d.left, false) : {url: iconURL("drop", "#d0453a"), name: d.key, left: d.left, good: false}); }
@@ -1700,8 +1719,12 @@ function petAurasHUD(){ return G.petAuras().map(a => a.shield ? {url: iconURL("s
   : AB[a.id] ? abAura(a.id, a.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", left: a.left, good: true}); }
 const fmtLeft = s => s == null ? "" : s >= 60 ? Math.ceil(s / 60) + "m" : Math.ceil(s) + "";
 const OWN_TOTEM_BUFF = {stskin: "stoneskin", earthstr: "strength", airgrace: "graceair"};
-function setAuras(el, list){ const html = list.map(a => `<span class="aura ${a.good ? "" : "bad"}" title="${a.name}"${a.cancel ? ` data-cancel="${a.cancel}"` : ""}><img src="${a.url}"><b>${fmtLeft(a.left)}</b></span>`).join("");
+function setAuras(el, list){ el._aur = list; const html = list.map((a, i) => `<span class="aura ${a.good ? "" : "bad"}" data-ai="${i}"${a.cancel ? ` data-cancel="${a.cancel}"` : ""}><img src="${a.url}"><b>${fmtLeft(a.left)}</b></span>`).join("");
   if(el.innerHTML !== html) el.innerHTML = html; }
+let auraTip = false;
+addEventListener("mouseover", e => { const s = e.target.closest && e.target.closest(".aura[data-ai]"), a = s && s.parentElement._aur && s.parentElement._aur[+s.dataset.ai];
+  if(!a){ if(auraTip){ auraTip = false; hideTip(); } return; }
+  auraTip = true; showTipAt(e, `<h4 style="color:${a.good ? "#7be08a" : "#ff8a7a"}">${a.name}</h4>${a.desc ? `<div>${a.desc}</div>` : ""}${a.left != null ? `<div class="muted" style="margin-top:4px">${fmtLeft(a.left)}${a.left < 60 ? " sec" : ""} remaining</div>` : ""}${a.cancel ? `<div class="muted">Right-click to cancel.</div>` : ""}`); });
 // right-click a totem under your portrait to cancel it
 $("pbuffs").addEventListener("contextmenu", e => { e.preventDefault(); const a = e.target.closest("[data-cancel]"); if(!a) return; const [k, id] = a.dataset.cancel.split(":"); if(k === "totem") G.cancelTotem(id); });
 const BUFF_NAMES = {shout: "War Cry", bark: "Barkskin", avenging: "Righteous Wrath", bubble: "Divine Shield", dash: "Dash"};
@@ -1730,7 +1753,7 @@ function updHUD(dt){
   if(P.target || P.ftarget || P.selfT || !G.getPet() || G.getPet().dead) P.petSel = false;
   { const pf = $("pframe"), left = pf.offsetLeft + pf.offsetWidth + 12 + "px"; if($("tframe").style.left !== left) $("tframe").style.left = left; }   // the target frame sits right of yours
   const t = P.target, tf = $("tframe"), fr = !t && P.ftarget ? CO.remoteById(P.ftarget) : null, me = !t && !fr && P.selfT, pe = !t && !fr && !me && G.petSelected() ? G.getPet() : null;
-  setAuras($("tauras"), t && !t.dead ? targetAuras(t) : pe ? petAurasHUD() : []);
+  setAuras($("tauras"), t && !t.dead ? targetAuras(t) : pe ? petAurasHUD() : fr && !fr.dead ? friendAuras(fr.au) : me ? playerAuras() : []);
   tf.classList.toggle("friend", !!fr); tf.classList.toggle("self", !!(me || pe));
   { const mob = t && !t.dead ? t : null, rank = !mob ? "" : mob.boss ? "boss" : mob.elite || mob.dg ? "elite" : (mob.rare || mob.K.rare) ? "rare" : "";   // elites, rares and bosses get their own frame
     for(const k of ["boss", "elite", "rare"]) tf.classList.toggle(k, rank === k); tf.dataset.rank = rank ? rank[0].toUpperCase() + rank.slice(1) : ""; }
@@ -1948,7 +1971,7 @@ function update(dt){
       const sd = flightMesh.userData.saddle; hero.position.set(P.x + Math.sin(P.rot) * FLY_SEAT, P.fy + sd - 0.5, P.z + Math.cos(P.rot) * FLY_SEAT); hero.rotation.set(FLY_PITCH * 0.6, P.rot, P.flying.bank * 0.8, "YXZ"); }
     else if(mountMesh){ const gy = height(P.x, P.z); mountMesh.position.set(P.x, gy + (P.jumpY || 0), P.z); mountMesh.rotation.y = hero.rotation.y; mountMesh.userData.animate(P.walk * 0.75, P.moving, 0); hero.position.y = gy + (P.jumpY || 0) + mountMesh.userData.saddle - 0.38 + (P.moving ? Math.abs(Math.sin(P.walk * 0.75)) * 0.08 : 0); } }
   // monsters: only the ones near you (or a friend) are drawn and move about
-  { const rs = CO.visible(), reg0 = curDungeon();
+  { const rs = Object.values(CO.COOP.remotes), reg0 = curDungeon();
     for(const m of mobs){ const d = Math.hypot(m.x - P.x, m.z - P.z), dr = rs.length ? Math.min(...rs.map(r => Math.hypot(m.x - r.x, m.z - r.z))) : 1e9;
       m.far = Math.min(d, dr) > 110 && m.state === "idle"; const show = running && d < (P.ghost ? GHOST_SIGHT : GFX.view) && dungeonAt(m.x) === reg0;
       if(show !== m.inScene){ m.inScene = show; if(show) scene.add(m.mesh); else scene.remove(m.mesh); if(m.sheep){ if(show) scene.add(m.sheep); else scene.remove(m.sheep); } } } }

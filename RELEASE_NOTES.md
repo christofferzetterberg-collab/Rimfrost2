@@ -1,5 +1,21 @@
 # Rimfrost 2 – Release notes
 
+## v0.46.0
+
+### New
+- **Aura tooltips:** Hover over a buff or debuff to see what it does and how long it lasts.
+- **Friends' auras:** Buffs, heals over time and shields on a targeted friend or companion are now shown on the target frame.
+
+### Changed
+- **Release Spirit:** In a dungeon, you can no longer release your spirit while your group is in combat.
+- **Companion healers:** Companion healers now stay with the group and only heal members close to them.
+
+### Fixed
+- Monsters near friends now move and attack as normal, even when the host is far away.
+- Co-op is smoother: less data is sent per second, which removes delays in monster movement and boss mechanics.
+- Boss ground effects now hit friends based on where they stand on their own screen.
+- Friends' jumps are now smooth.
+
 ## v0.45.0
 
 ### New

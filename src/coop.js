@@ -100,6 +100,7 @@ function data(c, d){
   if(!r){ r = COOP.remotes[d.id] = {id: d.id, x: d.x, z: d.z, rot: d.rot, r: 0.4, walk: 0}; H.log(`${d.name} joined the game.`, "#7be08a"); refresh(); }
   const wasReg = reg(r.x);
   Object.assign(r, d, {x: r.x, z: r.z, rot: r.rot, tx: d.x, tz: d.z, trot: d.rot, seen: performance.now(), via: c.peer});
+  if(d.jy > 0 && !(r.jyL > 0)){ r.jyL = d.jy; r.jvL = Math.sqrt(Math.max(0, 5.6 * 5.6 - 32 * d.jy)); }      // a friend jumps: played here at full frame rate
   if(Math.hypot(r.tx - r.x, r.tz - r.z) > 20){ r.x = r.tx; r.z = r.tz; }                   // teleports and dungeon entries snap
   if(COOP.role === "host" && reg(r.tx) > 0 && reg(r.tx) !== wasReg) H.someoneEnters(reg(r.tx));
   syncPet(r);
@@ -118,10 +119,15 @@ export function chat(text){ text = String(text || "").trim().slice(0, 200); if(!
 
 // ---------------------------------------------------------------- my state → friends, 12 times a second
 function lookKey(){ const eq = S.cur.eq || {}, o = {}; for(const k of ["head", "shoulder", "chest", "hands", "legs", "feet", "weapon", "offhand"]) if(eq[k]) o[k] = {arm: eq[k].arm, wt: eq[k].wt, q: eq[k].q}; return o; }
+// your buffs, heals over time and shield, for friends' target frames: [kind, key, seconds left (, amount)]
+function myAuras(){ const L = [];
+  for(const [k, v] of Object.entries(P.buffs)) if(typeof v === "number" && v > 0 && L.length < 16) L.push(["b", k, Math.ceil(v)]);
+  for(const h of P.hots) L.push(["h", h.key.split("_")[0], Math.ceil(h.left)]);
+  if(P.shield > 0) L.push(["s", "shield", Math.ceil(P.shieldT), Math.round(P.shield)]); return L; }
 function state(){
   const pet = G.getPet();
   return {t: "st", id: COOP.peer.id, name: S.cur.name, race: S.cur.race, cls: S.cur.cls, lvl: S.cur.level, x: +P.x.toFixed(2), z: +P.z.toFixed(2), rot: +P.rot.toFixed(2), mv: !!P.moving,
-    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!P.buffs.meld, st: !!P.buffs.stealth, mt: P.flying ? (P.flying.ship ? "ship" : "drake") : P.mount || null, fy: P.flying ? +P.fy.toFixed(2) : null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, cx: P.ghost && P.corpse ? +P.corpse.x.toFixed(2) : null, cz: P.ghost && P.corpse ? +P.corpse.z.toFixed(2) : null, jy: P.jumpY > 0 ? +P.jumpY.toFixed(2) : 0, tk: H.tankMult && H.tankMult() > 1 ? 1 : 0, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
+    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!P.buffs.meld, st: !!P.buffs.stealth, mt: P.flying ? (P.flying.ship ? "ship" : "drake") : P.mount || null, fy: P.flying ? +P.fy.toFixed(2) : null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, au: myAuras(), cx: P.ghost && P.corpse ? +P.corpse.x.toFixed(2) : null, cz: P.ghost && P.corpse ? +P.corpse.z.toFixed(2) : null, jy: P.jumpY > 0 ? +P.jumpY.toFixed(2) : 0, tk: H.tankMult && H.tankMult() > 1 ? 1 : 0, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
     pet: pet && !P.flying ? {k: pet.kind, x: +pet.x.toFixed(2), z: +pet.z.toFixed(2), rot: +pet.rot.toFixed(2), hp: Math.round(pet.hp), mhp: pet.maxHp, dead: !!pet.dead, mv: !!pet.moving, atk: +(pet.attackAnim || 0).toFixed(2), res: Math.round(pet.res || 0)} : null};
 }
 function sendState(){ if(!on() || !COOP.peer || !S.cur) return; broadcast(state()); }
@@ -134,6 +140,7 @@ export function update(dt){
     if(now - r.seen > 8000){ H.log(`${r.name} lost connection.`, "#93a4ad"); removeRemote(id); continue; }
     const k = Math.min(1, dt * 12); r.x += (r.tx - r.x) * k; r.z += (r.tz - r.z) * k; let dr = r.trot - r.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); r.rot += dr * k;
     r.walk = r.mv ? r.walk + dt * 9 : r.walk * 0.85;
+    if(r.jyL > 0){ r.jyL += r.jvL * dt; r.jvL -= 16 * dt; if(r.jyL <= 0) r.jyL = 0; }
     const po = r.petObj; if(po){ po.x += (po.tx - po.x) * k; po.z += (po.tz - po.z) * k; po.walk = po.mv ? (po.walk || 0) + dt * 10 : (po.walk || 0) * 0.85; }
   }
 }
@@ -160,11 +167,10 @@ export function render(){
     { const fade = !!(r.meld || r.st); if(fade !== !!r.mesh.userData.faded){ r.mesh.userData.faded = fade;   // a friend in Stealth or Shadowmeld looks faded
       r.mesh.traverse(o => { if(!o.isMesh) return; if(fade){ o.userData.m0 = o.material; o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.4; o.material.depthWrite = false; } else if(o.userData.m0){ o.material = o.userData.m0; o.userData.m0 = null; } }); } }
     if((r.mt || null) !== (r.mtShown || null)){ if(r.mtMesh) H.scene.remove(r.mtMesh); r.mtMesh = r.mt && H.mountMesh ? H.mountMesh(r.mt) : null; if(r.mtMesh) H.scene.add(r.mtMesh); r.mtShown = r.mt || null; }
-    r.jyS = (r.jyS || 0) + ((r.jy || 0) - (r.jyS || 0)) * 0.45;                     // a friend jumping
-    r.mesh.userData.animate(r.walk, r.mv, r.ak === "cast" ? 0 : r.atk || 0, r.sit || (r.mt && r.mt !== "ship") ? "sit" : r.jyS > 0.05 && !r.mt ? "jump" : r.pose || null);
+    r.mesh.userData.animate(r.walk, r.mv, r.ak === "cast" ? 0 : r.atk || 0, r.sit || (r.mt && r.mt !== "ship") ? "sit" : r.jyL > 0.05 && !r.mt ? "jump" : r.pose || null);
     const gy = r.fy != null ? (r.fyS = r.fyS == null ? r.fy : r.fyS + (r.fy - r.fyS) * 0.25) : (r.fyS = null, height(r.x, r.z));   // a friend on a flight is up in the air
-    if(body) r.mesh.position.set(r.cx, height(r.cx, r.cz) + 0.3, r.cz); else r.mesh.position.set(r.x, gy + (r.dead ? 0.3 : 0) + (r.fy == null ? r.jyS : 0), r.z); r.mesh.rotation.set(r.dead ? -1.4 : 0, r.rot, 0);
-    if(r.mtMesh){ r.mtMesh.visible = vis; r.mtMesh.position.set(r.x, gy + (r.fy == null ? r.jyS : 0), r.z); r.mtMesh.rotation.y = r.rot; r.mtMesh.userData.animate(r.walk * 0.75, r.mv, 0); if(r.mt !== "ship") r.mesh.position.y += r.mtMesh.userData.saddle - 0.38; }
+    if(body) r.mesh.position.set(r.cx, height(r.cx, r.cz) + 0.3, r.cz); else r.mesh.position.set(r.x, gy + (r.dead ? 0.3 : 0) + (r.fy == null ? r.jyL || 0 : 0), r.z); r.mesh.rotation.set(r.dead ? -1.4 : 0, r.rot, 0);
+    if(r.mtMesh){ r.mtMesh.visible = vis; r.mtMesh.position.set(r.x, gy + (r.fy == null ? r.jyL || 0 : 0), r.z); r.mtMesh.rotation.y = r.rot; r.mtMesh.userData.animate(r.walk * 0.75, r.mv, 0); if(r.mt !== "ship") r.mesh.position.y += r.mtMesh.userData.saddle - 0.38; }
     if(!r.plate){ r.plate = document.createElement("div"); r.plate.className = "plate friend"; r.plate.innerHTML = `<span></span><div class="hb"><i></i></div>`; H.hud.appendChild(r.plate); }
     const s = !vis ? {on: false} : body ? H.toScreen(r.cx, height(r.cx, r.cz) + 0.9, r.cz) : H.toScreen(r.x, gy + r.mesh.userData.height + 0.35 + (r.mtMesh ? r.mtMesh.userData.saddle : 0), r.z);
     if(!s.on){ r.plate.style.display = "none"; } else { r.plate.style.display = ""; r.plate.style.left = s.x + "px"; r.plate.style.top = s.y + "px";
@@ -289,18 +295,20 @@ function rollResult(d){ H.rollHide(d.rid); const nm = id => (d.names && d.names[
 export function rollTick(){ const now = performance.now(); for(const [rid, R] of Object.entries(ROLLS)) if(now - R.t > 30000) resolveRoll(rid); }   // (30 sec to choose)
 // host → guests: monsters near any guest, 10 times a second
 const ST = {idle: 0, chase: 1, return: 2, dead: 0};
-function hostMobs(){ const rs = Object.values(COOP.remotes); if(!rs.length) return; const out = [];
+function hostMobs(){ const rs = Object.values(COOP.remotes); if(!rs.length) return; const out = [], now = performance.now();
   for(const m of mobs){ if(m.nid == null) continue;
     if(!rs.some(r => reg(r.x) === reg(m.x) && Math.hypot(r.x - m.x, r.z - m.z) < 90)) continue;
-    out.push([m.nid, +m.x.toFixed(2), +m.z.toFixed(2), Math.round(m.hp), ST[m.state] || 0, m.dead ? 1 : 0, +m.rot.toFixed(2), m.moving ? 1 : 0, m.tgtId || 0,
+    const e = [m.nid, +m.x.toFixed(2), +m.z.toFixed(2), Math.round(m.hp), ST[m.state] || 0, m.dead ? 1 : 0, +m.rot.toFixed(2), m.moving ? 1 : 0, m.tgtId || 0,
       m.nova ? [+m.nova.t.toFixed(2), +m.nova.x.toFixed(1), +m.nova.z.toFixed(1)] : 0, +m.stunT.toFixed(1), +m.rootT.toFixed(1), +m.slowT.toFixed(1), m.dots.map(d => [d.key, d.left]), +(m.attackAnim || 0).toFixed(2), m.slowPct || 0, m.maxHp, m.state === "chase" && (m.threat || m.botTh) ? Object.entries({...m.threat, ...m.botTh}).map(([k, v]) => [k, Math.round(v)]) : 0, +(m.freezeT || 0).toFixed(1),
-      m.zones && m.zones.length ? m.zones.map(z => [+z.x.toFixed(1), +z.z.toFixed(1), +z.t.toFixed(2)]) : 0, (m.enraged ? 1 : 0) + (m.phase || 0) * 2, +(m.fearT || 0).toFixed(1), +(m.polyT || 0).toFixed(1)]); }
-  broadcast({t: "mobs", m: out}); }
+      m.zones && m.zones.length ? m.zones.map(z => [+z.x.toFixed(1), +z.z.toFixed(1), +z.t.toFixed(2)]) : 0, (m.enraged ? 1 : 0) + (m.phase || 0) * 2, +(m.fearT || 0).toFixed(1), +(m.polyT || 0).toFixed(1)];
+    const k = JSON.stringify(e), age = now - (m.sentT || 0); if(age < 2000 && (k === m.sentK || (m.state === "idle" && !m.dead && age < 400))) continue;   // (unchanged: again every 2 sec; calm ones wandering: 2–3 times a sec)
+    m.sentK = k; m.sentT = now; out.push(e); }
+  if(out.length) broadcast({t: "mobs", m: out}); }
 // host → guests: the host's dungeon companions (drawn on the guests' screens; they are run by the host)
 let hadBots = false;
 function hostBots(){ const bs = H.bots ? H.bots() : []; if(!bs.length && !hadBots) return; hadBots = bs.length > 0;
   broadcast({t: "bots", b: bs.map(b => ({id: b.id, name: b.name, role: b.role, cls: b.cls, race: b.race, x: +b.x.toFixed(2), z: +b.z.toFixed(2), rot: +b.rot.toFixed(2), hp: Math.round(b.hp), mhp: b.maxHp, mana: Math.round(b.mana),
-    dead: !!b.dead, mv: !!b.moving, atk: +(b.attackAnim || 0).toFixed(2), ak: b.akind || "melee", dr: !!b.drinking, lvl: b.lvl, cast: b.cast && !b.dead ? [b.cast.name, +(1 - b.cast.t / b.cast.total).toFixed(2)] : 0,
+    dead: !!b.dead, au: H.botAu ? H.botAu(b) : [], mv: !!b.moving, atk: +(b.attackAnim || 0).toFixed(2), ak: b.akind || "melee", dr: !!b.drinking, lvl: b.lvl, cast: b.cast && !b.dead ? [b.cast.name, +(1 - b.cast.t / b.cast.total).toFixed(2)] : 0,
     pet: b.pet ? [+b.pet.x.toFixed(2), +b.pet.z.toFixed(2), +b.pet.rot.toFixed(2), b.pet.moving ? 1 : 0, +(b.pet.attackAnim || 0).toFixed(2)] : 0}))}); }
 // a companion heals or resurrects a friend (host)
 export function botHealFriend(r, amt, label){ sendFx(r, [["heal", Math.round(amt)]], label); }
@@ -330,7 +338,7 @@ export const setCap = c => { CAP = c; };
 const FRIENDLY = new Set(["heal", "renew", "pws", "palheal", "touch", "rejuv", "bloom", "healwave", "thorns", "powerinf", "painsupp", "guardian"]);
 // a companion as a friendly target: the host's own, or (guests) the copy the host sends
 function botView(id){ if(!id) return null;
-  if(COOP.role !== "guest"){ const b = (H.bots ? H.bots() : []).find(b => b.id === id); return b ? {id, bot: true, name: b.name, cls: b.cls, lvl: b.lvl, hp: b.hp, mhp: b.maxHp, dead: !!b.dead, x: b.x, z: b.z, mesh: b.mesh} : null; }
+  if(COOP.role !== "guest"){ const b = (H.bots ? H.bots() : []).find(b => b.id === id); return b ? {id, bot: true, name: b.name, cls: b.cls, lvl: b.lvl, hp: b.hp, mhp: b.maxHp, dead: !!b.dead, x: b.x, z: b.z, mesh: b.mesh, au: H.botAu ? H.botAu(b) : []} : null; }
   const g = COOP.gbots.find(b => b.id === id); if(!g) return null; const p = H.gbotPos ? H.gbotPos(id) : null; return {...g, bot: true, ...(p || {})}; }
 const friendOrBot = id => (on() && COOP.remotes[id]) || botView(id);
 function friendSel(){ const r = P.ftarget && friendOrBot(P.ftarget); return r && !r.dead && sameRegion(r, P) ? r : null; }
