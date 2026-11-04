@@ -128,7 +128,12 @@ function botSpellHit(b, tg, sp){ const crit = Math.random() < 0.1, k = (0.9 + Ma
   if(sp.dmg) G.botDamageMob(tg, Math.max(1, Math.round(baseDmg() * sp.dmg * k)), crit, "magic", b);
   if(sp.dot){ b.dots = (b.dots || []).filter(d => !(d.m === tg && d.name === sp.name)); b.dots.push({m: tg, name: sp.name, per: baseDmg() * sp.dot * 3, left: 12, t: 3}); } }
 let bots = [], mercPick = [null, null], botMode = "assist", botStay = null;   // botMode: assist | stay | follow (passive)
-const botSlots = () => CO.on() ? 0 : 2;                                                        // (co-op: not yet)
+// a dungeon group is at most 3: alone 2 companions, two players 1, three none (in co-op the host hires them for the group)
+const groupSize = () => CO.on() ? 1 + Object.keys(CO.COOP.remotes).length : 1;
+const botSlots = () => CO.COOP.role === "guest" ? 0 : Math.max(0, 3 - groupSize());
+// friends in the same place as the companions (co-op)
+const friendsHere = () => CO.on() && bots.length ? Object.values(CO.COOP.remotes).filter(r => regionOf(r.x) === botRegion() && r.fy == null) : [];
+const isFriend = t => !!(t && t.id && CO.COOP.remotes[t.id] === t);
 const botRegion = () => bots.length ? regionOf(bots[0].x) : null;
 const baseDmg = () => 3 + S.cur.level * 2.4;
 function botStats(b){ const pct = b.maxHp ? b.hp / b.maxHp : 1, mh = Math.round(P.maxHp / (P.buffs.ressick ? 0.25 : 1) * (b.role === "tank" ? 1.35 : 0.8));
@@ -150,7 +155,8 @@ function dismissBots(quiet){ botMode = "assist"; botStay = null;  if(bots.length
 function botHurt(b, dmg, m){ if(b.dead) return; if(Math.random() < (b.role === "tank" ? 0.12 : 0.05)){ floatText(b, "Dodge", "#cfd8dc"); return; }
   const amt = Math.max(1, Math.round(dmg * (b.role === "tank" ? 0.6 : BOT_ARMOR[b.cls] || 1) * (0.92 + Math.random() * 0.16))); b.hp -= amt; floatText(b, "-" + amt, "#ff7a6a");
   if(b.hp <= 0){ b.hp = 0; b.dead = true; b.deadT = 0; b.cast = null; log(`${b.name} has died.`, "#ff8a7a"); } }
-function botHeal(t, amt, b){ if(t === P){ if(P.dead) return; P.hp = Math.min(P.maxHp, P.hp + amt); }
+function botHeal(t, amt, b, label){ if(isFriend(t)){ if(t.dead) return; CO.botHealFriend(t, amt, label || "Heal"); }
+  else if(t === P){ if(P.dead) return; P.hp = Math.min(P.maxHp, P.hp + amt); }
   else { if(t.dead) return; t.hp = Math.min(t.maxHp, t.hp + amt); }
   floatText(t, "+" + Math.round(amt), "#7be08a"); G.burst(t.x * PXU, t.z * PXU, "#9cf07a", 8);
   for(const m of mobs) if(m.state === "chase" && !m.dead && regionOf(m.x) === regionOf(b.x)) (m.botTh = m.botTh || {})[b.id] = (m.botTh[b.id] || 0) + amt * 0.4; }   // healing draws attention too
@@ -164,9 +170,10 @@ function botTarget(b){ const L = engaged(b); const pt = P.target && !P.target.de
   if(t && botMode === "stay" && botStay && Math.hypot(t.x - botStay.x, t.z - botStay.z) > 14) t = null;          // holding position: only what comes close
   if(t && waitForTank(t)){ b.waiting = t; return null; } b.waiting = null; return t; }
 // like real players, damage dealers give the tank a moment to gain the monster's attention before they attack (unless you order an attack)
-function groupTank(){ if(tankMult() > 1 && !P.dead) return P; return bots.find(o => o.role === "tank" && !o.dead) || null; }
+function groupTank(){ if(tankMult() > 1 && !P.dead) return P; return bots.find(o => o.role === "tank" && !o.dead) || friendsHere().find(r => r.tk && !r.dead) || null; }
+const thOf = (m, e) => e.bot ? ((m.botTh || {})[e.id] || 0) : CO.coopMob(m) ? ((m.threat || {})[e === P ? CO.myId() : e.id] || 0) : (m.thMe || 0);
 function waitForTank(m){ const tk = groupTank(); if(!tk || m.botGo) return false;
-  m.bStart = m.bStart || now; const th = tk === P ? (m.thMe || 0) : ((m.botTh || {})[tk.id] || 0);
+  m.bStart = m.bStart || now; const th = thOf(m, tk);
   return now - m.bStart < 2.5 || th <= 0; }
 // stay out of the glowing circles a boss puts on the ground
 function botDanger(b){ for(const m of mobs){ if(m.dead || regionOf(m.x) !== regionOf(b.x)) continue;
@@ -176,6 +183,8 @@ function botMoveTo(b, x, z, dt, sp = 7.4){ if(Math.hypot(x - b.x, z - b.z) < 0.4
 function updBots(dt){ const el = $("botparty");
   if(!bots.length) return;
   if(!running || regionOf(P.x) !== botRegion()) return dismissBots();                       // they stay in their dungeon
+  while(bots.length > botSlots()){ const b = bots.pop(); scene.remove(b.mesh); if(b.pet) scene.remove(b.pet.mesh); b.plate.remove(); for(const m of mobs) if(m.botTh) delete m.botTh[b.id];
+    log(`${b.name} leaves the group to make room.`, "#93a4ad"); if(!bots.length){ dismissBots(true); return; } }
   const inCombat = bots.some(b => !b.dead && engaged(b).length) || (!P.dead && P.combatT > 0);
   for(const b of bots){ b.walk = b.moving ? b.walk + dt * 9 : b.walk * 0.85; b.moving = false; b.attackAnim = Math.max(0, b.attackAnim - dt * 3); b.tauntCd -= dt;
     if((b.statT = (b.statT || 0) - dt) <= 0){ b.statT = 2; botStats(b); }
@@ -190,9 +199,9 @@ function updBots(dt){ const el = $("botparty");
     const danger = botDanger(b); if(danger){ const a = Math.atan2(b.z - danger.z, b.x - danger.x); b.cast = null; botMoveTo(b, danger.x + Math.cos(a) * (danger.r + 1), danger.z + Math.sin(a) * (danger.r + 1), dt, 8.5); continue; }
     // healer: heals the most hurt in the group first
     if(b.role === "healer"){
-      if(b.cast && b.cast.heal){ b.cast.t -= dt; const t = b.cast.tg; if(t !== P && t.dead || t === P && P.dead){ b.cast = null; } else if(b.cast.t <= 0){ botHeal(t, (t === P ? P.maxHp : t.maxHp) * b.cast.pct, b); b.cast = null; b.attackAnim = 1; } continue; }
-      const group = [P, ...bots, ...(G.getPet() && !G.getPet().dead ? [G.getPet()] : [])].filter(t => t === P ? !P.dead : !t.dead && t.maxHp);
-      const pct = t => (t === P ? P.hp / P.maxHp : t.hp / t.maxHp), hurt = group.filter(t => pct(t) < 0.9).sort((a, c) => pct(a) - pct(c))[0];
+      if(b.cast && b.cast.heal){ b.cast.t -= dt; const t = b.cast.tg; if(t !== P && t.dead || t === P && P.dead){ b.cast = null; } else if(b.cast.t <= 0){ botHeal(t, (t === P ? P.maxHp : isFriend(t) ? t.mhp : t.maxHp) * b.cast.pct, b, b.cast.name); b.cast = null; b.attackAnim = 1; } continue; }
+      const group = [P, ...bots, ...(G.getPet() && !G.getPet().dead ? [G.getPet()] : []), ...friendsHere().filter(r => !r.dead && r.mhp)].filter(t => t === P ? !P.dead : !t.dead && (t.maxHp || t.mhp));
+      const pct = t => (t === P ? P.hp / P.maxHp : isFriend(t) ? t.hp / t.mhp : t.hp / t.maxHp), hurt = group.filter(t => pct(t) < 0.9).sort((a, c) => pct(a) - pct(c))[0];
       if(hurt){ const d = Math.hypot(hurt.x - b.x, hurt.z - b.z);
         if(d > 11 || !sees(b, hurt)){ botMoveTo(b, hurt.x, hurt.z, dt); continue; }
         turnTo(b, hurt.x - b.x, hurt.z - b.z, dt, 10); const fast = pct(hurt) < 0.5, cost = fast ? 9 : 6, nm = (HEAL_NAMES[b.cls] || ["Heal", "Flash Heal"])[fast ? 1 : 0];
@@ -202,6 +211,11 @@ function updBots(dt){ const el = $("botparty");
       if(P.dead && !P.ghost && !inCombat){ const d = Math.hypot(P.x - b.x, P.z - b.z);
         if(d > 8){ botMoveTo(b, P.x, P.z, dt); continue; }
         if(!rezOffer && (b.rezT = (b.rezT || 0) + dt) > 2){ b.rezT = 0; b.cast = null; b.attackAnim = 1; G.burst(P.x * PXU, P.z * PXU, "#fff2b0", 16); rezAt(P.x, P.z, b.name); } continue; }
+      // a dead friend (still at their body): resurrects them too
+      const fd = !inCombat && friendsHere().find(r => r.dead && !r.gh && !(now - ((b.rezSent || {})[r.id] || -99) < 20));
+      if(fd){ const d = Math.hypot(fd.x - b.x, fd.z - b.z);
+        if(d > 8){ botMoveTo(b, fd.x, fd.z, dt); continue; }
+        if((b.rezT = (b.rezT || 0) + dt) > 2){ b.rezT = 0; b.attackAnim = 1; (b.rezSent = b.rezSent || {})[fd.id] = now; G.burst(fd.x * PXU, fd.z * PXU, "#fff2b0", 16); CO.botRezFriend(fd, b); log(`${b.name} resurrects ${fd.name}.`, "#7be08a"); } continue; }
     }
     // like a real player: with a tank in the group, a damage dealer that pulls a monster stops attacking and runs to the tank until the tank takes it back
     if(b.role === "dps" && inCombat){ const tk = groupTank(), mine = tk && tk !== b && engaged(b).find(m => m.tgtId === b.id);
@@ -243,6 +257,32 @@ function updBots(dt){ const el = $("botparty");
     <div class="bar"><i style="width:${Math.max(0, b.hp / b.maxHp * 100)}%;background:${b.dead ? "#555" : "#3fbf5a"}"></i></div>${usesMana(b) ? `<div class="bar rs"><i style="width:${Math.round(b.mana)}%;background:var(--mana)"></i></div>` : ""}</div>`).join("");
   if(el.innerHTML !== html) el.innerHTML = html;
   { const pa = $("party"), top = pa.offsetTop + pa.offsetHeight + (pa.innerHTML ? 6 : 0) + "px"; if(el.style.top !== top) el.style.top = top; } }
+// co-op guests: the host's companions, drawn here (the host runs them)
+const gBots = new Map();
+function guestBotsIn(list){ const seen = new Set();
+  for(const s of list){ seen.add(s.id); let b = gBots.get(s.id);
+    if(b && (b.cls !== s.cls || b.race !== s.race)){ dropGuestBot(b); b = null; }
+    if(!b){ const mesh = s.role === "tank" && s.cls === "druid" ? makeBearForm() : makeHero(s.race, s.cls, RACES, {}); scene.add(mesh);
+      const pl = document.createElement("div"); pl.className = "plate friend"; pl.innerHTML = `<span></span><div class="hb"><i></i></div><div class="cb"><i></i><em></em></div>`; hud.appendChild(pl);
+      b = {...s, mesh, plate: pl, walk: 0, tx: s.x, tz: s.z, trot: s.rot}; if(s.pet){ b.petMesh = makeWolf(); scene.add(b.petMesh); b.px = s.pet[0]; b.pz = s.pet[1]; b.pwalk = 0; } gBots.set(s.id, b); }
+    Object.assign(b, s, {x: b.x, z: b.z, rot: b.rot, tx: s.x, tz: s.z, trot: s.rot}); if(Math.hypot(b.tx - b.x, b.tz - b.z) > 20){ b.x = b.tx; b.z = b.tz; } }
+  for(const [id, b] of gBots) if(!seen.has(id)) dropGuestBot(b); }
+function dropGuestBot(b){ scene.remove(b.mesh); if(b.petMesh) scene.remove(b.petMesh); b.plate.remove(); gBots.delete(b.id); if(!gBots.size) $("botparty").innerHTML = ""; }
+function updGuestBots(dt){ if(!gBots.size) return; const k = Math.min(1, dt * 10), here = b => regionOf(b.x) === regionOf(P.x);
+  for(const b of gBots.values()){ b.x += (b.tx - b.x) * k; b.z += (b.tz - b.z) * k; let dr = b.trot - b.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); b.rot += dr * k;
+    b.walk = b.mv ? b.walk + dt * 9 : b.walk * 0.85; const vis = here(b), ms = b.mesh; ms.visible = vis; ms.position.set(b.x, height(b.x, b.z), b.z); ms.rotation.set(0, b.rot, 0);
+    ms.userData.animate(b.walk, b.mv, b.atk || 0, b.dr ? "sit" : b.cast ? "cast" : null, {kind: b.ak || "melee", dead: b.dead});
+    if(b.petMesh && b.pet){ b.px += (b.pet[0] - b.px) * k; b.pz += (b.pet[1] - b.pz) * k; b.pwalk = b.pet[3] ? b.pwalk + dt * 10 : b.pwalk * 0.85; b.petMesh.visible = vis;
+      b.petMesh.position.set(b.px, height(b.px, b.pz), b.pz); b.petMesh.rotation.y = b.pet[2]; b.petMesh.userData.animate(b.pwalk, !!b.pet[3], b.pet[4]); }
+    const s = vis ? toScreen(b.x, height(b.x, b.z) + (ms.userData.height || 2) + 0.35, b.z) : {on: false};
+    if(!s.on){ b.plate.style.display = "none"; continue; } b.plate.style.display = ""; b.plate.style.left = s.x + "px"; b.plate.style.top = s.y + "px"; b.plate.firstChild.textContent = b.name;
+    b.plate.children[1].firstChild.style.width = Math.max(0, b.hp / (b.mhp || 1) * 100) + "%";
+    const cb = b.plate.children[2]; cb.style.display = b.cast ? "" : "none"; if(b.cast){ cb.firstChild.style.width = Math.min(100, b.cast[1] * 100) + "%"; if(cb.lastChild.textContent !== b.cast[0]) cb.lastChild.textContent = b.cast[0]; } }
+  const el = $("botparty"), list = [...gBots.values()].filter(here);
+  const html = list.map(b => `<div class="pmem"><div class="n"><b style="color:${CLASSES[b.cls].color}">${b.name}</b><span>${b.dead ? "Dead" : b.dr ? "Drinking" : ROLE_NAME[b.role]}</span></div>
+    <div class="bar"><i style="width:${Math.max(0, b.hp / (b.mhp || 1) * 100)}%;background:${b.dead ? "#555" : "#3fbf5a"}"></i></div>${b.role !== "tank" && BOT_KIT[b.cls] ? `<div class="bar rs"><i style="width:${Math.round(b.mana)}%;background:var(--mana)"></i></div>` : ""}</div>`).join("");
+  if(el.innerHTML !== html) el.innerHTML = html;
+  { const pa = $("party"), top = pa.offsetTop + pa.offsetHeight + (pa.innerHTML ? 6 : 0) + "px"; if(el.style.top !== top) el.style.top = top; } }
 // a tank (Bear Form, or a Warrior or Paladin with 5 points in Protection) makes 50% more threat
 const tankMult = () => P.form === "bear" || (S.cur.cls === "warrior" && G.treePoints("prot") >= 5) || (S.cur.cls === "paladin" && G.treePoints("pprot") >= 5) ? 1.5 : 1;
 // a caster's turn: finish the cast, or start the next spell (Life Tap for warlocks low on mana; a wand when out of mana)
@@ -276,18 +316,19 @@ function botCommand(x){ if(!bots.length) return;
     t.botGo = true; if(t.state === "idle") G.engage(t); if(botMode === "follow") botMode = "assist"; botBarKey = ""; log("Companions: attacking " + t.name + ".", "#9fd6ff"); return; }
   botMode = x; botStay = x === "stay" ? {x: P.x, z: P.z, rot: P.rot} : null; botBarKey = "";
   log(x === "stay" ? "Companions: holding this position." : x === "follow" ? "Companions: following, not attacking." : "Companions: assisting you.", "#9fd6ff"); }
-function m_taunt(m, b){ m.botTauntT = 3; m.botTauntId = b.id; (m.botTh = m.botTh || {})[b.id] = Math.max(m.botTh[b.id] || 0, (m.thMe || 0) * 1.3 + 50); floatText(b, "Taunt", "#ffd36b"); G.ring(m.x * PXU, m.z * PXU, 30, "#ffd36b"); }
+function m_taunt(m, b){ m.botTauntT = 3; m.botTauntId = b.id; m.tauntT = 0; const top = CO.coopMob(m) ? Math.max(0, ...Object.values(m.threat || {})) : (m.thMe || 0);
+  (m.botTh = m.botTh || {})[b.id] = Math.max(m.botTh[b.id] || 0, top * 1.3 + 50); floatText(b, "Taunt", "#ffd36b"); G.ring(m.x * PXU, m.z * PXU, 30, "#ffd36b"); }
 // the Companion Master inside each dungeon, next to the way out
 const MERC_NAMES = ["Captain Hask", "Captain Orla", "Captain Brand", "Captain Ysolde", "Captain Torvik", "Captain Mirra", "Captain Grell", "Captain Senna", "Captain Volk", "Captain Aud"];
 DUNGEONS.forEach((d, i) => { const s = d.tileCenter(...d.start); let spot = null;
   for(const [dx, dz] of [[2.2, 1.2], [-2.2, 1.2], [2.2, 2.6], [-2.2, 2.6], [1.4, 3.4], [-1.4, 3.4], [3, 0], [-3, 0]]){ const x = s.x + dx, z = s.z + dz; if(!G.blocked(x, z, x, z, 0.6)){ spot = {x, z}; break; } }
   if(!spot) spot = {x: s.x + 1.5, z: s.z + 1.5};
   const def = {id: "merc_" + d.id, name: MERC_NAMES[i % MERC_NAMES.length], title: "Companion Master", color: "#c8a040", race: ["human", "dwarf", "orc", "elf", "undead"][i % 5], hub: null, role: "merc", x: spot.x, z: spot.z,
-    rot: Math.atan2(s.x - spot.x, s.z + 1 - spot.z), hello: "Need a hand down here? I can send two of my best with you."};
+    rot: Math.atan2(s.x - spot.x, s.z + 1 - spot.z), hello: "Need a hand down here? I can fill your group up to three."};
   const mesh = npcModel(def); mesh.position.set(def.x, height(def.x, def.z), def.z); mesh.rotation.y = def.rot; scene.add(mesh);
   const n = {...def, mesh, rot0: def.rot, r: 0.45}; mesh.traverse(o => { if(o.isMesh) o.userData.npc = n; }); npcs.push(n); });
 function mercHTML(){ const slots = botSlots();
-  if(!slots) return `<div class="muted" style="margin-top:8px">Companions are not available in co-op.</div>`;
+  if(!slots) return `<div class="muted" style="margin-top:8px">${CO.COOP.role === "guest" ? "The group leader hires companions for the group." : "Your group is full. A dungeon group has at most 3 members."}</div>`;
   let h = "";
   if(bots.length){ h += `<h3>Your companions</h3>`; for(const b of bots) h += `<div class="it"><div class="nm"><b style="color:${CLASSES[b.cls].color}">${b.name}</b> <span class="muted">· ${ROLE_NAME[b.role]}</span><small>Level ${b.lvl} ${CLASSES[b.cls].name}${b.dead ? " · dead" : ""}</small></div></div>`;
     return h + `<button class="sbtn" data-act="mercdismiss">Dismiss companions</button>`; }
@@ -1235,7 +1276,7 @@ $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("ch
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
 G.initEngine(scene, {tankMult: () => tankMult(), startAim, floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
-CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, devApply: (a, v) => devApply(a, v), bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
+CO.initCoop({scene, hud, log, err, save, floatText, guestBots: list => guestBotsIn(list), rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, devApply: (a, v) => devApply(a, v), bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t), zoneVis: (m, l) => zoneVis(m, l), bossSync: (m, f) => bossSync(m, f),
   someoneEnters: () => {}});
@@ -1896,7 +1937,7 @@ function update(dt){
   for(const m of mobs) updMob(m, dt); separate();
   if(running && !inCrypt() && (exploreT -= dt) <= 0){ exploreT = 0.4; Q.questExplore(P.x, P.z); }
   if(running && !P.flying) G.updPet(dt, blocked, tryMove, turnTo);
-  updBots(dt);
+  updBots(dt); updGuestBots(dt);
   CO.update(dt); if(running){ CO.render(); CO.tradeTick(); CO.rollTick(); updRolls(); }
   if(running && P.pendingUse && !P.dead){ if(!P.dest) P.pendingUse = null; else if(distU(P, P.pendingUse) < USE_RANGE){ const n = P.pendingUse; P.dest = null; marker.visible = false; useThing(n); } }
   if(talkNpc && distU(P, talkNpc) > 7) closePanel();
@@ -1984,5 +2025,5 @@ initDev({rezAt: (x, z, from) => rezAt(x, z, from), update, save, refresh, buildB
   makeMob: (kind, p, lvl) => { const m = makeMob(kind, p, lvl, rng(7)); m.dev = true; return m; },
   removeMob: m => { const i = mobs.indexOf(m); if(i >= 0) mobs.splice(i, 1); scene.remove(m.mesh); const pl = plates.get(m); if(pl){ pl.remove(); plates.delete(m); } if(P.target === m) P.target = null; },
   restore: c => { G.clearFx(); play(c); }});
-window.R2 = {renderer, bots: () => bots, rezAt, hero: () => hero, startFlight: h => startFlight(h), startVoyage: () => startVoyage(), perchDrakes, flyTune: (p, s) => { FLY_PITCH = p; FLY_SEAT = s; }, buildMount: () => buildMount(), setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
+window.R2 = {renderer, bots: () => bots, guestBots: l => guestBotsIn(l), rezAt, hero: () => hero, startFlight: h => startFlight(h), startVoyage: () => startVoyage(), perchDrakes, flyTune: (p, s) => { FLY_PITCH = p; FLY_SEAT = s; }, buildMount: () => buildMount(), setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
 requestAnimationFrame(loop);

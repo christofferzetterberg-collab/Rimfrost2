@@ -591,7 +591,7 @@ export function proj(t, color, size, onHit, kind, sp, from){
   if(from) m.position.set(from.x, height(from.x, from.z) + (from.y || 1.2), from.z);                  // (from a pet or a totem)
   else m.position.set(P.x + Math.sin(P.rot) * 0.4, height(P.x, P.z) + 1.4, P.z + Math.cos(P.rot) * 0.4); scene.add(m);
   fx.push({kind: "proj", m, t, onHit, sp: (sp || (arrow ? 680 : 540)) / PXU, arrow});
-  if(CO.isMe() && t && t.nid != null) CO.sendVfx({k: "p", n: t.nid, c: color, s: size, a: arrow ? 1 : 0});   // friends see it fly
+  if(CO.isMe() && t && t.nid != null) CO.sendVfx({k: "p", n: t.nid, c: color, s: size, a: arrow ? 1 : 0, ...(from ? {ox: +from.x.toFixed(2), oz: +from.z.toFixed(2)} : {})});   // friends see it fly
 }
 // what a friend cast: only the picture
 export function vfxProj(x, z, t, color, size, arrow){ const m = new THREE.Mesh(arrow ? arrowGeo : sphereGeo, gmat(color)); if(!arrow) m.scale.setScalar(0.08 + size * 0.03);
@@ -906,4 +906,6 @@ export function mobTarget(m){
 }
 
 // the helper table the Rimfrost 1 ability code calls
-Object.assign(E, {playerTaunt, rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petHealTick, wandToggle, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, lastStand, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});
+// behind the target: in the half circle at its back
+const behind = t => !!t && Math.sin(t.rot) * (P.x - t.x) + Math.cos(t.rot) * (P.z - t.z) < 0;
+Object.assign(E, {playerTaunt, behind, rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petHealTick, wandToggle, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, lastStand, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});

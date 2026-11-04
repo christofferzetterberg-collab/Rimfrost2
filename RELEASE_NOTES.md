@@ -1,5 +1,17 @@
 # Rimfrost 2 – Release notes
 
+## v0.44.0
+
+### New
+- **Companions in co-op:** The group leader can hire companions from the Companion Master. A dungeon group has at most 3 members: 2 players get 1 companion, 3 players get none. Companions heal and resurrect every group member, appear in the threat meter, and leave when a new player needs the spot.
+
+### Changed
+- **Buffs on friends:** Thorns, Power Infusion, Pain Suppression and Guardian Spirit can now be cast on a selected friend.
+- **Backstab:** Now requires you to be behind the target.
+
+### Fixed
+- Friends in co-op are now shown jumping.
+
 ## v0.43.1
 
 ### Changed

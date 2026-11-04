@@ -298,7 +298,7 @@ Numbered so we can refer to them. Tick them off as they get done.
 
 ### Feature – dungeon companions
 - [x] 89. A Companion Master in every dungeon: hire up to two computer-controlled companions (Tank, Healer or Damage; random class of that role, scaled to your level), solo only
-- [ ] 90. Companions in co-op (fill the group up to three)
+- [x] 90. Companions in co-op (fill the group up to three)
 - [x] 91. Hunter companions bring a wolf
 - [x] 92. Dungeons tuned for three players (companions count); not soloable
 - [x] 93. Companions build real threat, show in the threat meter and can pull aggro; tanks get a taunt (Taunt, Growl, Hand of Reckoning)
