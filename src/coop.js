@@ -184,6 +184,7 @@ function hostOp(d){ const m = mobByNid(d.nid); if(!m || m.dead) return; const a 
   asAttacker(d.from, () => {
     if(d.op === "dmg"){ hostPetAtk = !!a[3]; hostThMult = a[4] || 1; G.damageMob(m, a[0], a[1], a[2]); hostPetAtk = false; hostThMult = 1; }
     else if(d.op === "taunt") hostTaunt(m, d.from + ":pet");
+    else if(d.op === "ptaunt") hostTaunt(m, d.from);
     else if(d.op === "dot") G.dot(m, a[0], a[1], a[2], a[3], true, true);
     else if(d.op === "slow") G.slow(m, a[0], a[1]); else if(d.op === "root") G.root(m, a[0], a[1]); else if(d.op === "stun") G.stun(m, a[0]); else if(d.op === "fear") G.fear(m, a[0], a[1], a[2]); else if(d.op === "poly") G.polymorph(m, a[0]); else if(d.op === "curse") G.curse(m, a[0]); }); }
 let hostPetAtk = false, hostThMult = 1;
@@ -197,6 +198,7 @@ export function threat(m, amt, petAtkLocal, mult = 1){
   m.threat[id] = (m.threat[id] || 0) + amt * (tank ? 2 : 1) * (pk ? PET_THREAT[pk][1] : 1); }
 function hostTaunt(m, id){ m.threat = m.threat || {}; const top = Math.max(0, ...Object.values(m.threat)); m.threat[id] = Math.max(m.threat[id] || 0, top * 1.3 + 40); m.tauntT = 3; m.tauntId = id;
   if(m.state === "idle"){ G.aggro(m); G.social(m); } }
+export function tauntMe(m){ if(COOP.role === "guest") op("ptaunt", m, []); else hostTaunt(m, myId()); }
 export function taunt(m){ if(COOP.role === "guest") op("taunt", m, []); else hostTaunt(m, myId() + ":pet"); }
 // everyone a monster could go after: you, your pet, friends and their pets in the same place
 export function cands(m){
@@ -206,18 +208,30 @@ export function cands(m){
   if(coopMob(m)) for(const r of Object.values(COOP.remotes)){
     if(!r.dead && !r.meld && r.fy == null && reg(r.x) === inC) L.push({id: r.id, e: r, lvl: r.lvl, stealth: !!r.st});
     const po = r.petObj; if(po && !po.dead && reg(po.x) === inC) L.push({id: r.id + ":pet", e: po, pet: true, owner: r.id}); }
+  for(const b of H.bots ? H.bots() : []) if(!b.dead && reg(b.x) === inC) L.push({id: b.id, e: b, bot: true, lvl: b.lvl});   // dungeon companions
   return L; }
+// with companions: the highest threat wins (a new target needs 10% more than the current one); a companion's Taunt forces it for a moment
+function botPick(m, L){ if(m.meTauntT > 0){ const c = L.find(c => c.me); if(c) return c; }
+  if(m.botTauntT > 0){ const c = L.find(c => c.id === m.botTauntId); if(c) return c; }
+  if(m.tauntT > 0){ const c = L.find(c => c.pet); if(c) return c; }
+  const th = c => c.me ? (m.thMe || 0) * (H.tankMult ? H.tankMult() : 1) : c.pet ? (m.thPet || 0) : c.bot ? ((m.botTh || {})[c.id] || 0) : 0;
+  let best = null, bv = 0; for(const c of L){ const v = th(c); if(v > bv){ bv = v; best = c; } }
+  const cur = L.find(c => c.id === m.tgtId), need = best && Math.hypot(m.x - best.e.x, m.z - best.e.z) < 5 ? 1.1 : 1.3;   // to pull it away: 110% of the current target's threat in melee, 130% from range
+  if(cur && th(cur) > 0 && bv < th(cur) * need) return cur;
+  if(best) return best; let bd = 1e9; for(const c of L){ const d = Math.hypot(m.x - c.e.x, m.z - c.e.z); if(d < bd){ bd = d; best = c; } } return best; }
 export function mobTarget(m){
   const L = cands(m); if(!L.length) return null;
   // Shadowmeld: the one it was fighting faded away and nobody else has fought it – it gives up instead of running to someone new
   if(m.threat && !L.some(c => (m.threat[c.id] || 0) > 0)){ const melded = id => id === myId() ? !!P.buffs.meld : !!(COOP.remotes[id] && COOP.remotes[id].meld);
     if(Object.keys(m.threat).some(id => m.threat[id] > 0 && melded(id))) return null; }
   if(L.length === 1) return L[0];
+  if(L.some(c => c.bot)) return botPick(m, L);
   if(!coopMob(m)){ const e = G.mobTarget(m); return L.find(c => c.e === e) || L[0]; }      // alone: you and your pet (old rules)
   if(m.tauntT > 0 && m.tauntId){ const c = L.find(c => c.id === m.tauntId); if(c) return c; }
   if(m.threat){ let best = null, bv = 0; for(const c of L){ const v = m.threat[c.id] || 0; if(v > bv && Math.hypot(m.x - c.e.x, m.z - c.e.z) < 30){ bv = v; best = c; } } if(best) return best; }
   let best = null, bd = 1e9; for(const c of L){ const d = Math.hypot(m.x - c.e.x, m.z - c.e.z); if(d < bd){ bd = d; best = c; } } return best; }
 export function mobAttack(m, c, dmg, kind){
+  if(c.bot) return H.botHurt(c.e, dmg, m);
   if(c.pet && c.owner) sendTo(c.owner, {t: "phit", to: c.owner, nid: m.nid, dmg});
   else if(c.pet) G.petDamage(dmg, m);
   else if(c.me) G.playerDamage(dmg, m, kind);
@@ -421,7 +435,8 @@ export function threatList(m){
   if(coopMob(m)){ const src = COOP.role === "guest" ? m.thSync : m.threat && Object.entries(m.threat); if(!src) return [];
     L = src.map(([id, v]) => ({id, name: thName(id), v, me: id === myId(), mine: id === myId() + ":pet"})); }
   else { const pet = G.getPet(); L = [{id: "me", name: S.cur.name, v: m.thMe || 0, me: true}];
-    if(pet && !pet.dead) L.push({id: "pet", name: `${S.cur.name}'s ${PETNAME[pet.kind]}`, v: m.thPet || 0, mine: true}); }
+    if(pet && !pet.dead) L.push({id: "pet", name: `${S.cur.name}'s ${PETNAME[pet.kind]}`, v: m.thPet || 0, mine: true});
+    const bs = H.bots ? H.bots() : []; if(bs.length){ L[0].v *= H.tankMult ? H.tankMult() : 1; for(const b of bs) if(!b.dead) L.push({id: b.id, name: b.name, v: (m.botTh || {})[b.id] || 0}); } }
   L = L.filter(e => e.v > 0).sort((a, b) => b.v - a.v);
   const top = L.length ? L[0].v : 1; for(const e of L) e.pct = Math.round(e.v / top * 100);
   return L; }

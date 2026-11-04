@@ -3,7 +3,7 @@
 import * as THREE from "three";
 import {clamp, lerp, smooth, rng, fbm} from "./util.js";
 import {dgLos} from "./dungeon.js";
-import {natureReady, natureInstances} from "./nature.js";
+import {natureReady, natureInstances, grassInstances} from "./nature.js";
 import {buildingsReady, buildingModel, stretchedModel, LOOKS, PROPS} from "./buildings.js";
 import {TS, ZONES, HUBS, ROADS, LAIRS, EXPLORE, DG_DOORS, CITY_SIGNS, SEA, continentOf} from "./worlddata.js";
 
@@ -148,22 +148,54 @@ export const SIGNS = [];                           // names shown over sign post
 // ---------------------------------------------------------------- terrain (flat-shaded low-poly)
 const STEP = 1.5;
 function buildTerrain(){                                                          // in square pieces, so only what the camera sees is drawn
-  const NXs = Math.ceil((B.x1 - B.x0) / STEP), NZs = Math.ceil((B.z1 - B.z0) / STEP), c = new THREE.Color(), r = rng(3), CH = 64, grp = new THREE.Group();
-  const hv = new Float32Array((NXs + 1) * (NZs + 1)); for(let j = 0; j <= NZs; j++) for(let i = 0; i <= NXs; i++) hv[j * (NXs + 1) + i] = height(B.x0 + i * STEP, B.z0 + j * STEP);
-  const mat = new THREE.MeshLambertMaterial({vertexColors: true, flatShading: true});
+  const NXs = Math.ceil((B.x1 - B.x0) / STEP), NZs = Math.ceil((B.z1 - B.z0) / STEP), c = new THREE.Color(), CH = 64, grp = new THREE.Group(), W = NXs + 1;
+  const hv = new Float32Array(W * (NZs + 1)); for(let j = 0; j <= NZs; j++) for(let i = 0; i <= NXs; i++) hv[j * W + i] = height(B.x0 + i * STEP, B.z0 + j * STEP);
+  // one colour per corner, so colours flow smoothly from triangle to triangle
+  const cv = new Float32Array(W * (NZs + 1) * 3);
+  for(let j = 0; j <= NZs; j++) for(let i = 0; i <= NXs; i++){ const k = j * W + i, H0 = (a, b) => hv[clamp(j + b, 0, NZs) * W + clamp(i + a, 0, NXs)];
+    const gx = (H0(1, 0) - H0(-1, 0)) / (2 * STEP), gz = (H0(0, 1) - H0(0, -1)) / (2 * STEP), up = 1 / Math.sqrt(1 + gx * gx + gz * gz);
+    groundColor(c, B.x0 + i * STEP, B.z0 + j * STEP, up); cv[k * 3] = c.r; cv[k * 3 + 1] = c.g; cv[k * 3 + 2] = c.b; }
+  const mat = new THREE.MeshLambertMaterial({vertexColors: true, flatShading: true, map: groundTexture()});
   for(let cj = 0; cj < NZs; cj += CH) for(let ci = 0; ci < NXs; ci += CH){
-    const nj = Math.min(CH, NZs - cj), ni = Math.min(CH, NXs - ci), tris = ni * nj * 2, pos = new Float32Array(tris * 9), col = new Float32Array(tris * 9); let p = 0;
+    const nj = Math.min(CH, NZs - cj), ni = Math.min(CH, NXs - ci), tris = ni * nj * 2, pos = new Float32Array(tris * 9), col = new Float32Array(tris * 9), uv = new Float32Array(tris * 6); let p = 0, q = 0;
     for(let j = cj; j < cj + nj; j++) for(let i = ci; i < ci + ni; i++){
-      const V = (a, b) => [B.x0 + (i + a) * STEP, hv[(j + b) * (NXs + 1) + i + a], B.z0 + (j + b) * STEP];
-      const A = V(0, 0), Bv = V(1, 0), D = V(0, 1), E = V(1, 1);
-      for(const tri of [[A, D, Bv], [Bv, D, E]]){
-        const cx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3, cz = (tri[0][2] + tri[1][2] + tri[2][2]) / 3;
-        c.setHex(GROUND[ground(cx, cz)][r() < 0.5 ? 0 : 1]); c.offsetHSL(0, 0, (r() - 0.5) * 0.04);
-        for(const v of tri){ pos[p] = v[0]; pos[p + 1] = v[1]; pos[p + 2] = v[2]; col[p] = c.r; col[p + 1] = c.g; col[p + 2] = c.b; p += 3; } } }
+      const V = (a, b) => (j + b) * W + i + a, A = V(0, 0), Bv = V(1, 0), D = V(0, 1), E = V(1, 1);
+      for(const tri of [[A, D, Bv], [Bv, D, E]]) for(const k of tri){ const x = B.x0 + (k % W) * STEP, z = B.z0 + Math.floor(k / W) * STEP;
+        pos[p] = x; pos[p + 1] = hv[k]; pos[p + 2] = z; col[p] = cv[k * 3]; col[p + 1] = cv[k * 3 + 1]; col[p + 2] = cv[k * 3 + 2]; p += 3;
+        uv[q] = x / TEX_SIZE; uv[q + 1] = z / TEX_SIZE; q += 2; } }
     const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.computeVertexNormals(); g.computeBoundingSphere();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.setAttribute("uv", new THREE.BufferAttribute(uv, 2)); g.computeVertexNormals(); g.computeBoundingSphere();
     const m = new THREE.Mesh(g, mat); m.receiveShadow = true; grp.add(m); }
   return grp;
+}
+// a painted detail texture for the ground, drawn once at load: soft blotches, short strokes like grass and small specks of dirt and pebbles.
+// It is light grey (multiplied with the ground colour), and it tiles: anything crossing an edge is drawn again on the other side.
+const TEX_SIZE = 7;                                                                  // yards per repeat of the texture
+function groundTexture(){
+  const N = 512, cv = document.createElement("canvas"); cv.width = cv.height = N; const g = cv.getContext("2d"), r = rng(17);
+  g.fillStyle = "rgb(232,232,232)"; g.fillRect(0, 0, N, N);
+  const wrap = (fn, x, y, m) => { for(const dx of [-N, 0, N]) for(const dy of [-N, 0, N]) if(x + dx > -m && x + dx < N + m && y + dy > -m && y + dy < N + m) fn(x + dx, y + dy); };
+  for(let k = 0; k < 70; k++){ const x = r() * N, y = r() * N, rad = 30 + r() * 70, v = r() < 0.5 ? 205 : 255, a = 0.22 + r() * 0.25;     // soft blotches
+    wrap((px, py) => { const gr = g.createRadialGradient(px, py, 0, px, py, rad); gr.addColorStop(0, `rgba(${v},${v},${v},${a})`); gr.addColorStop(1, `rgba(${v},${v},${v},0)`); g.fillStyle = gr; g.fillRect(px - rad, py - rad, rad * 2, rad * 2); }, x, y, rad); }
+  g.lineCap = "round";
+  for(let k = 0; k < 2600; k++){ const x = r() * N, y = r() * N, len = 4 + r() * 9, ang = -Math.PI / 2 + (r() - 0.5) * 1.1, light = r() < 0.5, v = light ? 255 : 165 + r() * 25;   // grass-like strokes
+    g.strokeStyle = `rgba(${v},${v},${v},${light ? 0.7 : 0.6})`; g.lineWidth = 1.2 + r() * 1.6;
+    wrap((px, py) => { g.beginPath(); g.moveTo(px, py); g.quadraticCurveTo(px + Math.cos(ang) * len * 0.5 + (r() - 0.5) * 3, py + Math.sin(ang) * len * 0.5, px + Math.cos(ang) * len, py + Math.sin(ang) * len); g.stroke(); }, x, y, 16); }
+  for(let k = 0; k < 900; k++){ const x = r() * N, y = r() * N, rad = 0.8 + r() * 2.2, v = r() < 0.7 ? 150 + r() * 30 : 255;           // specks and little pebbles
+    g.fillStyle = `rgba(${v},${v},${v},0.6)`; wrap((px, py) => { g.beginPath(); g.arc(px, py, rad, 0, 7); g.fill(); }, x, y, 4); }
+  const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+// the colour of the ground: its kind, soft lighter and darker patches, rock on steep slopes, shade under groves of trees, and worn earth along roads and around towns
+const PAVED = new Set(["cobble", "camp", "dirt", "snowroad", "ashroad"]), worn = new THREE.Color();
+const shadeB = new THREE.Color();
+function groundColor(c, x, z, up){
+  const g = ground(x, z), t = landAt(x, z), G2 = GROUND[g]; c.setHex(G2[0]).lerp(shadeB.setHex(G2[1]), fbm(x * 0.21 + 5, z * 0.21 + 2));   // the two shades of each ground, mixed in small soft patches
+  const pn = fbm(x * 0.035 + 21, z * 0.035 - 8) - 0.5; c.offsetHSL(pn * 0.03, pn * 0.08, pn * 0.1 + 0.04);
+  if(PAVED.has(g) || g === "ice" || g === "scorch") return;
+  if(up < 0.86){ const L = LAND[t] || {}; worn.setHex(L.cg ? L.cg[0] : ROCK_COL[t] || 0x8a8d91); c.lerp(worn, smooth(0.86, 0.62, up) * 0.75); }   // steep: bare rock
+  const D = DENS[t]; if(D && D[0] >= 1){ const cl = smooth(0.45, 0.65, fbm(x * 0.05 + 7, z * 0.05 - 3)); c.multiplyScalar(1 - cl * 0.16); }   // the shade of thick woods
+  const rd = roadDist(x, z); let k = rd < 3.6 ? smooth(3.6, 1.8, rd) * 0.45 : 0;                                // trodden earth beside the roads
+  for(const h of HL){ const d = Math.hypot(x - h.x, z - h.z) - h.R; if(d > -1 && d < 7) k = Math.max(k, smooth(7, 0, d) * 0.5); }   // and around towns and camps
+  if(k > 0.02){ k *= 0.6 + fbm(x * 0.3, z * 0.3) * 0.8; worn.setHex((t === "snow" || t === "snowhigh") ? GROUND.snowroad[0] : t === "ash" ? GROUND.ashroad[0] : GROUND.dirt[1]); c.lerp(worn, Math.min(0.6, k)); }
 }
 // one water surface for the whole world, coloured by zone (blue lakes, murky marsh, glowing lava)
 function buildWater(){
@@ -431,6 +463,8 @@ const DENS = {   // per 100 square units: trees, rocks, spikes (ice / obsidian)
   coast: [0.35, 0.12], jungle: [4.2, 0.06], desert: [0.1, 0.14], badlands: [0.22, 0.4], dread: [0.7, 0.4, 0.22]};
 const TREE = {meadow: "oak", forest: "pine", elfwood: "birch", moonwood: "violet", highland: "pine", snowhigh: "snowpine", steppe: "cactus", canyon: "cactus", rock: "pine",
   swamp: "dead", ash: "charred", snow: "snowpine", blight: "dead", gloom: "dead", coast: "oak", jungle: "jungle", desert: "cactus", badlands: "dead", dread: "dreadwood"};
+const GRASS_DENS = {meadow: 0.75, forest: 0.45, elfwood: 0.75, moonwood: 0.5, highland: 0.3, swamp: 0.5, blight: 0.35, gloom: 0.4, steppe: 0.2, coast: 0.55, jungle: 0.85, dread: 0.18};   // grass clumps (chance per spot)
+export let GRASS = [];   // grass chunks: {mesh, x, z} (main.js shows the ones near you)
 const BUSH = {meadow: 0.1, forest: 0.12, elfwood: 0.12, moonwood: 0.08, highland: 0.05, swamp: 0.06, rock: 0.03, coast: 0.08, jungle: 0.3};    // bushes (chance per spot, only with the new models)
 const ROCK_COL = {steppe: 0x9a5a40, canyon: 0xa86a48, snowhigh: 0xdde6ea, snow: 0xdde6ea, ash: 0x3a3634, gloom: 0x4a4a52, blight: 0x6a6a5e, desert: 0xd8b880, badlands: 0x9a4a36, dread: 0x3a3446};
 function buildProps(){
@@ -469,6 +503,13 @@ function buildProps(){
     for(let z = B.z0 + 6; z < B.z1 - 6; z += 3.1) for(let x = B.x0 + 6; x < B.x1 - 6; x += 3.1){ const px = x + (rb() - 0.5) * 3, pz = z + (rb() - 0.5) * 3, t = landAt(px, pz), dn = BUSH[t] || 0;
       if(dn && rb() < dn && ok(px, pz, 2.2)) bush.push([px, height(px, pz) - 0.05, pz, 0.7 + rb() * 0.6, t === "elfwood" ? 0xd8f0a0 : t === "moonwood" ? 0xb8a0e0 : t === "swamp" ? 0xa0a070 : t === "jungle" ? 0x70c070 : null]); }
     natureInstances(SCENE, "bush", bush, {size: 1.3, byWidth: true, shadow: false});
+    // grass clumps on grassy land, in patches, coloured like a lighter shade of the ground
+    const rg = rng(11), grass = [], col = new THREE.Color();
+    for(let z = B.z0 + 6; z < B.z1 - 6; z += 1.7) for(let x = B.x0 + 6; x < B.x1 - 6; x += 1.7){ const px = x + (rg() - 0.5) * 1.7, pz = z + (rg() - 0.5) * 1.7, t = landAt(px, pz), dn = GRASS_DENS[t] || 0;
+      if(!dn || rg() > dn * (0.25 + 1.2 * smooth(0.35, 0.62, fbm(px * 0.06 + 3, pz * 0.06 + 9)))) continue;
+      if(roadDist(px, pz) < 2.4 || hubAt(px, pz) || featureAt(px, pz) || height(px, pz) < 0.6 || openAt(px, pz) < 0.5) continue;
+      col.setHex(GROUND[t][1]); col.offsetHSL((rg() - 0.5) * 0.03, 0.08, 0.08 + (rg() - 0.5) * 0.08); grass.push([px, height(px, pz) - 0.03, pz, 0.7 + rg() * 0.7, col.getHex()]); }
+    GRASS = grassInstances(SCENE, grass);
     inst(cactusGeo, T.cactus); inst(spikeGeo, T.spike, (o, p) => o.rotation.set((p[0] % 1) * 0.3, p[2], 0)); inst(reedGeo, T.reed, null, false);
     return; }
   inst(trunkGeo, T.trunk); inst(pineGeo, T.cone); inst(crownGeo, T.crown, (o, p) => o.scale.set(p[3] * 1.1, p[3] * 0.95, p[3] * 1.1)); inst(deadGeo, T.dead); inst(cactusGeo, T.cactus);

@@ -189,7 +189,7 @@ function afterHit(m, base, amt, crit, school, ab){ if(EXTRA) return; const cls =
 const CP_BUILD = new Set(["sinister", "backstab", "gouge", "ambush", "fanknives", "claw", "rake", "pounce"]);
 // Last Stand: more maximum health for a while (you get the extra health too)
 export function lastStand(){ const before = P.maxHp; buff("laststand", 20); recompute(false); P.hp = Math.min(P.maxHp, P.hp + (P.maxHp - before)); }
-export function playerSpeed(){ return 7 * (P.form === "cat" ? 1.3 : P.form === "leopard" ? 1.6 : 1) * (P.mount ? 1.6 : 1) * (P.buffs.dash ? 1.7 : 1) * (P.buffs.sprint ? 1.4 : 1) * (P.ghost ? 1.25 : 1) * (P.devSpeed || 1) * (P.buffs.chill ? 0.6 : 1) * (P.envSpeed || 1) * (P.buffs.stealth ? 0.7 + 0.1*T("r_camo") : 1); }
+export function playerSpeed(){ return 7 * (P.form === "cat" ? 1.2 : P.form === "leopard" ? 1.6 : 1) * (P.mount ? 1.6 : 1) * (P.buffs.dash ? 1.5 : 1) * (P.buffs.sprint ? 1.4 : 1) * (P.ghost ? 1.25 : 1) * (P.devSpeed || 1) * (P.buffs.chill ? 0.6 : 1) * (P.envSpeed || 1) * (P.buffs.stealth ? 0.7 + 0.1*T("r_camo") : 1); }
 export function recompute(full){
   const c = CLASSES[C().cls]; let hp = (80 + C().level * 22) * c.hp + gearStat("hp") + gearStat("sta") * 10;
   if(C().race === "dwarf") hp *= 1.08;
@@ -229,6 +229,8 @@ export function aggro(m){ if(m.state !== "chase"){ m.state = "chase"; m.path = n
 export function engage(m){ if(CO.guestMob(m)){ P.combatT = 6; return; } if(m && !m.dead && m.state === "idle"){ aggro(m); social(m); } if(CO.isMe()) P.combatT = 6; }
 export function social(m){ if(m.K && (m.K.passive || m.boss) || m.neutral) return; for(const o of mobs) if(o !== m && !(o.K && o.K.passive) && !o.neutral && !o.dead && o.state === "idle" && (o.kind === m.kind || (m.dg && o.dg && !o.boss)) && distU(o, m) < 7) aggro(o); }   // (in dungeons a whole pack joins in, whatever its kinds)
 const lvlPenalty = m => { const d = m.lvl - C().level; return d > 0 ? Math.max(0.5, 1 - 0.06 * d) : 1; };
+// tank abilities that draw extra attention (threat × this)
+const THREAT_AB = {maul: 2, swipe: 1.5, heroic: 1.8, shieldbash: 2, quake: 1.5, holyshield: 2, consecrate: 1.5, avengershield: 2, hammer: 1.5};
 export function hit(m, base, school, ab){
   if(!m || m.dead) return null;
   if(m.state === "return"){ H.floatText(m, "Evade", "#cfd8dc"); return null; }
@@ -243,7 +245,7 @@ export function hit(m, base, school, ab){
   if(crit) amt *= 2 * (1 + 0.1*(T("r_lethal") + T("wl_ruin")));
   if(crit && pet && !pet.dead && T("h_throat")) pet.res = Math.min(100, pet.res + 10 * T("h_throat"));   // Go for the Throat
   amt = Math.max(1, Math.round(amt));
-  damageMob(m, amt, crit, school);
+  { const k = THREAT_AB[ab] || 1, prev = TH_MULT; TH_MULT = prev * k; try{ damageMob(m, amt, crit, school); } finally{ TH_MULT = prev; } }
   afterHit(m, base, amt, crit, school, ab);
   if(crit){
     if(school === "holy" && T("lightbringer")) healP(amt * 0.3);
@@ -259,18 +261,28 @@ export function damageMob(m, amt, crit, school){
   m.hp -= amt; m.flash = 0.15; m.lastHit = H.now();
   if(m.polyT > 0) m.polyT = 0;                                                            // any damage breaks Polymorph
   if(CO.coopMob(m)) CO.threat(m, amt, PET_ATK, TH_MULT);
-  else { if(PET_ATK && pet) m.thPet = (m.thPet || 0) + amt * PETS[pet.kind].threat * TH_MULT; else m.thMe = (m.thMe || 0) + amt * (!pet || pet.dead ? 1 : PETS[pet.kind].ownerThreat); }
+  else { if(PET_ATK && pet) m.thPet = (m.thPet || 0) + amt * PETS[pet.kind].threat * TH_MULT; else m.thMe = (m.thMe || 0) + amt * TH_MULT * (!pet || pet.dead ? 1 : PETS[pet.kind].ownerThreat); }
   if(CO.isMe()) H.floatText(m, crit ? amt + "!" : "" + amt, crit ? "#ffd36b" : (SCHOOL_COLOR[school] || "#fff"), crit);
   engage(m);
   if(m.hp <= 0) killMob(m);
 }
+// a companion's hit (see the dungeon companions in main.js): its own threat; the kill and its rewards are yours
+// Taunt, Growl and Hand of Reckoning: the target attacks you for 3 sec, and your threat goes above the highest
+export function playerTaunt(t){ if(!t || t.dead) return; if(CO.coopMob(t)){ CO.tauntMe(t); } else { const others = Math.max(t.thPet || 0, ...Object.values(t.botTh || {}), 0), k = H.tankMult ? H.tankMult() : 1;
+    t.thMe = Math.max(t.thMe || 0, (others * 1.1 + 40) / k); t.meTauntT = 3; t.tauntT = 0; t.botTauntT = 0; engage(t); }
+  H.floatText(t, "Taunted", "#ffd36b"); ring(t.px, t.py, 30, "#ffd36b"); }
+export function botDamageMob(m, amt, crit, school, b){ if(!m || m.dead) return; if(m.state === "return"){ H.floatText(m, "Evade", "#cfd8dc"); return; }
+  m.hp -= amt; m.flash = 0.15; m.lastHit = H.now(); if(m.polyT > 0) m.polyT = 0;
+  (m.botTh = m.botTh || {})[b.id] = (m.botTh[b.id] || 0) + amt * b.thr;
+  H.floatText(m, crit ? amt + "!" : "" + amt, "#c8d0d8", crit); engage(m);
+  if(m.hp <= 0) killMob(m); }
 export function killMob(m){
   const ua = m.dots.find(d => d.key === "unstable" && d.left > 1);                       // Unstable Affliction jumps to the nearest enemy
   if(ua){ let best = null, bd = 12; for(const o of mobs){ if(o === m || o.dead || o.state === "return" || o.polyT > 0) continue; const d = Math.hypot(o.x - m.x, o.z - m.z); if(d < bd){ bd = d; best = o; } }
     if(best){ const left = ua.left; CO.asAttacker(ua.owner, () => dot(best, "unstable", ua.per * left, left, "shadow", true, true)); burst(best.px, best.py, "#9a5ae0", 12); } }
   m.hp = 0; m.dead = true; m.state = "dead"; m.deadT = 0; m.dots = []; m.slowT = m.rootT = m.stunT = m.fearT = m.polyT = 0;
   if(P.target === m){ P.auto = false; }
-  m.thMe = m.thPet = 0; m.tauntT = 0; m.threat = null;
+  m.thMe = m.thPet = 0; m.tauntT = 0; m.threat = null; m.botTh = null; m.botTauntT = 0; m.bStart = 0; m.botGo = false;
   const share = CO.killShare(m);                // in co-op everyone near shares the XP (loot is personal)
   if(share > 0) killRewards(m, share);
   if(m.dg && (m.elite || m.boss)) CO.dungeonLoot(m);   // a dungeon elite or boss: one piece of gear for the group to roll for
@@ -563,7 +575,7 @@ export function updPlayer(dt, moving){
 export function updMobStatus(m, dt){
   for(const d of m.dots){ d.tick -= dt; if(d.tick <= 0){ d.tick += 1; d.left -= 1; CO.asAttacker(d.owner, () => damageMob(m, Math.max(1, Math.round(d.per)), false, d.school)); if(m.dead) return false; } }
   m.dots = m.dots.filter(d => d.left > 0);
-  m.slowT = Math.max(0, m.slowT - dt); m.rootT = Math.max(0, m.rootT - dt); m.freezeT = Math.max(0, (m.freezeT || 0) - dt); m.stunT = Math.max(0, m.stunT - dt); m.tauntT = Math.max(0, (m.tauntT || 0) - dt); m.weakT = Math.max(0, (m.weakT || 0) - dt);
+  m.botTauntT = Math.max(0, (m.botTauntT || 0) - dt); m.meTauntT = Math.max(0, (m.meTauntT || 0) - dt); m.slowT = Math.max(0, m.slowT - dt); m.rootT = Math.max(0, m.rootT - dt); m.freezeT = Math.max(0, (m.freezeT || 0) - dt); m.stunT = Math.max(0, m.stunT - dt); m.tauntT = Math.max(0, (m.tauntT || 0) - dt); m.weakT = Math.max(0, (m.weakT || 0) - dt);
   m.fearT = Math.max(0, (m.fearT || 0) - dt); m.polyT = Math.max(0, (m.polyT || 0) - dt);
   return m.stunT <= 0;
 }
@@ -704,7 +716,7 @@ export const PETS = {
   bear: {name: "Bear", sp: 125, hp: 1.2, taken: 0.85, coef: 0.18, atk: 2.0, threat: 4, ownerThreat: 0.8, r: 0.6, role: "tank", res: "rage"},
   wolf: {name: "Wolf", sp: 135, hp: 0.8, taken: 1.0, coef: 0.20, atk: 1.1, threat: 0.5, ownerThreat: 1, r: 0.5, role: "dps", res: "energy"},
   imp: {name: "Imp", sp: 120, hp: 0.55, taken: 1.1, coef: 0.38, atk: 2.2, threat: 0.4, ownerThreat: 1, r: 0.35, role: "caster", res: "mana", school: "fire", range: 13},
-  voidwalker: {name: "Voidwalker", sp: 115, hp: 0.95, taken: 1.0, coef: 0.08, atk: 2.0, threat: 3, ownerThreat: 0.8, r: 0.6, role: "tank", res: "mana", school: "shadow"}
+  voidwalker: {name: "Voidwalker", sp: 115, hp: 1.4, taken: 0.9, coef: 0.08, atk: 2.0, threat: 3, ownerThreat: 0.8, r: 0.6, role: "tank", res: "mana", school: "shadow"}
 };
 // a tank pet's three skills: the taunt, the hit-everything skill and the single-target threat strike
 const TANK_SK = {bear: {taunt: "growl", aoe: "sweep", one: "maul"}, voidwalker: {taunt: "torment", aoe: "suffering", one: "voidstrike"}};
@@ -883,6 +895,7 @@ function updTotems(dt){ if(!totems.length) return;
 
 // who a monster goes after: you, or your pet (highest threat wins; Growl forces the pet for a few seconds)
 export function mobTarget(m){
+  if(m.meTauntT > 0 && !P.dead) return P;
   if(!pet || pet.dead || distU(pet, m) > 30) return P;
   if(P.dead) return pet;
   if(m.tauntT > 0) return pet;
@@ -893,4 +906,4 @@ export function mobTarget(m){
 }
 
 // the helper table the Rimfrost 1 ability code calls
-Object.assign(E, {rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petHealTick, wandToggle, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, lastStand, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});
+Object.assign(E, {playerTaunt, rezCheck: () => CO.rezCheck(), rezSend: l => CO.rezSend(l), breakStealth, curse, totem, finisher, drain, shockCd, targetsMe: m => CO.targetsMe(m), evade: m => H.evade(m), willOfTheDead: () => H.willOfTheDead(), coopGroupFx: (...a) => CO.groupFx(...a), petCallCheck, petCall, petMend, petHealTick, wandToggle, petDismiss, petFight, petIntimidateCheck, petIntimidate, petWrath, pet: null, pow, spow, hit, proj, slash, burst, ring, dot, aoe, healP, buff, stun, fear, polymorph, lastStand, slow, zone, tmul, setForm, root, hot, addCP, addRes, shieldP, pdist, fmt, T});

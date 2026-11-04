@@ -1,5 +1,106 @@
 # Rimfrost 2 – Release notes
 
+## v0.42.2
+
+### Fixed
+- Elves no longer have round human ears next to their pointed ones.
+
+## v0.42.1
+
+### Changed
+- **Smoother ground:** colours now flow gradually across the land instead of changing triangle by triangle, with soft transitions between grass, dirt, rock and roads.
+- **Painted ground detail:** the ground has a hand-painted pattern of grass strokes, small specks and pebbles, tinted by each zone's colour.
+
+## v0.42.0
+
+### New
+- **Grass:** clumps of grass now grow in patches across grassy land, coloured to match each zone, from Frost Meadows to the Verdant Tangle. Grass is drawn near you; how far depends on the graphics setting.
+- **Richer ground:** the land has soft lighter and darker patches, steep slopes show bare rock, the ground is shaded under thick woods, and the earth is worn along roads and around towns and camps.
+
+## v0.41.2
+
+### Changed
+- **Tank abilities generate more threat:** Maul ×2, Swipe ×1.5, Mighty Strike ×1.8, Shield Bash ×2, Earthquake ×1.5, Holy Shield ×2, Hallowed Ground ×1.5, Avenger's Shield ×2 and Hammer of Judgment ×1.5.
+- **Companions:**
+  - Damage dealers generate less threat.
+  - A damage dealer that pulls a monster off the tank stops attacking and runs to the tank until the tank takes it back.
+  - Companions take damage according to their armor: cloth wearers (Mage, Warlock, Priest) take the most and plate wearers the least.
+  - Healer and damage companions have less health than before.
+
+## v0.41.1
+
+### Changed
+- **Dungeon monsters hit much harder:** all monsters in dungeons are now elites, shown with the Elite frame and label. Their damage is increased by about 65% for a group of three.
+
+## v0.41.0
+
+### New
+- **Companion bar:** while you have companions, a bar above the action bars lets you command them.
+  - **Attack:** attack your target now, without waiting for the tank.
+  - **Assist** (default): fight what you fight.
+  - **Stay:** hold the current position and only fight enemies that come close.
+  - **Follow:** follow you without attacking. Healers still heal.
+
+### Changed
+- **Companions act more like players:**
+  - Damage dealers and healers give the tank (you, or a tank companion) a moment to gain a monster's attention before they attack. Until then they keep their distance and wait.
+  - Out of combat they follow a few steps behind you at your own pace, and only set off once you have moved away.
+
+## v0.40.1
+
+### Changed
+- **Companions use mana like players.** Mana returns only slowly during a fight, so long fights can drain them. After a fight they sit down and drink until their mana is restored, unless you move on.
+- **Companion healers** cast their class's own heals (for example Heal and Flash Heal, Healing Touch and Regrowth, Holy Light and Flash of Light, Healing Wave and Lesser Healing Wave). When nobody needs healing, they attack with their class's spells but keep their mana above 60% for healing. Paladin healers fight in melee instead.
+- **Companion casters** use their class's spells: Frostbolt and Fire Blast, Shadow Bolt and Corruption (with Life Tap when low on mana), Smite and Shadow Word: Pain, Wrath and Moonfire, Lightning Bolt and Earth Shock. When out of mana they fall back to a weak wand.
+- Companions show a cast bar above their heads, and their party frames show mana and when they are drinking.
+
+## v0.40.0
+
+### New
+- **Taunts:** Warriors learn **Taunt**, Paladins **Hand of Reckoning** and Druids **Growl** (Bear Form) at level 10. The target attacks you for 3 sec and your threat is raised above everyone else's. 8 sec cooldown.
+- **Hunter companions** bring a wolf that fights alongside them.
+
+### Changed
+- **Dungeons are made for groups of three.** Monsters always have at least the health and damage of a three-player group. Companions count as group members, so a dungeon can no longer be cleared alone unless you are far above its level.
+- **Threat with companions:** companions now build real threat and can pull monsters off you if you don't hold them. Tanks (Bear Form, or Protection Warriors and Paladins) generate 50% more threat. To take a monster from its current target you need 110% of that target's threat in melee range, or 130% from range.
+- Companions now appear in the threat meter.
+
+### Fixed
+- A companion healer now walks to your body and offers to resurrect you after the fight, also when you died to the environment.
+
+## v0.39.2
+
+### Changed
+- **Wolf Form (Druid):** movement speed bonus reduced from 30% to 20%.
+- **Dash (Druid):** movement speed bonus reduced from 70% to 50%.
+
+## v0.39.1
+
+### Changed
+- **Charge (Warrior) and Feral Charge (Druid):** range increased from 3–11 m to 8–20 m, the charge itself is slower, and both can no longer be used in combat.
+
+## v0.39.0 – Dungeon Companions
+
+### New
+- **Dungeon companions:** every dungeon has a Companion Master next to the entrance. When playing alone, hire up to two companions for that dungeon. Choose a role for each (Tank, Healer or Damage) and a random class of that role joins you at your level.
+  - **Tanks** (Warrior, Paladin or a Druid in Bear Form) pick up monsters attacking you or the healer and taunt them back.
+  - **Healers** (Priest, Druid, Paladin or Shaman) heal whoever is most hurt, including you, your pet and each other, and attack when nobody needs healing. A healer can resurrect you after the fight.
+  - **Damage dealers** (Mage, Warlock, Hunter, Rogue or Warrior) attack your target, or the tank's target.
+  - Companions move out of glowing danger circles, get back up after a fight if they die, and are shown with name plates and frames under yours.
+  - They take no experience or loot, are free, and leave when you leave the dungeon.
+  - If you tank yourself (Bear Form, or a Protection Warrior or Paladin), monsters stay on you instead of your companions.
+  - Companions are not available in co-op yet.
+
+### Fixed
+- Friends in co-op could not see your drake or ship while you travelled.
+
+## v0.38.1
+
+### Changed
+- **Voidwalker:** maximum health increased by about 50% (140% of your maximum health, up from 95%) and it takes 10% less damage.
+- **Health Funnel:** heals your demon for 6% of its maximum health per second (up from 4%).
+- **Demonology:** the Tier 7 talent is now Improved Health Funnel (3 ranks, +25% Health Funnel healing per rank). The Tier 6 talent is renamed Demonic Power.
+
 ## v0.38.0
 
 ### New

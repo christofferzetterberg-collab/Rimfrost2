@@ -19,6 +19,9 @@
   .bar i{position:absolute;inset:0 auto 0 0;background:#3fbf5a}
   .bar b{position:absolute;inset:0;text-align:center;font-size:11px;line-height:14px;text-shadow:0 1px 2px #000}
   #tframe .bar i{background:#d84a42} #tframe.friend .bar i{background:#3fbf5a} #tframe.friend{border-color:#7fc4ff} #tframe.self{border-color:#7be08a}
+  .plate .cb{position:relative;width:70px;height:8px;margin:2px auto 0;background:#1a1410;border:1px solid #5a4a30;border-radius:2px;overflow:hidden}
+  .plate .cb i{position:absolute;left:0;top:0;bottom:0;background:#e6bd5c}
+  .plate .cb em{position:absolute;left:0;right:0;top:-3px;font:700 8px 'Alegreya Sans',sans-serif;color:#fff;text-align:center;font-style:normal;text-shadow:0 1px 1px #000}
   #procs{position:fixed;left:50%;bottom:170px;transform:translateX(-50%);display:flex;gap:14px;pointer-events:none;z-index:6}
   #procs .proc{display:flex;flex-direction:column;align-items:center;gap:3px;animation:procin .25s ease-out}
   #procs .proc img{width:54px;height:54px;border-radius:8px;border:2px solid var(--pc);box-shadow:0 0 14px 3px var(--pc);animation:procpulse 1s ease-in-out infinite}
@@ -85,7 +88,7 @@
   #bar{flex-wrap:nowrap} .slot canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:5px}
   .slot .k{z-index:2;text-shadow:0 1px 2px #000} .slot .cd{z-index:3;border-radius:5px} .slot.nores canvas{filter:saturate(.3) brightness(.6)} .slot.oor .k{color:#ff6b5e}
   .slot.atk{font-size:12px}
-  #petbar .slot{width:40px;height:40px}
+  #petbar .slot,#botbar .slot{width:40px;height:40px} #botbar .slot.on{box-shadow:0 0 0 2px #7be08a inset}
   #petbar .slot.auto{border-color:#ffd86e;animation:petglow 1.6s ease-in-out infinite}
   @keyframes petglow{0%,100%{box-shadow:0 0 0 1px #e6bd5c,0 0 5px 1px rgba(230,189,92,.55)} 50%{box-shadow:0 0 0 1px #ffe08a,0 0 11px 3px rgba(255,216,110,.95)}} #petbar .slot.on{box-shadow:0 0 0 2px #7be08a inset}
   #ppet{margin-top:6px;padding-top:5px;border-top:1px solid var(--line);cursor:pointer;border-radius:4px} #ppet.sel{outline:1px solid #5adc6a;outline-offset:2px} #ppet .n{font-size:12.5px} #ppet .n span:last-child{color:var(--mute);font-weight:700;font-size:11.5px} #ppet .bar{height:11px;margin-top:3px} #ppet .bar b{font-size:9.5px;line-height:11px}
@@ -169,7 +172,7 @@
   .aura{position:relative;width:26px;height:26px} .aura img{width:26px;height:26px;border-radius:4px;border:1px solid #6a9a5a;display:block} .aura.bad img{border-color:#c0443a}
   .aura b{position:absolute;left:0;right:0;bottom:-2px;text-align:center;font-size:10.5px;text-shadow:0 0 2px #000,0 1px 2px #000}
   .frame,#mini,#barwrap,#tracker,#log{z-index:2}
-  #party{position:absolute;left:12px;top:150px;width:220px;display:flex;flex-direction:column;gap:5px;pointer-events:auto;z-index:2}
+  #party,#botparty{position:absolute;left:12px;top:150px;width:220px;display:flex;flex-direction:column;gap:5px;pointer-events:auto;z-index:2}
   .pmem{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 8px;cursor:pointer} .pmem.sel{border-color:#7fc4ff;box-shadow:0 0 0 1px #7fc4ff inset}
   .pmem .n{display:flex;justify-content:space-between;font-size:12.5px} .pmem .n span{color:var(--mute);font-size:11.5px} .pmem .bar{height:11px;margin-top:3px} .pmem .bar b{font-size:9.5px;line-height:11px}
   .plate.sign span{color:#f2ead8;font:italic 700 12px 'Alegreya Sans'}
@@ -190,7 +193,7 @@
   #loadtxt{font:15px 'Alegreya Sans',sans-serif;color:var(--mute)}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261116o", "./src/dungeon.js": "./src/dungeon.js?v=20261116o", "./src/dev.js": "./src/dev.js?v=20261116o", "./src/clock.js": "./src/clock.js?v=20261116o", "./src/coop.js": "./src/coop.js?v=20261116o", "./src/content.js": "./src/content.js?v=20261116o", "./src/engine.js": "./src/engine.js?v=20261116o", "./src/items.js": "./src/items.js?v=20261116o", "./src/keys.js": "./src/keys.js?v=20261116o", "./src/main.js": "./src/main.js?v=20261116o", "./src/models.js": "./src/models.js?v=20261116o", "./src/nav.js": "./src/nav.js?v=20261116o", "./src/quests.js": "./src/quests.js?v=20261116o", "./src/rimdata.js": "./src/rimdata.js?v=20261116o", "./src/state.js": "./src/state.js?v=20261116o", "./src/util.js": "./src/util.js?v=20261116o", "./src/world.js": "./src/world.js?v=20261116o", "./src/worlddata.js": "./src/worlddata.js?v=20261116o", "./src/mobs.js": "./src/mobs.js?v=20261116o", "./src/dgmech.js": "./src/dgmech.js?v=20261116o", "./src/avatar.js": "./src/avatar.js?v=20261116o", "./src/glb.js": "./src/glb.js?v=20261116o", "./src/beasts.js": "./src/beasts.js?v=20261116o", "./src/nature.js": "./src/nature.js?v=20261116o", "./src/buildings.js": "./src/buildings.js?v=20261116o", "./src/dgkit.js": "./src/dgkit.js?v=20261116o", "./src/account.js": "./src/account.js?v=20261116o" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261117a", "./src/dungeon.js": "./src/dungeon.js?v=20261117a", "./src/dev.js": "./src/dev.js?v=20261117a", "./src/clock.js": "./src/clock.js?v=20261117a", "./src/coop.js": "./src/coop.js?v=20261117a", "./src/content.js": "./src/content.js?v=20261117a", "./src/engine.js": "./src/engine.js?v=20261117a", "./src/items.js": "./src/items.js?v=20261117a", "./src/keys.js": "./src/keys.js?v=20261117a", "./src/main.js": "./src/main.js?v=20261117a", "./src/models.js": "./src/models.js?v=20261117a", "./src/nav.js": "./src/nav.js?v=20261117a", "./src/quests.js": "./src/quests.js?v=20261117a", "./src/rimdata.js": "./src/rimdata.js?v=20261117a", "./src/state.js": "./src/state.js?v=20261117a", "./src/util.js": "./src/util.js?v=20261117a", "./src/world.js": "./src/world.js?v=20261117a", "./src/worlddata.js": "./src/worlddata.js?v=20261117a", "./src/mobs.js": "./src/mobs.js?v=20261117a", "./src/dgmech.js": "./src/dgmech.js?v=20261117a", "./src/avatar.js": "./src/avatar.js?v=20261117a", "./src/glb.js": "./src/glb.js?v=20261117a", "./src/beasts.js": "./src/beasts.js?v=20261117a", "./src/nature.js": "./src/nature.js?v=20261117a", "./src/buildings.js": "./src/buildings.js?v=20261117a", "./src/dgkit.js": "./src/dgkit.js?v=20261117a", "./src/account.js": "./src/account.js?v=20261117a" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -200,7 +203,7 @@
 <div id="load"><div class="lbox">Rimfrost 2<div id="loadbar"><i></i></div><div id="loadtxt">Loading…</div></div></div>
 <div id="hud">
   <div class="frame" id="pframe"><div class="n"><span id="pname">Adventurer</span><span id="plvl">Level 1</span></div><div class="bar"><i id="phpi" style="width:100%"></i><b id="phpt"></b></div><div class="bar res"><i id="presi"></i><b id="prest"></b></div><div id="pcp"></div><div class="auras" id="pbuffs"></div><div id="ppet" hidden><div class="n"><span id="ppetn"></span><span id="ppetm"></span></div><div class="bar"><i id="ppethi"></i><b id="ppetht"></b></div><div class="bar res"><i id="ppetri"></i><b id="ppetrt"></b></div><div class="auras" id="ppetb"></div></div></div>
-  <div id="party"></div>
+  <div id="party"></div><div id="botparty"></div>
   <div class="frame" id="tframe" hidden><div class="n"><span id="tname"></span><span id="tlvl"></span></div><div class="bar"><i id="thpi"></i><b id="thpt"></b></div><div class="s" id="tstate"></div><div class="auras" id="tauras"></div></div>
   <div id="mini"><canvas id="minimap" width="180" height="180"></canvas><div id="zone"></div><div id="clock"></div></div>
   <div id="banner"></div><div id="procs"></div>
@@ -209,7 +212,7 @@
   <div id="threat" hidden></div>
   <div id="chatbox" hidden><span>Say:</span><input id="chatin" maxlength="200" autocomplete="off" placeholder="Type a message – Enter sends, Esc cancels"></div>
   <div id="tracker"></div>
-  <div id="barwrap"><div class="bar" id="cast" style="visibility:hidden"><i></i><b></b></div><div class="abar" id="petbar" hidden></div><div class="abar" id="bar2"></div><div class="abar" id="bar1"></div></div>
+  <div id="barwrap"><div class="bar" id="cast" style="visibility:hidden"><i></i><b></b></div><div class="abar" id="botbar" hidden></div><div class="abar" id="petbar" hidden></div><div class="abar" id="bar2"></div><div class="abar" id="bar1"></div></div>
 <div id="rbars"><div class="abar vbar" id="bar4" hidden></div><div class="abar vbar" id="bar3" hidden></div></div>
   <div class="bar" id="xpbar"><i id="xpi"></i><b id="xpt"></b></div>
   <div id="fps"></div>
@@ -238,6 +241,6 @@
 <div id="petcast" hidden><i></i></div>
 <div id="rezask" hidden><span></span><button id="rezyes">Accept</button><button id="rezno" class="no">Decline</button></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261116o"></script>
+<script type="module" src="./src/main.js?v=20261117a"></script>
 </body>
 </html>

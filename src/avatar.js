@@ -88,6 +88,12 @@ function raceTexture(asset, char, race, cls, alt){
 
 const LARGE_HITS = ["Melee_2H_Attack", "Melee_2H_Slam", "Melee_1H_Slash"];
 const MELEE_HITS = {"1H": ["Melee_1H_Attack_Chop", "Melee_1H_Attack_Slice_Diagonal", "Melee_1H_Attack_Slice_Horizontal"], "DW": ["Melee_Dualwield_Attack_Chop", "Melee_Dualwield_Attack_Slice", "Melee_Dualwield_Attack_Stab"]};
+// a head without its ears: the points that stick out at the sides of the lower half of the head are pushed in to the cheek (one copy per head model)
+const earCache = new WeakMap();
+function earless(geo){ if(earCache.has(geo)) return earCache.get(geo);
+  const g = geo.clone(), p = g.attributes.position; g.computeBoundingBox(); const b = g.boundingBox, mx = Math.max(-b.min.x, b.max.x), mid = (b.min.y + b.max.y) / 2, lim = 0.84 * mx;
+  for(let i = 0; i < p.count; i++){ const x = p.getX(i); if(p.getY(i) < mid && Math.abs(x) > lim) p.setX(i, Math.sign(x) * lim); }
+  p.needsUpdate = true; g.computeVertexNormals(); g.computeBoundingSphere(); earCache.set(geo, g); return g; }
 // look: a model for NPCs and monsters: {char, right, left, shield, alt (texture), helm (show helmets), scale, large}
 export function makeAvatar(race, cls, eq = {}, look = null){
   if(!READY) return null; const spec = specFor(race, cls, look); if(!spec || !assets[spec.char]) return null;
@@ -102,11 +108,12 @@ export function makeAvatar(race, cls, eq = {}, look = null){
   for(const m of meshes){ const ch = m.userData.char || spec.char, tex = spec.tint ? tintTexture(assets[ch], "tint:" + ch + ":" + spec.tint.join(","), spec.tint, spec.alt) : raceTexture(assets[ch], ch, race, cls, ch === spec.char ? spec.alt : null); m.material = m.material.clone(); if(tex && !m.material.transparent){ m.material.map = tex; m.material.needsUpdate = true; } if(spec.glow) m.material.emissive = new THREE.Color(spec.glow); }   // own materials (ghosts and glows change them)
   // extra parts on the head: elf ears, orc tusks, undead eyes (placed from the head's size)
   const headMesh = meshes.find(m => /_Head$/.test(m.name));
+  if(headMesh && R.ears && spec.char !== "Druid") headMesh.geometry = earless(headMesh.geometry);   // elves: the model's round ears are folded away, pointed ones go in their place
   if(headMesh && N.head && (R.ears || R.tusks || R.eyes)){ model.updateMatrixWorld(true); const hb = new THREE.Box3().setFromObject(headMesh), c = hb.getCenter(new THREE.Vector3()), sz = hb.getSize(new THREE.Vector3());
     const at = (x, y, z) => N.head.worldToLocal(new THREE.Vector3(c.x + x * sz.x, c.y + y * sz.y, c.z + z * sz.z));
     const skinMat = new THREE.MeshLambertMaterial({color: R.skin || 0xf0c8a0}), add = (geo, mat, p, rot, scl) => { const m = new THREE.Mesh(geo, mat); m.position.copy(p); if(rot) m.rotation.set(...rot); if(scl) m.scale.setScalar(scl); m.castShadow = true; N.head.add(m); return m; };
     const hs = sz.y / N.head.getWorldScale(new THREE.Vector3()).y;
-    if(R.ears && spec.char !== "Druid") for(const s2 of [-1, 1]) add(new THREE.ConeGeometry(0.1, 0.75, 5), skinMat, at(s2 * 0.5, 0.06, -0.04), [-0.45, 0, -s2 * 1.1], hs * 0.85);
+    if(R.ears && spec.char !== "Druid") for(const s2 of [-1, 1]) add(new THREE.ConeGeometry(0.1, 0.75, 5), skinMat, at(s2 * 0.46, -0.1, -0.03), [-0.5, 0, -s2 * 1.15], hs * 0.85);
     if(R.tusks) for(const s2 of [-1, 1]) add(new THREE.ConeGeometry(0.035, 0.14, 5), new THREE.MeshLambertMaterial({color: 0xf0e6cc}), at(s2 * 0.13, -0.28, 0.43), [0.2, 0, 0], hs * 0.9);
     if(R.eyes) for(const s2 of [-1, 1]) add(new THREE.SphereGeometry(0.035, 6, 4), new THREE.MeshBasicMaterial({color: R.eyes}), at(s2 * 0.14, -0.02, 0.45), null, hs * 0.9); }
   const hold = (slot, item) => { if(!item || !assets[item] || !N[slot]) return; const w = build(assets[item]); w.traverse(o => { if(o.isMesh){ o.castShadow = true; } }); N[slot].add(w); if(UPRIGHT[item]){ w.userData.up = UPRIGHT[item]; uprights.push(w); }

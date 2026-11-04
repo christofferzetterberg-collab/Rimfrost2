@@ -1,7 +1,7 @@
 // Rimfrost 2 – stage 3: races, classes and Rimfrost's abilities in a low-poly 3D world, seen from an angled top-down camera.
 import * as THREE from "three";
 import {clamp, lerp, rng} from "./util.js";
-import {B, WATER, height, ground, houses, colliders, decor, buildWorld, zoneAt, landAt, hubAt, placeName, openAt, featureAt, roadDist, GROUND, waterColor, SIGNS, DOORS, STABLE_HORSES} from "./world.js";
+import {GRASS, B, WATER, height, ground, houses, colliders, decor, buildWorld, zoneAt, landAt, hubAt, placeName, openAt, featureAt, roadDist, GROUND, waterColor, SIGNS, DOORS, STABLE_HORSES} from "./world.js";
 import {HUBS, ZONES, LAIRS, EXPLORE, RACE_HUB, DG_DOORS, continentOf} from "./worlddata.js";
 import {KINDS, SPAWNS, ZONE_MOB_MULT, FIXED} from "./mobs.js";
 import {DUNGEONS, DG_VER, dungeonAt, regionOf, buildDungeons} from "./dungeon.js";
@@ -12,8 +12,8 @@ import {preloadNature} from "./nature.js";
 import {preloadBuildings, buildingModel} from "./buildings.js";
 import {preloadKit} from "./dgkit.js";
 import * as ACC from "./account.js";
-import {preloadBeasts, makeMountModel} from "./beasts.js";
-import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount, makeSheep} from "./models.js";
+import {preloadBeasts, makeMountModel, makeAnimal} from "./beasts.js";
+import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount, makeSheep, makeWolf} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
 import {P, S, mobs, PXU} from "./state.js";
 import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, SCHOOL_COLOR, abIcon, drawIcon} from "./rimdata.js";
@@ -46,7 +46,7 @@ sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, {left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 140}); sun.shadow.bias = -0.0005;
 scene.add(sun, sun.target);
 // graphics quality (Esc menu): resolution, shadows and how far away people and monsters are drawn
-const GFX_LEVELS = {low: {name: "Low", pr: 1, shadow: 0, area: 0, view: 60}, medium: {name: "Medium", pr: 1.25, shadow: 1024, area: 32, view: 72}, high: {name: "High", pr: 2, shadow: 2048, area: 40, view: 85}};
+const GFX_LEVELS = {low: {name: "Low", pr: 1, shadow: 0, area: 0, view: 60, grass: 28}, medium: {name: "Medium", pr: 1.25, shadow: 1024, area: 32, view: 72, grass: 45}, high: {name: "High", pr: 2, shadow: 2048, area: 40, view: 85, grass: 65}};   // grass: how far grass is drawn
 const GFX_KEY = "rimfrost2_gfx"; let GFX = GFX_LEVELS.medium, frameNo = 0;
 function applyGfx(id){ GFX = GFX_LEVELS[id] || GFX_LEVELS.medium; GFX.id = GFX_LEVELS[id] ? id : "medium"; try{ localStorage.setItem(GFX_KEY, GFX.id); }catch(e){}
   renderer.setPixelRatio(Math.min(GFX.pr, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight); sun.castShadow = GFX.shadow > 0;
@@ -103,6 +103,198 @@ const portals = [];
 { const mk = (x, z, name, to, d) => { const m = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3, 1.2), new THREE.MeshBasicMaterial({visible: false})); m.position.set(x, height(x, z) + 1.5, z); scene.add(m);
     const p = {portal: to, d, name, x, z, mesh: m}; m.userData.node = p; portals.push(p); return p; };
   for(const d of DUNGEONS){ d.door = DOORS[d.id]; mk(d.door.x + d.door.fx * 0.8, d.door.z + d.door.fz * 0.8, "Enter " + d.name, "in", d); const ex = d.tileCenter(...d.exit); mk(ex.x, ex.z - 0.4, "Leave " + d.name, "out", d); } }
+// ---------------------------------------------------------------- dungeon companions: up to two computer-controlled helpers (tank, healer or damage) hired from the
+// Companion Master inside each dungeon. A random class of the chosen role joins, scaled to your level; they follow you, fight what you fight and leave when you leave.
+const BOT_ROLES = {tank: ["warrior", "paladin", "druid"], healer: ["priest", "druid", "paladin", "shaman"], dps: ["mage", "warlock", "hunter", "rogue", "warrior"]};
+const ROLE_NAME = {tank: "Tank", healer: "Healer", dps: "Damage"};
+const BOT_NAMES = {human: ["Aldric", "Bryn", "Cedric", "Elsa", "Haldor", "Maren", "Rowan", "Tilda"], elf: ["Aerith", "Caelan", "Ilyra", "Lorien", "Sylas", "Thalia"],
+  dwarf: ["Borin", "Dagna", "Grimli", "Helga", "Thrain", "Ulla"], orc: ["Drakka", "Gorm", "Krug", "Mogra", "Rukh", "Zagra"], undead: ["Ashka", "Morrow", "Silas", "Vesna", "Wren", "Yorick"]};
+const BOT_BOLT = {mage: ["#8fd8ff", "orb"], warlock: ["#9a5ae0", "orb"], hunter: ["#e9e2c8", "arrow"], priest: ["#fff2b0", "orb"], druid: ["#9cf07a", "orb"], shaman: ["#9fd0ff", "orb"], paladin: ["#ffe08a", "orb"]};
+const MELEE_BOT = new Set(["rogue", "warrior"]);
+const BOT_ARMOR = {mage: 1.3, warlock: 1.3, priest: 1.3, druid: 1.15, rogue: 1.15, hunter: 1.05, shaman: 1.05, paladin: 0.95, warrior: 0.95};   // damage taken by armor type (cloth takes the most)
+// what each class casts. dmg: × base damage at once; dot: × base damage per second for 12 sec; mana: share of their mana (%); cast: sec; cd: sec. The first ready spell is used, the last one is the filler.
+const BOT_KIT = {
+  mage:    [{name: "Fire Blast", dmg: 3.2, mana: 4, cast: 0, cd: 8, col: "#ff8a3a"}, {name: "Frostbolt", dmg: 5.4, mana: 3, cast: 2.0, col: "#8fd8ff"}],
+  warlock: [{name: "Corruption", dot: 1.2, mana: 3, cast: 0, cd: 12, col: "#9a5ae0"}, {name: "Shadow Bolt", dmg: 5.2, mana: 3, cast: 2.2, col: "#9a5ae0"}],
+  priest:  [{name: "Shadow Word: Pain", dot: 0.8, mana: 3, cast: 0, cd: 12, col: "#9a7ae0"}, {name: "Smite", dmg: 3.2, mana: 3, cast: 2.0, col: "#fff2b0"}],
+  druid:   [{name: "Moonfire", dmg: 1.2, dot: 0.5, mana: 3, cast: 0, cd: 12, col: "#c8a8ff"}, {name: "Wrath", dmg: 3.2, mana: 3, cast: 2.0, col: "#9cf07a"}],
+  shaman:  [{name: "Earth Shock", dmg: 2.4, mana: 4, cast: 0, cd: 6, col: "#9ad06a"}, {name: "Lightning Bolt", dmg: 3.4, mana: 3, cast: 2.0, col: "#9fd0ff"}],
+  paladin: [{name: "Judgement", dmg: 2.2, mana: 4, cast: 0, cd: 10, col: "#ffe08a"}]
+};
+const HEAL_NAMES = {priest: ["Heal", "Flash Heal"], druid: ["Healing Touch", "Regrowth"], paladin: ["Holy Light", "Flash of Light"], shaman: ["Healing Wave", "Lesser Healing Wave"]};
+const usesMana = b => b.role !== "tank" && !!BOT_KIT[b.cls];
+// a spell lands: at once, and/or as damage over time (ticks every 3 sec)
+function botSpellHit(b, tg, sp){ const crit = Math.random() < 0.1, k = (0.9 + Math.random() * 0.2) * (crit ? 1.8 : 1);
+  if(sp.dmg) G.botDamageMob(tg, Math.max(1, Math.round(baseDmg() * sp.dmg * k)), crit, "magic", b);
+  if(sp.dot){ b.dots = (b.dots || []).filter(d => !(d.m === tg && d.name === sp.name)); b.dots.push({m: tg, name: sp.name, per: baseDmg() * sp.dot * 3, left: 12, t: 3}); } }
+let bots = [], mercPick = [null, null], botMode = "assist", botStay = null;   // botMode: assist | stay | follow (passive)
+const botSlots = () => CO.on() ? 0 : 2;                                                        // (co-op: not yet)
+const botRegion = () => bots.length ? regionOf(bots[0].x) : null;
+const baseDmg = () => 3 + S.cur.level * 2.4;
+function botStats(b){ const pct = b.maxHp ? b.hp / b.maxHp : 1, mh = Math.round(P.maxHp / (P.buffs.ressick ? 0.25 : 1) * (b.role === "tank" ? 1.35 : 0.8));
+  b.maxHp = mh; b.hp = b.dead ? 0 : Math.max(1, mh * pct); b.lvl = S.cur.level; }
+function hireBots(roles){ dismissBots(true); const d = curDungeon(); if(!d) return;
+  roles.forEach((role, i) => { const list = BOT_ROLES[role], cls = list[Math.floor(Math.random() * list.length)], races = Object.keys(RACE_CLASSES).filter(r => RACE_CLASSES[r].includes(cls));
+    const race = races[Math.floor(Math.random() * races.length)], names = BOT_NAMES[race], name = names[Math.floor(Math.random() * names.length)];
+    const mesh = role === "tank" && cls === "druid" ? makeBearForm() : makeHero(race, cls, RACES, {}); scene.add(mesh);
+    const b = {id: "bot" + i, bot: true, name, role, cls, race, x: P.x - Math.sin(P.rot) * 1.5 + (i ? 1.2 : -1.2), z: P.z - Math.cos(P.rot) * 1.5, r: 0.45, rot: P.rot, mesh, walk: 0, moving: false,
+      attackAnim: 0, atkT: 1 + i * 0.4, castT: 0, cast: null, mana: 100, tauntCd: 0, deadT: 0, thr: role === "tank" ? 4 : role === "dps" ? 0.8 : 0.6, offset: i ? 1 : -1};
+    botStats(b); b.hp = b.maxHp;
+    const pl = document.createElement("div"); pl.className = "plate friend"; pl.innerHTML = `<span></span><div class="hb"><i></i></div><div class="cb"><i></i><em></em></div>`; hud.appendChild(pl); b.plate = pl;
+    if(cls === "hunter"){ const pm = makeWolf(); scene.add(pm); b.pet = {mesh: pm, x: b.x + 1, z: b.z, rot: b.rot, walk: 0, moving: false, r: 0.5, attackAnim: 0, atkT: 1}; }
+    bots.push(b); G.burst(b.x * PXU, b.z * PXU, "#ffe08a", 14); });
+  log(`${bots.map(b => `${b.name} (${ROLE_NAME[b.role]}, ${CLASSES[b.cls].name})`).join(" and ")} ${bots.length > 1 ? "join" : "joins"} your group.`, "#7be08a"); }
+function dismissBots(quiet){ botMode = "assist"; botStay = null;  if(bots.length && !quiet) log("Your companions leave the group.", "#93a4ad");
+  for(const b of bots){ scene.remove(b.mesh); if(b.pet) scene.remove(b.pet.mesh); b.plate.remove(); } bots = []; updBotBar(); for(const m of mobs) if(m.botTh) m.botTh = null; $("botparty").innerHTML = ""; }
+// what the monsters do to them
+function botHurt(b, dmg, m){ if(b.dead) return; if(Math.random() < (b.role === "tank" ? 0.12 : 0.05)){ floatText(b, "Dodge", "#cfd8dc"); return; }
+  const amt = Math.max(1, Math.round(dmg * (b.role === "tank" ? 0.6 : BOT_ARMOR[b.cls] || 1) * (0.92 + Math.random() * 0.16))); b.hp -= amt; floatText(b, "-" + amt, "#ff7a6a");
+  if(b.hp <= 0){ b.hp = 0; b.dead = true; b.deadT = 0; b.cast = null; log(`${b.name} has died.`, "#ff8a7a"); } }
+function botHeal(t, amt, b){ if(t === P){ if(P.dead) return; P.hp = Math.min(P.maxHp, P.hp + amt); }
+  else { if(t.dead) return; t.hp = Math.min(t.maxHp, t.hp + amt); }
+  floatText(t, "+" + Math.round(amt), "#7be08a"); G.burst(t.x * PXU, t.z * PXU, "#9cf07a", 8);
+  for(const m of mobs) if(m.state === "chase" && !m.dead && regionOf(m.x) === regionOf(b.x)) (m.botTh = m.botTh || {})[b.id] = (m.botTh[b.id] || 0) + amt * 0.4; }   // healing draws attention too
+// the fight: who they go for
+const engaged = b => mobs.filter(m => !m.dead && m.state === "chase" && regionOf(m.x) === regionOf(b.x) && Math.hypot(m.x - b.x, m.z - b.z) < 35);
+function botTarget(b){ const L = engaged(b); const pt = P.target && !P.target.dead && P.target.state !== "return" && regionOf(P.target.x) === regionOf(b.x) && (P.target.state === "chase" || P.auto) ? P.target : null;
+  if(b.role === "tank"){ const loose = L.filter(m => m.tgtId !== b.id).sort((a, c) => Math.hypot(a.x - P.x, a.z - P.z) - Math.hypot(c.x - P.x, c.z - P.z));
+    return loose[0] || (b.tgt && L.includes(b.tgt) ? b.tgt : pt || L[0] || null); }
+  const tank = bots.find(o => o.role === "tank" && !o.dead && o.tgt && !o.tgt.dead);
+  let t = pt || (tank && tank.tgt) || L.sort((a, c) => a.hp - c.hp)[0] || null;
+  if(t && botMode === "stay" && botStay && Math.hypot(t.x - botStay.x, t.z - botStay.z) > 14) t = null;          // holding position: only what comes close
+  if(t && waitForTank(t)){ b.waiting = t; return null; } b.waiting = null; return t; }
+// like real players, damage dealers give the tank a moment to gain the monster's attention before they attack (unless you order an attack)
+function groupTank(){ if(tankMult() > 1 && !P.dead) return P; return bots.find(o => o.role === "tank" && !o.dead) || null; }
+function waitForTank(m){ const tk = groupTank(); if(!tk || m.botGo) return false;
+  m.bStart = m.bStart || now; const th = tk === P ? (m.thMe || 0) : ((m.botTh || {})[tk.id] || 0);
+  return now - m.bStart < 2.5 || th <= 0; }
+// stay out of the glowing circles a boss puts on the ground
+function botDanger(b){ for(const m of mobs){ if(m.dead || regionOf(m.x) !== regionOf(b.x)) continue;
+    for(const zn of m.zones || []){ const r = m.K.mech.zones.r + 1; if(Math.hypot(b.x - zn.x, b.z - zn.z) < r) return {x: zn.x, z: zn.z, r}; }
+    if(m.nova){ const r = m.K.nova.r + 1; if(Math.hypot(b.x - m.nova.x, b.z - m.nova.z) < r) return {x: m.nova.x, z: m.nova.z, r}; } } return null; }
+function botMoveTo(b, x, z, dt, sp = 7.4){ if(Math.hypot(x - b.x, z - b.z) < 0.4) return; moveMob(b, x, z, sp, dt); }
+function updBots(dt){ const el = $("botparty");
+  if(!bots.length) return;
+  if(!running || regionOf(P.x) !== botRegion()) return dismissBots();                       // they stay in their dungeon
+  const inCombat = bots.some(b => !b.dead && engaged(b).length) || (!P.dead && P.combatT > 0);
+  for(const b of bots){ b.walk = b.moving ? b.walk + dt * 9 : b.walk * 0.85; b.moving = false; b.attackAnim = Math.max(0, b.attackAnim - dt * 3); b.tauntCd -= dt;
+    if((b.statT = (b.statT || 0) - dt) <= 0){ b.statT = 2; botStats(b); }
+    if(b.dead){ b.deadT += dt; if(!inCombat && b.deadT > 4){ b.dead = false; b.hp = b.maxHp * 0.6; b.mana = 60; log(`${b.name} gets back up.`, "#7be08a"); G.burst(b.x * PXU, b.z * PXU, "#fff2b0", 14); } continue; }
+    for(const d of b.dots || []){ d.left -= dt; d.t -= dt; if(d.t <= 0 && !d.m.dead){ d.t += 3; G.botDamageMob(d.m, Math.max(1, Math.round(d.per)), false, "magic", b); } }
+    if(b.dots) b.dots = b.dots.filter(d => d.left > 0 && !d.m.dead); for(const k in b.cds || {}) b.cds[k] -= dt;
+    if(!inCombat) b.hp = Math.min(b.maxHp, b.hp + b.maxHp * 0.06 * dt);
+    if(usesMana(b)){ b.mana = Math.min(100, b.mana + dt * (b.drinking ? 7 : inCombat ? 0.5 : 1.5));                 // mana comes back slowly in a fight; after it they sit down and drink
+      if(inCombat || b.mana >= 100 || Math.hypot(P.x - b.x, P.z - b.z) > 12) b.drinking = false;
+      else if(!b.drinking && b.mana < 75 && !P.moving && Math.hypot(P.x - b.x, P.z - b.z) < 6){ b.drinking = true; floatText(b, "Drinking", "#9fd6ff"); }
+      if(b.drinking){ b.cast = null; continue; } } else b.drinking = false;
+    const danger = botDanger(b); if(danger){ const a = Math.atan2(b.z - danger.z, b.x - danger.x); b.cast = null; botMoveTo(b, danger.x + Math.cos(a) * (danger.r + 1), danger.z + Math.sin(a) * (danger.r + 1), dt, 8.5); continue; }
+    // healer: heals the most hurt in the group first
+    if(b.role === "healer"){
+      if(b.cast && b.cast.heal){ b.cast.t -= dt; const t = b.cast.tg; if(t !== P && t.dead || t === P && P.dead){ b.cast = null; } else if(b.cast.t <= 0){ botHeal(t, (t === P ? P.maxHp : t.maxHp) * b.cast.pct, b); b.cast = null; b.attackAnim = 1; } continue; }
+      const group = [P, ...bots, ...(G.getPet() && !G.getPet().dead ? [G.getPet()] : [])].filter(t => t === P ? !P.dead : !t.dead && t.maxHp);
+      const pct = t => (t === P ? P.hp / P.maxHp : t.hp / t.maxHp), hurt = group.filter(t => pct(t) < 0.9).sort((a, c) => pct(a) - pct(c))[0];
+      if(hurt){ const d = Math.hypot(hurt.x - b.x, hurt.z - b.z);
+        if(d > 11 || !sees(b, hurt)){ botMoveTo(b, hurt.x, hurt.z, dt); continue; }
+        turnTo(b, hurt.x - b.x, hurt.z - b.z, dt, 10); const fast = pct(hurt) < 0.5, cost = fast ? 9 : 6, nm = (HEAL_NAMES[b.cls] || ["Heal", "Flash Heal"])[fast ? 1 : 0];
+        if(b.mana >= cost){ b.mana -= cost; b.cast = {heal: true, name: nm, tg: hurt, t: fast ? 1.5 : 2.5, total: fast ? 1.5 : 2.5, pct: fast ? 0.2 : 0.3}; continue; }
+        if(!b.oomT || now - b.oomT > 10){ b.oomT = now; floatText(b, "Out of mana", "#7fb2ff"); } }
+      // and in a dead (P.dead, not a spirit) player's case: resurrects after the fight
+      if(P.dead && !P.ghost && !inCombat){ const d = Math.hypot(P.x - b.x, P.z - b.z);
+        if(d > 8){ botMoveTo(b, P.x, P.z, dt); continue; }
+        if(!rezOffer && (b.rezT = (b.rezT || 0) + dt) > 2){ b.rezT = 0; b.cast = null; b.attackAnim = 1; G.burst(P.x * PXU, P.z * PXU, "#fff2b0", 16); rezAt(P.x, P.z, b.name); } continue; }
+    }
+    // like a real player: with a tank in the group, a damage dealer that pulls a monster stops attacking and runs to the tank until the tank takes it back
+    if(b.role === "dps" && inCombat){ const tk = groupTank(), mine = tk && tk !== b && engaged(b).find(m => m.tgtId === b.id);
+      if(mine){ b.tgt = null; b.cast = null; const d = Math.hypot(tk.x - b.x, tk.z - b.z); if(d > 2.5) botMoveTo(b, tk.x, tk.z, dt, 8.5); else turnTo(b, mine.x - b.x, mine.z - b.z, dt, 8);
+        if(!b.saidAggro || now - b.saidAggro > 8){ b.saidAggro = now; floatText(b, "Help!", "#ff9a7a"); } continue; } }
+    const tg = inCombat && botMode !== "follow" ? botTarget(b) : null; b.tgt = tg;
+    if(!tg && b.waiting && botMode !== "follow"){ const w = b.waiting, d = Math.hypot(w.x - b.x, w.z - b.z); if(d < 6){ const a = Math.atan2(b.z - w.z, b.x - w.x); botMoveTo(b, w.x + Math.cos(a) * 7, w.z + Math.sin(a) * 7, dt); } turnTo(b, w.x - b.x, w.z - b.z, dt, 8); continue; }   // waiting: keep a little distance and watch
+    if(tg){ const melee = b.role === "tank" || MELEE_BOT.has(b.cls) && b.role === "dps" || b.role === "healer" && b.cls === "paladin" && b.mana < 60, d = Math.hypot(tg.x - b.x, tg.z - b.z), reach = melee ? tg.r + b.r + 1.1 : 10;
+      if(b.role === "tank" && tg.tgtId !== b.id && b.tauntCd <= 0 && d < 12){ b.tauntCd = 8; m_taunt(tg, b); }
+      if(d > reach || !sees(b, tg)){ botMoveTo(b, tg.x, tg.z, dt); continue; }
+      turnTo(b, tg.x - b.x, tg.z - b.z, dt, 10); b.atkT -= dt;
+      if(!melee && usesMana(b)){ if(botCast(b, tg, dt)) continue; }
+      if(b.atkT <= 0){ const spd = melee ? 1.6 : 2.0, mult = b.role === "dps" ? 2.6 : b.role === "tank" ? 1.15 : 0.5, crit = Math.random() < 0.1;
+        const amt = Math.max(1, Math.round(baseDmg() * mult * spd * (crit ? 1.8 : 1) * (0.9 + Math.random() * 0.2))); b.atkT = spd; b.attackAnim = 1; b.akind = melee ? "melee" : b.cls === "hunter" ? "bow" : "cast";
+        if(melee) G.botDamageMob(tg, amt, crit, "phys", b);
+        else { const [col, kind] = BOT_BOLT[b.cls] || ["#fff", "orb"]; G.proj(tg, col, 4, () => G.botDamageMob(tg, amt, crit, b.cls === "hunter" ? "phys" : "magic", b), kind === "arrow" ? "arrow" : null, null, {x: b.x, z: b.z, y: 1.3}); } }
+      continue; }
+    // nothing to fight: hold the spot you ordered, or follow you a few steps behind (they set off once you have moved away, at your pace)
+    if(botMode === "stay" && botStay){ const sx = botStay.x + Math.cos(botStay.rot) * 1.6 * b.offset, sz = botStay.z - Math.sin(botStay.rot) * 1.6 * b.offset, d = Math.hypot(sx - b.x, sz - b.z);
+      if(d > 0.6) botMoveTo(b, sx, sz, dt, 7); continue; }
+    const fx = P.x - Math.sin(P.rot) * 4.5 + Math.cos(P.rot) * 2 * b.offset, fz = P.z - Math.cos(P.rot) * 4.5 - Math.sin(P.rot) * 2 * b.offset, d = Math.hypot(fx - b.x, fz - b.z);
+    if(d > 3.2) b.following = true; else if(d < 1.2) b.following = false;
+    if(d > 40 && !P.dead){ b.x = fx; b.z = fz; } else if(b.following) botMoveTo(b, fx, fz, dt, d > 14 ? 9.5 : Math.min(8.5, Math.max(4, G.playerSpeed()))); else if(Math.hypot(P.x - b.x, P.z - b.z) < 9) turnTo(b, P.x - b.x, P.z - b.z, dt, 3); }
+  // a hunter's wolf: fights the hunter's target, otherwise stays at its side
+  for(const b of bots){ const w = b.pet; if(!w) continue; w.moving = false; w.attackAnim = Math.max(0, w.attackAnim - dt * 3); const t = !b.dead && b.tgt && !b.tgt.dead ? b.tgt : null;
+    if(t){ const d = Math.hypot(t.x - w.x, t.z - w.z); if(d > t.r + 1.3) moveMob(w, t.x, t.z, 8.5, dt); else { turnTo(w, t.x - w.x, t.z - w.z, dt, 10);
+        if((w.atkT -= dt) <= 0){ w.atkT = 1.5; w.attackAnim = 1; G.botDamageMob(t, Math.max(1, Math.round(baseDmg() * 0.55 * 1.5 * (0.9 + Math.random() * 0.2))), false, "phys", b); } } }
+    else { const fx = b.x + Math.cos(b.rot) * 1.3, fz = b.z - Math.sin(b.rot) * 1.3; if(Math.hypot(fx - w.x, fz - w.z) > 1) moveMob(w, fx, fz, 8, dt); if(Math.hypot(fx - w.x, fz - w.z) > 30){ w.x = fx; w.z = fz; } }
+    w.walk = w.moving ? w.walk + dt * 10 : w.walk * 0.85; w.mesh.position.set(w.x, height(w.x, w.z), w.z); w.mesh.rotation.y = w.rot; w.mesh.userData.animate(w.walk, w.moving, w.attackAnim); }
+  // their models, name plates and frames under yours
+  for(const b of bots){ const ms = b.mesh; ms.position.set(b.x, height(b.x, b.z), b.z); ms.rotation.set(0, b.rot, 0);
+    ms.userData.animate(b.walk, b.moving, b.attackAnim, b.drinking ? "sit" : b.cast && !b.dead ? "cast" : null, {kind: b.akind || "melee", dead: b.dead});
+    const s = toScreen(b.x, height(b.x, b.z) + (ms.userData.height || 2) + 0.35, b.z);
+    if(!s.on){ b.plate.style.display = "none"; } else { b.plate.style.display = ""; b.plate.style.left = s.x + "px"; b.plate.style.top = s.y + "px"; b.plate.firstChild.textContent = b.name;
+      b.plate.children[1].firstChild.style.width = Math.max(0, b.hp / b.maxHp * 100) + "%";
+      const cb = b.plate.children[2], c = !b.dead && b.cast; cb.style.display = c ? "" : "none"; if(c){ cb.firstChild.style.width = Math.min(100, (1 - c.t / c.total) * 100) + "%"; if(cb.lastChild.textContent !== c.name) cb.lastChild.textContent = c.name; } } }
+  updBotBar();
+  const html = bots.map(b => `<div class="pmem"><div class="n"><b style="color:${CLASSES[b.cls].color}">${b.name}</b><span>${b.dead ? "Dead" : b.drinking ? "Drinking" : ROLE_NAME[b.role]}</span></div>
+    <div class="bar"><i style="width:${Math.max(0, b.hp / b.maxHp * 100)}%;background:${b.dead ? "#555" : "#3fbf5a"}"></i></div>${usesMana(b) ? `<div class="bar rs"><i style="width:${Math.round(b.mana)}%;background:var(--mana)"></i></div>` : ""}</div>`).join("");
+  if(el.innerHTML !== html) el.innerHTML = html;
+  { const pa = $("party"), top = pa.offsetTop + pa.offsetHeight + (pa.innerHTML ? 6 : 0) + "px"; if(el.style.top !== top) el.style.top = top; } }
+// a tank (Bear Form, or a Warrior or Paladin with 5 points in Protection) makes 50% more threat
+const tankMult = () => P.form === "bear" || (S.cur.cls === "warrior" && G.treePoints("prot") >= 5) || (S.cur.cls === "paladin" && G.treePoints("pprot") >= 5) ? 1.5 : 1;
+// a caster's turn: finish the cast, or start the next spell (Life Tap for warlocks low on mana; a wand when out of mana)
+function botCast(b, tg, dt){
+  if(b.cast){ if(b.cast.tg.dead || b.cast.tg !== tg){ b.cast = null; return true; } b.cast.t -= dt; if(b.cast.t > 0) return true;
+    const sp = b.cast.sp; b.cast = null; b.attackAnim = 1; b.akind = "cast"; G.proj(tg, sp.col, 4, () => botSpellHit(b, tg, sp), null, null, {x: b.x, z: b.z, y: 1.3}); b.atkT = 0.3; return true; }
+  if(b.atkT > 0) return true;
+  if(b.cls === "warlock" && b.mana < 25 && b.hp > b.maxHp * 0.6){ b.hp -= b.maxHp * 0.15; b.mana = Math.min(100, b.mana + 20); floatText(b, "Life Tap", "#9a5ae0"); b.atkT = 1.2; return true; }
+  const save = b.role === "healer" ? 60 : 0;                                                     // a healer keeps its mana for healing
+  b.cds = b.cds || {};
+  const kit = BOT_KIT[b.cls] || [], sp = kit.find(s => !(b.cds[s.name] > 0) && b.mana - s.mana >= save && (!s.dot || !(b.dots || []).some(d => d.m === tg && d.name === s.name)));
+  if(sp){ b.mana -= sp.mana; if(sp.cd) b.cds[sp.name] = sp.cd;
+    if(sp.cast){ b.cast = {sp, tg, name: sp.name, t: sp.cast, total: sp.cast}; return true; }
+    b.attackAnim = 1; b.akind = "cast"; G.proj(tg, sp.col, 4, () => botSpellHit(b, tg, sp), null, null, {x: b.x, z: b.z, y: 1.3}); b.atkT = 1.0; return true; }
+  if(b.role === "healer" && b.cls === "paladin") return false;                                  // (a paladin healer swings its weapon instead)
+  // out of mana: a weak wand shot
+  b.atkT = 1.6; b.attackAnim = 1; b.akind = "cast"; const amt = Math.max(1, Math.round(baseDmg() * 0.8 * 1.6 * (0.9 + Math.random() * 0.2)));
+  G.proj(tg, "#d38cff", 3, () => G.botDamageMob(tg, amt, false, "magic", b), "orb", null, {x: b.x, z: b.z, y: 1.3}); return true; }
+// the companion bar: Attack, Assist, Stay and Follow
+const BOT_CMDS = [{x: "attack", name: "Attack", icon: "sword", color: "#d84a42", desc: "Your companions attack your target now, without waiting for the tank."},
+  {x: "assist", name: "Assist", icon: "fang", color: "#e0b050", desc: "Your companions fight what you fight. Damage dealers wait a moment for the tank to gain the monster's attention."},
+  {x: "stay", name: "Stay", icon: "shield", color: "#9aa4ad", desc: "Your companions hold this position and fight only enemies that come close."},
+  {x: "follow", name: "Follow", icon: "leap", color: "#9ccf8a", desc: "Your companions follow you and do not attack. Healers still heal."}];
+let botBarKey = "";
+function updBotBar(){ const el = $("botbar"), key = bots.length ? botMode : "";
+  if(key === botBarKey) return; botBarKey = key; el.hidden = !bots.length; el.innerHTML = "";
+  for(const c of bots.length ? BOT_CMDS : []){ const s = document.createElement("div"); s.className = "slot" + (c.x === botMode ? " on" : ""); const cv = document.createElement("canvas"); cv.width = cv.height = 52; drawIcon(cv, c.icon, c.color); s.append(cv);
+    s.onclick = () => botCommand(c.x); s.onmouseenter = e => showTip(e, `<h4>${c.name}</h4>${c.desc}`); s.onmouseleave = hideTip; el.appendChild(s); } }
+function botCommand(x){ if(!bots.length) return;
+  if(x === "attack"){ const t = P.target && !P.target.dead && regionOf(P.target.x) === botRegion() ? P.target : null; if(!t) return err("You have no target");
+    t.botGo = true; if(t.state === "idle") G.engage(t); if(botMode === "follow") botMode = "assist"; botBarKey = ""; log("Companions: attacking " + t.name + ".", "#9fd6ff"); return; }
+  botMode = x; botStay = x === "stay" ? {x: P.x, z: P.z, rot: P.rot} : null; botBarKey = "";
+  log(x === "stay" ? "Companions: holding this position." : x === "follow" ? "Companions: following, not attacking." : "Companions: assisting you.", "#9fd6ff"); }
+function m_taunt(m, b){ m.botTauntT = 3; m.botTauntId = b.id; (m.botTh = m.botTh || {})[b.id] = Math.max(m.botTh[b.id] || 0, (m.thMe || 0) * 1.3 + 50); floatText(b, "Taunt", "#ffd36b"); G.ring(m.x * PXU, m.z * PXU, 30, "#ffd36b"); }
+// the Companion Master inside each dungeon, next to the way out
+const MERC_NAMES = ["Captain Hask", "Captain Orla", "Captain Brand", "Captain Ysolde", "Captain Torvik", "Captain Mirra", "Captain Grell", "Captain Senna", "Captain Volk", "Captain Aud"];
+DUNGEONS.forEach((d, i) => { const s = d.tileCenter(...d.start); let spot = null;
+  for(const [dx, dz] of [[2.2, 1.2], [-2.2, 1.2], [2.2, 2.6], [-2.2, 2.6], [1.4, 3.4], [-1.4, 3.4], [3, 0], [-3, 0]]){ const x = s.x + dx, z = s.z + dz; if(!G.blocked(x, z, x, z, 0.6)){ spot = {x, z}; break; } }
+  if(!spot) spot = {x: s.x + 1.5, z: s.z + 1.5};
+  const def = {id: "merc_" + d.id, name: MERC_NAMES[i % MERC_NAMES.length], title: "Companion Master", color: "#c8a040", race: ["human", "dwarf", "orc", "elf", "undead"][i % 5], hub: null, role: "merc", x: spot.x, z: spot.z,
+    rot: Math.atan2(s.x - spot.x, s.z + 1 - spot.z), hello: "Need a hand down here? I can send two of my best with you."};
+  const mesh = npcModel(def); mesh.position.set(def.x, height(def.x, def.z), def.z); mesh.rotation.y = def.rot; scene.add(mesh);
+  const n = {...def, mesh, rot0: def.rot, r: 0.45}; mesh.traverse(o => { if(o.isMesh) o.userData.npc = n; }); npcs.push(n); });
+function mercHTML(){ const slots = botSlots();
+  if(!slots) return `<div class="muted" style="margin-top:8px">Companions are not available in co-op.</div>`;
+  let h = "";
+  if(bots.length){ h += `<h3>Your companions</h3>`; for(const b of bots) h += `<div class="it"><div class="nm"><b style="color:${CLASSES[b.cls].color}">${b.name}</b> <span class="muted">· ${ROLE_NAME[b.role]}</span><small>Level ${b.lvl} ${CLASSES[b.cls].name}${b.dead ? " · dead" : ""}</small></div></div>`;
+    return h + `<button class="sbtn" data-act="mercdismiss">Dismiss companions</button>`; }
+  h += `<h3>Choose your companions</h3><div class="muted" style="margin-bottom:6px">Pick a role for each companion. A random class of that role joins you, at your level. They stay in this dungeon and take no loot or experience.</div>`;
+  for(let i = 0; i < slots; i++) h += `<div class="row" style="gap:6px;margin:4px 0"><span class="muted" style="width:90px">Companion ${i + 1}</span>${["tank", "healer", "dps"].map(r => `<button class="sbtn ${mercPick[i] === r ? "pri" : ""}" data-act="mercrole" data-id="${i}:${r}">${ROLE_NAME[r]}</button>`).join("")}</div>`;
+  const n = mercPick.slice(0, slots).filter(Boolean).length;
+  return h + `<div style="margin-top:8px"><button class="sbtn pri" data-act="merchire" ${n ? "" : "disabled"}>Hire ${n || ""} companion${n === 1 ? "" : "s"}</button></div>`; }
 const torch = new THREE.PointLight(0xffb070, 0, 32, 1.1); scene.add(torch);
 const townLight = new THREE.PointLight(0xffa860, 0, 40, 1.2); scene.add(townLight);
 const GHOST_SKY = new THREE.Color(0x26323e), NIGHT_SKY = new THREE.Color(0x0c1424), MOON_COL = new THREE.Color(0x8fa8ff), DUSK_COL = new THREE.Color(0xff9a50);
@@ -286,7 +478,7 @@ function zoneSpot(r, zone, near, far, minTown = 0){
 function lairSpot(l){ for(let k = 0; k < 24; k++){ const a = 1.57 + k * 0.52, rr = 2.4 + Math.floor(k / 12) * 1.6, x = l.x + Math.cos(a) * rr, z = l.z + Math.sin(a) * rr;
   if(!nearAny(c => Math.hypot(c.x - x, c.z - z) < c.r + 1.3) && reachable(x, z)) return {x, z}; } return {x: l.x, z: l.z + 2.6}; }
 // dungeon monsters are tougher than those outside
-const DG_HP = 1.6, DG_DMG = 1.3, GROUP_HP = 0.7, GROUP_DMG = 0.1;
+const DG_HP = 1.6, DG_DMG = 2.0, GROUP_HP = 0.7, GROUP_DMG = 0.15, DG_MIN = 3;   // dungeons are made for a group of three (companions count)
 // a monster needs room around it: a spot squeezed between cliffs (a narrow crevice) leaves it stuck where nobody can fight it
 function roomy(x, z){ if(x > 500) return true; if(!reachable(x, z)) return false;
   for(let k = 0; k < 8; k++){ const a = k * Math.PI / 4; if(!reachable(x + Math.cos(a) * 2.5, z + Math.sin(a) * 2.5)) return false; } return true; }
@@ -327,7 +519,7 @@ function respawn(m){ if(m.summon){ Object.assign(m, {dead: true, state: "dead", 
   bossReset(m);
   if(m.night && !isNight()){ Object.assign(m, {dead: true, state: "dead", deadT: 99, nightGone: true, x: m.hx, z: m.hz}); m.mesh.visible = false; return; }   // night monsters wait for the dark
   m.nightGone = false; Object.assign(m, {x: m.hx, z: m.hz, hp: m.maxHp, state: "idle", dead: false, deadT: 0, wx: null, path: null, dots: [], slowT: 0, rootT: 0, stunT: 0, novaT: m.K.nova ? m.K.nova.every : 0}); clearNova(m); m.mesh.visible = true; m.mesh.rotation.z = 0; }
-function evade(m){ m.state = "return"; m.dots = []; m.path = null; m.thMe = m.thPet = 0; m.tauntT = 0; if(m.nova) clearNova(m); bossReset(m); }
+function evade(m){ m.bStart = 0; m.botGo = false; m.state = "return"; m.dots = []; m.path = null; m.thMe = m.thPet = 0; m.tauntT = 0; m.botTh = null; m.botTauntT = 0; if(m.nova) clearNova(m); bossReset(m); }
 
 // ---------------------------------------------------------------- characters: create, pick, save (kept in this browser)
 let KEY = "rimfrost2-chars";
@@ -417,6 +609,7 @@ function loadWorld(){ let w = null; try{ w = JSON.parse(localStorage.getItem(WKE
 addEventListener("beforeunload", () => save());
 let running = false;
 function play(c){
+  dismissBots(true);
   P.flying = null; P.fy = null; if(flightMesh){ scene.remove(flightMesh); flightMesh = null; }
   S.cur = c; K.useChar(c);                                                        /* every character has its own key bindings */ if(!c.learned) c.learned = []; for(const id of Q.starterAbilities(c.cls)) if(!c.learned.includes(id)) c.learned.push(id);   // the abilities every new character starts with
   if(RACIAL[c.race] && !c.learned.includes(RACIAL[c.race])) c.learned.push(RACIAL[c.race]);                        // and the racial ability
@@ -726,6 +919,9 @@ $("pbody").addEventListener("click", e => { const el = e.target.closest("[data-a
   else if(a === "dgenter"){ if(dgAsk && distU(P, dgAsk.door) < 8) enterDungeon(dgAsk); return; }
   else if(a === "dgreset"){ if(sureId !== "dgreset"){ sureId = "dgreset"; renderPanel(); return; } sureId = null; if(dgAsk && CO.COOP.role !== "guest" && !CO.anyRemoteIn(regionOf(dgAsk.x0))){ resetDungeon(dgAsk); enterDungeon(dgAsk); } return; }
   else if(a === "taltree") talTree = id;
+  else if(a === "mercrole"){ const [i, r] = id.split(":"); mercPick[+i] = mercPick[+i] === r ? null : r; }
+  else if(a === "merchire"){ const roles = mercPick.slice(0, botSlots()).filter(Boolean); if(roles.length && curDungeon()){ hireBots(roles); closePanel(); } return; }
+  else if(a === "mercdismiss"){ dismissBots(); }
   else if(a === "fly"){ startFlight(id); return; } else if(a === "sail"){ startVoyage(); return; }
   else if(a === "learnriding") learnRiding(); else if(a === "buymount") buyMount(id); else if(a === "pickmount"){ S.cur.mountSel = id; if(P.mount){ P.mount = id; buildMount(); } save(); }
   else if(a === "takepick"){ Q.takePick(+id); if(!S.cur.pick) closePanel(); return; }
@@ -832,6 +1028,7 @@ function npcHTML(n){
       h += `<div class="it"><div class="nm"><b>${H2.name}</b> <span class="muted">· ${k ? cost + " gold" : "undiscovered"}</span><small>${k ? `${placeName(H2.x, H2.z)} · about ${Math.round(distU(n, f) / FLY_SPEED + 3)} sec` : "Speak with the flight master there to unlock this route."}</small></div>
         <button class="sbtn" data-act="fly" data-id="${f.hub}" ${k && c.gold >= cost ? "" : "disabled"}>Fly</button></div>`; }
   }
+  if(n.role === "merc") h += mercHTML();
   if(n.role === "ship"){ const to = HUBS[n.ship], south = continentOf(to.z) === 1;
     h += `<h3>Passage · you have <b>${c.gold}</b> gold</h3><div class="it"><div class="nm"><b>${to.name}</b> <span class="muted">· ${SAIL_COST} gold</span><small>${south ? "The Southern Reaches · recommended level 30 and above" : "Rimfrost"}</small></div>
       <button class="sbtn pri" data-act="sail" ${c.gold >= SAIL_COST ? "" : "disabled"}>Sail</button></div>`; }
@@ -929,7 +1126,7 @@ $("ghostbar").addEventListener("click", e => { if(e.target.id === "gres") resurr
 // group scaling: every extra player inside a dungeon gives its monsters +70% health and +10% damage (the host decides; health keeps its share when it changes)
 function dgPlayers(d){ const reg = regionOf(d.x0); return (regionOf(P.x) === reg && !P.ghost ? 1 : 0) + Object.values(CO.COOP.remotes).filter(r => regionOf(r.x) === reg && !r.gh).length; }
 function scaleDungeons(){ if(CO.COOP.role === "guest") return;
-  for(const d of DUNGEONS){ const n = Math.max(1, dgPlayers(d)); d.players = n;
+  for(const d of DUNGEONS){ const n = Math.max(DG_MIN, dgPlayers(d) + bots.filter(b => regionOf(b.x) === regionOf(d.x0)).length); d.players = n;
     for(const m of mobs){ if(!m.dg || dungeonAt(m.hx) !== d || m.scaleN === n) continue; if(m.state === "chase" && n < m.scaleN) continue;   // (no weakening mid-fight)
       const pct = m.maxHp ? m.hp / m.maxHp : 1; m.maxHp = Math.round(m.baseHp * (1 + GROUP_HP * (n - 1))); m.dmg = m.baseDmg * (1 + GROUP_DMG * (n - 1)); if(!m.dead) m.hp = Math.max(1, Math.round(m.maxHp * pct)); m.scaleN = n; } } }
 // a dungeon keeps its state: what you killed stays dead until you choose to reset it at the door
@@ -952,7 +1149,7 @@ function enterDungeon(d){ dismount(); closePanel();
 function ghostEnter(d){ if(!P.corpse || dungeonAt(P.corpse.x) !== d) return err("Your corpse is not in this dungeon");
   enterDungeon(d); comeBack(0.5); G.burst(P.px, P.py, "#ffffff", 20); log(`You have been resurrected at the entrance of ${d.name}.`, "#7be08a"); save(); }
 function exitDungeon(d){
-  d = d || curDungeon(); if(!d) return;
+  d = d || curDungeon(); if(!d) return; dismissBots();
   P.x = d.door.x + d.door.fx * 3.2; P.z = d.door.z + d.door.fz * 3.2; P.rot = d.door.rot; P.target = null; P.auto = false; P.path = null;
   for(const m of mobs) if(m.dg && m.state === "chase" && dungeonAt(m.hx) === d) evade(m);
   banner(zoneName(), ""); log(`You leave ${d.name}.`, "#93a4ad"); save(); }
@@ -1037,8 +1234,8 @@ $("chatin").addEventListener("keydown", e => { e.stopPropagation();
 $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("chatbox").hidden = true; });
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
-G.initEngine(scene, {startAim, floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
-CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] ? mountModel(k) : null, toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
+G.initEngine(scene, {tankMult: () => tankMult(), startAim, floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
+CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t), zoneVis: (m, l) => zoneVis(m, l), bossSync: (m, f) => bossSync(m, f),
   someoneEnters: () => {}});
@@ -1158,7 +1355,7 @@ function setHover(h){ const was = hov; hov = h; const el = $("htip"); const cv =
 function updHover(){ if(!hov || !hovMouse) return; const el = $("htip");
   if(hov.mob){ const m = hov.mob; if(m.dead) return setHover(null); const pct = Math.max(0, Math.min(100, m.hp / m.maxHp * 100));
     const neu = m.neutral || m.K.passive;
-    el.innerHTML = `<b style="color:${neu ? "#f3dc55" : "#ff6b5e"}">${esc(m.name)}</b><div><span style="color:${lvlColor(m.lvl)}">Level ${m.lvl}${m.boss ? " · Boss" : m.elite ? " · Elite" : ""}</span> <span class="muted">· ${neu ? "Neutral" : "Hostile"}</span></div><div class="hb"><i style="width:${pct}%"></i></div><small>${Math.max(0, Math.ceil(m.hp))} / ${m.maxHp}</small>`; }
+    el.innerHTML = `<b style="color:${neu ? "#f3dc55" : "#ff6b5e"}">${esc(m.name)}</b><div><span style="color:${lvlColor(m.lvl)}">Level ${m.lvl}${m.boss ? " · Boss" : m.elite || m.dg ? " · Elite" : ""}</span> <span class="muted">· ${neu ? "Neutral" : "Hostile"}</span></div><div class="hb"><i style="width:${pct}%"></i></div><small>${Math.max(0, Math.ceil(m.hp))} / ${m.maxHp}</small>`; }
   else if(hov.node){ const n = hov.node, g = Q.gatherReq(n.item); if(!n.active || !n.mesh.visible) return setHover(null);
     let lines = "";
     if(g){ const ok = Q.canGather(n.item) === true; lines += `<div style="color:${ok ? "#d9e3e7" : "#ff6b5e"}">Requires ${PROF[g.skill]} ${g.req}</div><small>Your skill: ${Q.profSkill(g.skill)}</small>`; }
@@ -1345,7 +1542,7 @@ function updMovement(dt){
   if(P.target && P.target.dead){ P.target = null; P.auto = false; }
   if(P.dash){                                                                                // Charge: rush to the target
     const t = P.dash.t; P.dash.el = (P.dash.el || 0) + dt;
-    if(!t || t.dead || P.dash.el > 0.6) P.dash = null;
+    if(!t || t.dead || P.dash.el > 1.2) P.dash = null;
     else { const d = distU(P, t), dx = (t.x - P.x) / d, dz = (t.z - P.z) / d, sp = P.dash.speed / PXU;
       tryMove(P, dx * sp * dt, dz * sp * dt); turnTo(P, dx, dz, dt, 30); P.moving = true;
       if(d < t.r + P.r + 0.6){ G.stun(t, 1); P.dash = null; } }
@@ -1476,7 +1673,7 @@ function updHUD(dt){
   const t = P.target, tf = $("tframe"), fr = !t && P.ftarget ? CO.remoteById(P.ftarget) : null, me = !t && !fr && P.selfT, pe = !t && !fr && !me && G.petSelected() ? G.getPet() : null;
   setAuras($("tauras"), t && !t.dead ? targetAuras(t) : pe ? petAurasHUD() : []);
   tf.classList.toggle("friend", !!fr); tf.classList.toggle("self", !!(me || pe));
-  { const mob = t && !t.dead ? t : null, rank = !mob ? "" : mob.boss ? "boss" : mob.elite ? "elite" : (mob.rare || mob.K.rare) ? "rare" : "";   // elites, rares and bosses get their own frame
+  { const mob = t && !t.dead ? t : null, rank = !mob ? "" : mob.boss ? "boss" : mob.elite || mob.dg ? "elite" : (mob.rare || mob.K.rare) ? "rare" : "";   // elites, rares and bosses get their own frame
     for(const k of ["boss", "elite", "rare"]) tf.classList.toggle(k, rank === k); tf.dataset.rank = rank ? rank[0].toUpperCase() + rank.slice(1) : ""; }
   if(pe){ tf.hidden = false; $("tname").textContent = pe.name; $("tlvl").textContent = "Level " + c.level; $("tlvl").style.color = "#7be08a";
     $("thpi").style.width = (pe.hp / pe.maxHp * 100) + "%"; $("thpt").textContent = `${Math.ceil(pe.hp)} / ${pe.maxHp}`; $("tstate").textContent = "Your pet"; }
@@ -1525,7 +1722,7 @@ function updHUD(dt){
   // nameplates for monsters near you
   for(const m of mobs){ const p = plateFor(m), qm = questMob(m), near = !m.dead && distU(P, m) < (P.ghost ? GHOST_SIGHT : qm ? 40 : 26);
     if(!near){ p.style.display = "none"; continue; } const s = toScreen(m.x, height(m.x, m.z) + m.mesh.userData.height + 0.3, m.z); if(!s.on){ p.style.display = "none"; continue; }
-    p.style.display = ""; p.style.left = s.x + "px"; p.style.top = s.y + "px"; const sp = p.firstChild; sp.textContent = `${m.name} (${m.lvl}${m.boss ? " Boss" : m.elite ? " Elite" : ""})`; sp.style.color = lvlColor(m.lvl);
+    p.style.display = ""; p.style.left = s.x + "px"; p.style.top = s.y + "px"; const sp = p.firstChild; sp.textContent = `${m.name} (${m.lvl}${m.boss ? " Boss" : m.elite || m.dg ? " Elite" : ""})`; sp.style.color = lvlColor(m.lvl);
     p.lastChild.style.display = (m.hp < m.maxHp || m === P.target) ? "" : "none"; p.lastChild.firstChild.style.width = (m.hp / m.maxHp * 100) + "%"; p.classList.toggle("neutral", !!(m.neutral || m.K.passive)); p.classList.toggle("sel", m === P.target); p.classList.toggle("q", qm); }
 }
 
@@ -1658,7 +1855,7 @@ function drawBigMap(){
 const zoneEl = $("zone"), fpsEl = $("fps");
 const SKIES = {jungle: [0x9cc4a0, 45, 115], desert: [0xe6d6b0, 60, 140], dread: [0x5e5070, 38, 100], out: [0xa9d3ea, 70, 150], mist: [0x9db8a4, 40, 105], gloom: [0x6e6e80, 35, 95], ash: [0x9a7a68, 45, 115], snow: [0xd8e6ee, 55, 130], blight: [0x9aa08a, 50, 120], in: [0x0a0806, 18, 48]};
 const SKY_OF = {jungle: "jungle", desert: "desert", badlands: "desert", dread: "dread", swamp: "mist", gloom: "gloom", ash: "ash", snow: "snow", snowhigh: "snow", blight: "blight"}, skyCol = new THREE.Color();
-let exploreT = 0, needSet = new Set(), mobNeedSet = new Set();
+let grassT = 0, exploreT = 0, needSet = new Set(), mobNeedSet = new Set();
 const questMob = m => mobNeedSet.has(m.kind);
 let last = performance.now(), fpsT = 0, frames = 0, saveT = 0, trackT = 0;
 function zoneName(){ const dg = curDungeon(); return dg ? dg.name : placeName(P.x, P.z); }
@@ -1683,6 +1880,7 @@ function update(dt){
     hero.userData.animate(P.walk, P.moving, sk || P.attackKind !== "cast" ? P.attackAnim : 0, pose, {kind: P.attackKind, dead: lying, mount: !!P.mount || (!!P.flying && !P.flying.ship), speed: G.playerSpeed(), gait: P.mount ? null : P.gait});
     hero.position.set(P.x, height(P.x, P.z) + (P.moving && !sk ? Math.abs(Math.sin(P.walk)) * 0.06 : 0), P.z); hero.rotation.set(lying && !sk ? -1.4 : 0, P.mount ? mountYaw() : P.rot, 0); if(lying && !sk) hero.position.y += 0.3; hero.position.y += P.jumpY || 0;
   updRaceFx(dt); updProcs(dt);
+  if((grassT -= dt) <= 0){ grassT = 0.3; const out = !curDungeon(), gd = GFX.grass + 12; for(const g of GRASS) g.mesh.visible = out && running && Math.abs(g.x - P.x) < gd && Math.abs(g.z - P.z) < gd && Math.hypot(g.x - P.x, g.z - P.z) < gd; }   // grass only near you
     if(P.ghost) hero.position.y += 0.25 + Math.sin(now * 2) * 0.08;                            // a spirit floats
     if(flightMesh && P.flying && P.flying.ship){ const t = P.flying.t || 0, bob = Math.sin(t * 1.3) * 0.12, roll = Math.sin(t * 0.9) * 0.05 + P.flying.bank * 0.4, pitch = Math.sin(t * 1.1 + 1) * 0.03;
       flightMesh.position.set(P.x, P.fy + bob, P.z); flightMesh.rotation.set(pitch, P.rot, roll, "YXZ");
@@ -1698,6 +1896,7 @@ function update(dt){
   for(const m of mobs) updMob(m, dt); separate();
   if(running && !inCrypt() && (exploreT -= dt) <= 0){ exploreT = 0.4; Q.questExplore(P.x, P.z); }
   if(running && !P.flying) G.updPet(dt, blocked, tryMove, turnTo);
+  updBots(dt);
   CO.update(dt); if(running){ CO.render(); CO.tradeTick(); CO.rollTick(); updRolls(); }
   if(running && P.pendingUse && !P.dead){ if(!P.dest) P.pendingUse = null; else if(distU(P, P.pendingUse) < USE_RANGE){ const n = P.pendingUse; P.dest = null; marker.visible = false; useThing(n); } }
   if(talkNpc && distU(P, talkNpc) > 7) closePanel();
@@ -1785,5 +1984,5 @@ initDev({update, save, refresh, buildBar, buildHero, hubSpot, log, arena: ARENA,
   makeMob: (kind, p, lvl) => { const m = makeMob(kind, p, lvl, rng(7)); m.dev = true; return m; },
   removeMob: m => { const i = mobs.indexOf(m); if(i >= 0) mobs.splice(i, 1); scene.remove(m.mesh); const pl = plates.get(m); if(pl){ pl.remove(); plates.delete(m); } if(P.target === m) P.target = null; },
   restore: c => { G.clearFx(); play(c); }});
-window.R2 = {renderer, rezAt, hero: () => hero, startFlight: h => startFlight(h), startVoyage: () => startVoyage(), perchDrakes, flyTune: (p, s) => { FLY_PITCH = p; FLY_SEAT = s; }, buildMount: () => buildMount(), setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
+window.R2 = {renderer, bots: () => bots, rezAt, hero: () => hero, startFlight: h => startFlight(h), startVoyage: () => startVoyage(), perchDrakes, flyTune: (p, s) => { FLY_PITCH = p; FLY_SEAT = s; }, buildMount: () => buildMount(), setReachFrom, graveyards, pick, LAIRS, DOORS, hubSpot, HUBS, KINDS, zoneAt, reachable, DUNGEONS, EXPLORE, CO, portals, findPath, ABL: id => AB[id].lvl, screenOf: n => toScreen(n.x, height(n.x, n.z) + 1.2, n.z), buildBar, closePanel, npcs, nodes, Q, talkTo, useThing, renderPanel, togglePanel, scene, P, S, cam, mobs, height, update, startAttack, play, showChars, G, tryUse: G.tryUse, steer};   // handy for testing in the browser console
 requestAnimationFrame(loop);

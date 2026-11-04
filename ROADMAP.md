@@ -296,6 +296,16 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] 87. Procs (Maelstrom Weapon and the like) are shown clearly around the character, not only in the log
 - [x] 88. The Old Lighthouse (and the other new places to explore) need real landmarks, not only a sign
 
+### Feature – dungeon companions
+- [x] 89. A Companion Master in every dungeon: hire up to two computer-controlled companions (Tank, Healer or Damage; random class of that role, scaled to your level), solo only
+- [ ] 90. Companions in co-op (fill the group up to three)
+- [x] 91. Hunter companions bring a wolf
+- [x] 92. Dungeons tuned for three players (companions count); not soloable
+- [x] 93. Companions build real threat, show in the threat meter and can pull aggro; tanks get a taunt (Taunt, Growl, Hand of Reckoning)
+- [x] 94. Companion healer resurrects you after the fight
+- [x] 95. Companions use mana like players (drinking, class spells, real heals)
+- [x] 96. Companion bar (Attack, Assist, Stay, Follow); companions wait for the tank and follow at a distance
+
 ### Stage 10 – day and night
 - [x] Game clock: a day lasts 80 minutes (night 20), the same for everyone in co-op; light, sky, mist, town firelight and a small light around you at night
 - [x] More wolves, undead and spirits at night (a level higher); monsters see you from a bit shorter range in the dark

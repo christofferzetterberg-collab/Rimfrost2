@@ -8,6 +8,7 @@ const SETS = {
   oak: ["Tree_1_A", "Tree_1_B", "Tree_7_A", "Tree_2_A", "Tree_2_B"], birch: ["Tree_6_A", "Tree_6_B", "Tree_2_A"], violet: ["Tree_7_A", "Tree_1_A", "Tree_7_B"],
   pine: ["Tree_5_A", "Tree_5_B", "Tree_4_A", "Tree_5_D"], jungle: ["Tree_1_A", "Tree_2_A", "Tree_2_B", "Tree_7_A", "Tree_7_B"], dreadwood: ["Tree_7_A", "Tree_7_B", "Tree_1_B"], snowpine: ["Tree_5_A", "Tree_5_B", "Tree_5_D"],
   dead: ["Tree_Bare_1_A", "Tree_Bare_1_B", "Tree_Bare_2_A", "Tree_Bare_2_B"],
+  grass: ["Grass_1_A", "Grass_1_B", "Grass_1_C", "Grass_2_A", "Grass_2_B", "Grass_2_C"],
   rock: ["Rock_1_E", "Rock_3_E", "Rock_2_C", "Rock_6_C", "Rock_3_G", "Rock_5_C"], bush: ["Bush_1_C", "Bush_2_C", "Bush_3_A", "Bush_4_C", "Bush_1_E"]
 };
 // leaf colours: [new hue, saturation, lightness factor, lightness add] for the green parts of the texture
@@ -62,4 +63,19 @@ export function natureInstances(scene, kind, list, {size = null, byWidth = false
           c.setHex(p[4] == null ? 0xffffff : p[4]).multiplyScalar(bright * (1 + ((i * 37) % 10 - 5) * 0.012)); im.setColorAt(j, c); });
         im.computeBoundingSphere(); im.castShadow = shadow; im.receiveShadow = true; scene.add(im); } } });
   return true;
+}
+// grass clumps: flat colours (one per instance, picked by the land they grow on), in small square chunks that main.js shows only near you
+export const GRASS_CHUNK = 24;
+export function grassInstances(scene, list){
+  if(!READY || !list.length) return [];
+  const names = SETS.grass, groups = names.map(() => []), out = [], o = new THREE.Object3D(), c = new THREE.Color();
+  list.forEach(p => groups[Math.floor(Math.abs(Math.sin(p[0] * 91.7 + p[2] * 47.3) * 43758.5453) % 1 * names.length)].push(p));
+  const mat = new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.DoubleSide});
+  names.forEach((n, k) => { const pts = groups[k]; if(!pts.length) return; const P = parts(n), sz = P.box.getSize(new THREE.Vector3()), norm = 0.85 / (sz.y || 1);
+    const chunks = new Map(); for(const p of pts){ const key = Math.floor(p[0] / GRASS_CHUNK) + "," + Math.floor(p[2] / GRASS_CHUNK); if(!chunks.has(key)) chunks.set(key, []); chunks.get(key).push(p); }
+    for(const {geo} of P.parts) for(const [key, L] of chunks){ const im = new THREE.InstancedMesh(geo, mat, L.length);
+      L.forEach((p, j) => { o.position.set(p[0], p[1], p[2]); o.rotation.set(0, p[0] * 3.1 + p[2] * 1.7, 0); o.scale.setScalar(p[3] * norm); o.updateMatrix(); im.setMatrixAt(j, o.matrix); im.setColorAt(j, c.setHex(p[4])); });
+      im.computeBoundingSphere(); im.castShadow = false; im.receiveShadow = true; im.visible = false; scene.add(im);
+      const [cx, cz] = key.split(",").map(Number); out.push({mesh: im, x: (cx + 0.5) * GRASS_CHUNK, z: (cz + 0.5) * GRASS_CHUNK}); } });
+  return out;
 }
