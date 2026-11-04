@@ -1487,7 +1487,9 @@ function updMob(m, dt){
     m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.1 * dt);
     if(m.far) return;                                                                        // nobody near: it just stands there
     if(!m.K.passive && !m.neutral) for(const c of CO.cands(m)){ if(!m.dg && (c.pet ? S.cur.level : c.lvl) - m.lvl >= 6) continue;   // (grey monsters, far below you, leave you alone)
-      const range = clamp(9 + (m.lvl - (c.pet ? S.cur.level : c.lvl)) * 1.2, 5, 13) * (c.pet ? 0.7 : 1) * (nightNow ? 0.85 : 1) * (c.stealth ? 0.4 : 1);   // harder to see you at night, much harder in Stealth
+      const base = clamp(9 + (m.lvl - (c.pet ? S.cur.level : c.lvl)) * 1.2, 5, 13) * (c.pet ? 0.7 : 1) * (nightNow ? 0.85 : 1);   // harder to see you at night
+      const behind = Math.sin(m.rot) * (c.e.x - m.x) + Math.cos(m.rot) * (c.e.z - m.z) < 0;                  // in Stealth: much harder from the front; from behind only when right on top of it
+      const range = !c.stealth ? base : behind ? (m.r || 0.5) + 0.5 : base * 0.3;
       if(distU(m, c.e) < range && sees(m, c.e)){ if(c.me && P.buffs.stealth){ G.breakStealth(); log(`${m.name} has discovered you!`, "#ff9a7a"); } G.aggro(m); G.social(m); if(CO.coopMob(m)){ m.threat = m.threat || {}; m.threat[c.id] = (m.threat[c.id] || 0) + 1; } if(c.me) log(`${m.name} attacks you!`, "#ff9a7a"); return; } }
     m.wanderT -= dt; if(m.wanderT <= 0){ m.wanderT = 3 + Math.random() * 5; const a = Math.random() * 6.28, d = Math.random() * 5; m.wx = m.hx + Math.cos(a) * d; m.wz = m.hz + Math.sin(a) * d; }
     if(m.wx != null){ const dx = m.wx - m.x, dz = m.wz - m.z, d = Math.hypot(dx, dz); if(d < 0.3) m.wx = null; else { if(tryMove(m, dx / d * 1.6 * dt, dz / d * 1.6 * dt)) m.moving = true; else m.wx = null; turnTo(m, dx, dz, dt, 6); } }
@@ -1681,11 +1683,11 @@ function auraDesc(id, name){ const tl = name && procTalent(name); if(tl) return 
 const ITEM_DESC = {elixir: "Strength increased.", ironskin: "Armor increased.", keen: "Critical strike chance increased.", sage: "Spell power increased by 20%."};
 function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good, desc: auraDesc(id, name)}; }
 // a friend's or companion's buffs and heals over time: [kind, key, seconds left] (b = buff, h = heal over time, s = shield [amount])
-function friendAuras(list){ const L = [];
+function friendAuras(list, cls){ const L = [];
   for(const a of list || []){ const [kd, k, left, amt] = a;
     if(kd === "b"){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], desc: ITEM_DESC[k], left, good: true});
       else if(k === "ressick") L.push({url: iconURL("skull", "#8a9aa8"), name: "Resurrection Sickness", desc: "Damage, healing, health, mana and stats reduced by 75%.", left, good: false});
-      else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : left, true, AURA_NAME[k] || null)); }
+      else if(AURA[k] && AB[AURA[k]]) L.push(abAura(k === "stealth" && cls === "druid" ? "prowl" : AURA[k], k === "stealth" ? null : left, true, AURA_NAME[k] || null)); }
     else if(kd === "h") L.push(AB[k] ? abAura(k, left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", desc: "Restores health over time.", left, good: true});
     else if(kd === "s") L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(amt)} left)`, desc: "Absorbs damage.", left, good: true}); }
   return L; }
@@ -1694,7 +1696,7 @@ const botAuList = b => [...Object.entries(b.buffs || {}).map(([k, v]) => ["b", k
 function playerAuras(){ const L = [];
   for(const k in P.buffs){ if(ITEM_BUFF[k]) L.push({url: iconURL("flask", ITEM_BUFF[k][1]), name: ITEM_BUFF[k][0], desc: ITEM_DESC[k], left: P.buffs[k], good: true});
     else if(OWN_TOTEM_BUFF[k] && G.totemList().some(t => t.kind === OWN_TOTEM_BUFF[k])) continue;          // (your own totem is shown instead)
-    else if(AURA[k] && AB[AURA[k]]) L.push(abAura(AURA[k], k === "stealth" ? null : P.buffs[k], true, AURA_NAME[k] || null)); }   // (Stealth has no time limit)
+    else if(AURA[k] && AB[AURA[k]]) L.push(abAura(k === "stealth" && S.cur.cls === "druid" ? "prowl" : AURA[k], k === "stealth" ? null : P.buffs[k], true, AURA_NAME[k] || null)); }   // (Stealth has no time limit)
   for(const t of G.totemList()){ const id = Object.keys(G.TOTEM_OF).find(a => G.TOTEM_OF[a] === t.kind); L.push({...abAura(id, t.left, true, `${t.name} (${G.TOTEM_EL[t.el]}). Right-click to cancel.`), cancel: "totem:" + t.kind}); }
   for(const h of P.hots){ const k = h.key.split("_")[0]; L.push(AB[k] ? abAura(k, h.left, true) : {url: iconURL("bloom", "#7be08a"), name: "Healing", desc: "Restores health over time.", left: h.left, good: true}); }
   if(P.shield > 0) L.push({url: iconURL("shield", "#fff2b0"), name: `Shield (${Math.ceil(P.shield)} left)`, desc: "Absorbs damage.", left: P.shieldT, good: true});
@@ -1753,7 +1755,7 @@ function updHUD(dt){
   if(P.target || P.ftarget || P.selfT || !G.getPet() || G.getPet().dead) P.petSel = false;
   { const pf = $("pframe"), left = pf.offsetLeft + pf.offsetWidth + 12 + "px"; if($("tframe").style.left !== left) $("tframe").style.left = left; }   // the target frame sits right of yours
   const t = P.target, tf = $("tframe"), fr = !t && P.ftarget ? CO.remoteById(P.ftarget) : null, me = !t && !fr && P.selfT, pe = !t && !fr && !me && G.petSelected() ? G.getPet() : null;
-  setAuras($("tauras"), t && !t.dead ? targetAuras(t) : pe ? petAurasHUD() : fr && !fr.dead ? friendAuras(fr.au) : me ? playerAuras() : []);
+  setAuras($("tauras"), t && !t.dead ? targetAuras(t) : pe ? petAurasHUD() : fr && !fr.dead ? friendAuras(fr.au, fr.cls) : me ? playerAuras() : []);
   tf.classList.toggle("friend", !!fr); tf.classList.toggle("self", !!(me || pe));
   { const mob = t && !t.dead ? t : null, rank = !mob ? "" : mob.boss ? "boss" : mob.elite || mob.dg ? "elite" : (mob.rare || mob.K.rare) ? "rare" : "";   // elites, rares and bosses get their own frame
     for(const k of ["boss", "elite", "rare"]) tf.classList.toggle(k, rank === k); tf.dataset.rank = rank ? rank[0].toUpperCase() + rank.slice(1) : ""; }

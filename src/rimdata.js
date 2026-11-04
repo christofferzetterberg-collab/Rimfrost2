@@ -325,8 +325,13 @@ export const AB = {
     run:t=>{slash(t);hit(t,pow()*(1+0.9*P.cp),"phys","bite");P.cp=0;}},
   dash:{name:"Dash", lvl:18, cost:0, res:"energy", cd:30, range:0, school:"phys", icon:"leap", tgt:"self", offGcd:true,
     desc:()=>`Increases movement speed by 50% for 5 sec.`, run:()=>buff("dash",5)},
-  pounce:{name:"Ambush", lvl:20, cost:60, res:"energy", cd:12, range:52, school:"phys", icon:"fang", tgt:"enemy",
-    desc:()=>`Ambushes the target for ${fmt(pow()*3.0)} damage. Awards 1 combo point.`, run:t=>{slash(t);hit(t,pow()*3.0,"phys","pounce");addCP();}}
+  pounce:{name:"Ambush", lvl:20, cost:60, res:"energy", range:52, school:"phys", icon:"fang", tgt:"enemy",
+    check:()=>P.buffs.stealth?true:"Requires Prowl",
+    desc:()=>`Ambushes the target from Prowl for ${fmt(pow()*3.5)} damage. Awards 2 combo points.`, run:t=>{slash(t);hit(t,pow()*3.5,"phys","pounce");addCP(t);addCP(t);}},
+  prowl:{name:"Prowl", lvl:15, cost:0, res:"energy", cd:6, range:0, school:"phys", icon:"moon", tgt:"self", offGcd:true,
+    check:()=>P.buffs.stealth ? true : P.combatT > 0 ? "You cannot do that in combat" : true,
+    desc:()=>`Wolf Form only. Conceals you until cancelled. Movement speed reduced by 30%. Attacking or taking damage breaks Prowl.`,
+    run:()=>{ if(P.buffs.stealth){ E.breakStealth(); return; } P.buffs.stealth=1e9; P.auto=false; burst(P.px,P.py,"#3a3a4a",14);}}
 };
 
 // Hunter pets: one at a time. Call Bear (tank) / Call Wolf (damage) take PET_CAST seconds and only work out of combat.
@@ -605,7 +610,7 @@ export const BARS = {
   priest:["smite","heal","swp","pws","mindblast","holynova","renew","darkpulse","judgment","resurrection","innerfocus","powerinf","painsupp","desperate","guardian","voideruption","wand"],
   druid:["wrath","touch","moonfire","rejuv","roots","thorns","starfire","hurricane","bark","bloom","bear","cat","leopard","revive","starsurge","nswift","tranquility"],
   druid_bear:["maul","fcharge","dgrowl","swipe","frenzy","bash","roar","bear","cat","leopard","berserk"],
-  druid_cat:["claw","rake","bite","dash","pounce","bear","cat","leopard","berserk"],
+  druid_cat:["prowl","claw","rake","bite","dash","pounce","bear","cat","leopard","berserk"],
   druid_leopard:["leopard","bear","cat"],
   paladin:["palstrike","palheal","hammer","reckoning","holyshield","crusader","consecrate","avenging","bubble","judge","redemption","divinefavor","holyshock","avengershield","divinestorm"],
   warlock:["shadowbolt","summonimp","immolate","corruption","fear","agony","lifetap","drainlife","summonvoid","healthfunnel","weakness","rainfire","soulfire","deathcoil","dismissdemon","demonfrenzy","unstable","shadowburn","conflagrate","wand"],
@@ -907,7 +912,7 @@ export const AB_ICON = {
   starfire:["star","#e6b8ff"], hurricane:["tornado","#8fd8c8"], bark:["tree","#b08a58"], bloom:["bloom","#ff9ad0"],
   bear:["bear","#c89a68"], cat:["cat","#9cb0c0"], leopard:["paw","#ffd36b"],
   maul:["maul","#d08050"], dgrowl:["roar","#d08050"], taunt:["horn","#c8a070"], reckoning:["shield","#ffe08a"], fcharge:["dash","#c89a68"], swipe:["swipe","#c8a070"], frenzy:["plus","#e06060"], bash:["fist","#b89070"], roar:["roar","#e0b050"],
-  claw:["claw","#e2e2e2"], rake:["rake","#c84a4a"], bite:["fang","#f0e0c0"], dash:["boot","#7fd8e8"], pounce:["leap","#e8a050"],
+  claw:["claw","#e2e2e2"], rake:["rake","#c84a4a"], bite:["fang","#f0e0c0"], dash:["boot","#7fd8e8"], pounce:["leap","#e8a050"], prowl:["moon","#5a5a6a"],
   palstrike:["sword","#ffe37a"], palheal:["cross","#ffd890"], hammer:["hammer","#ffd060"], holyshield:["shield","#ffe9a0"], crusader:["axe","#f0c040"],
   consecrate:["ground","#ffd84a"], avenging:["wings","#ffb84a"], bubble:["bubble","#fff6d0"], judge:["scales","#ffcf4a"],
   shadowbolt:["orb","#8a5ad0"], summonimp:["imp","#e0603a"], immolate:["flame","#ff6a2a"], corruption:["drop","#7a4ad0"], agony:["skull","#9a6ae0"], lifetap:["heart","#8a5ad0"],

@@ -359,6 +359,7 @@ export function shockCd(){ const cd = 6 - 0.5*T("s_reverb"); for(const id of ["e
 export function setForm(f){
   if(P.flying) return;
   if(P.casting) cancelCast(); if(P.mount) H.dismount();
+  if(f !== "cat" && P.buffs.stealth && C().cls === "druid") breakStealth();           // Prowl ends when you leave Wolf Form
   P.form = f; clearCP(); P.auto = P.auto && f !== "leopard";
   if(f === "bear") P.rage = Math.max(P.rage, 10);
   if(f === "cat") P.energy = 100;
@@ -456,16 +457,16 @@ export function tryUse(id, at){
   else { P[type] -= cost; finishAbility(id, t); }
 }
 // Stealth ends: its cooldown starts now
-export function breakStealth(){ if(!P.buffs.stealth) return; delete P.buffs.stealth; if(AB.stealth) P.cds.stealth = Math.max(P.cds.stealth || 0, AB.stealth.cd); }
+export function breakStealth(){ if(!P.buffs.stealth) return; delete P.buffs.stealth; const id = C().cls === "druid" ? "prowl" : "stealth"; if(AB[id]) P.cds[id] = Math.max(P.cds[id] || 0, AB[id].cd); }
 function faceTo(t){ P.rot = Math.atan2(t.x - P.x, t.z - P.z); }
 function finishAbility(id, t){ if(id !== "meld") delete P.buffs.meld; const stealthy = P.buffs.stealth;
   const a = AB[id];
-  if(a.cd && id !== "stealth") P.cds[id] = cdOf(id);                            // (Stealth's cooldown starts when it ends)
+  if(a.cd && id !== "stealth" && id !== "prowl") P.cds[id] = cdOf(id);                            // (Stealth's cooldown starts when it ends)
   useProcs(id);
   HEALING = HEAL_AB.has(id);
   CUR_AB = id;
   try{ const ft = CO.friendTarget(id), pt = petHealTarget(id); if(ft) CO.castOn(ft, a, t); else if(pt) castOnPet(a, t); else a.run(t); } finally{ HEALING = false; CUR_AB = null; }   // a heal on a selected friend (or your pet) goes to them
-  if(stealthy && id !== "stealth" && id !== "vanish" && !a.racial && !a.keepStealth) breakStealth();          // acting breaks Stealth
+  if(stealthy && id !== "stealth" && id !== "prowl" && id !== "vanish" && !a.racial && !a.keepStealth) breakStealth();          // acting breaks Stealth
   if(!a.form && !P.form){ const melee = a.tgt === "enemy" && a.range <= 70; P.attackAnim = 1; P.attackKind = melee ? "melee" : (C().cls === "hunter" && a.tgt === "enemy") ? "bow" : "cast"; }
   else if(P.form) P.attackAnim = 1;
   // a monster notices a melee attack at once; a spell or arrow from range only when it lands

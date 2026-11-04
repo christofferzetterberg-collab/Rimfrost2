@@ -1,5 +1,14 @@
 # Rimfrost 2 – Release notes
 
+## v0.47.0
+
+### New
+- **Prowl (Druid, level 15):** Wolf Form only. Conceals you until cancelled and reduces movement speed by 30%. Attacking, taking damage or leaving Wolf Form breaks Prowl. Learn it from your trainer.
+
+### Changed
+- **Stealth and Prowl:** Monsters now spot you much later from the front. From behind, they only notice you when you are right on top of them. This works the same in co-op.
+- **Ambush (Druid):** Now requires Prowl, has no cooldown, deals more damage and awards 2 combo points.
+
 ## v0.46.0
 
 ### New
