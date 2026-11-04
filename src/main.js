@@ -22,7 +22,7 @@ import * as G from "./engine.js";
 import * as Q from "./quests.js";
 import * as K from "./keys.js";
 import * as CO from "./coop.js";
-import {DEV, initDev, toggle as toggleDev} from "./dev.js";
+import {DEV, initDev, toggle as toggleDev, devApply, devUnlock, devLock} from "./dev.js";
 import {gameHour, isNight, daylight, clockText, minutesToNight, minutesToDay, NIGHT_KINDS} from "./clock.js";
 import {NPCS, QOBJECTS, QITEMS, GOODS, GOODS_BASIC, MOUNTS, RIDING_LVL, RIDING_COST, PROF} from "./content.js";
 // is something (solid or walk-through) here? Used when placing things, so nothing ends up on top of a campfire or a person
@@ -541,18 +541,18 @@ const IDLE_WARN = 9 * 60e3, IDLE_OUT = 10 * 60e3; let lastInput = Date.now(), id
 for(const ev of ["keydown", "pointerdown", "pointermove", "wheel"]) addEventListener(ev, () => { lastInput = Date.now(); idleWarned = false; }, {passive: true, capture: true});
 async function idleLogout(){ const inGame = running;
   if(inGame){ save(); try{ CO.leave(true); }catch(e){} }
-  if(ACC.accountId()){ await ACC.saveCloud(cloudData()); ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); }
+  if(ACC.accountId()){ await ACC.saveCloud(cloudData()); ACC.logOut(); devLock(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); }
   else if(inGame) showChars(); else return;
   const m = "You were logged out after 10 minutes without activity."; if(ACC.accountId() === null && !$("login").hidden) $("lerr").textContent = m; else log(m, "#9fd6e8"); }
 setInterval(() => { if(!running && !ACC.accountId()) return; const idle = Date.now() - lastInput;
   if(idle > IDLE_OUT){ lastInput = Date.now(); idleLogout(); }
   else if(idle > IDLE_WARN && !idleWarned){ idleWarned = true; if(running) banner("Still there?", "You will be logged out in 1 minute"); log("You will be logged out in 1 minute because you have been inactive.", "#ffb347"); } }, 5000);
 // logged in from another browser: this one stops at once, without saving, so it can't overwrite the newer progress
-ACC.setOnKick(() => { try{ CO.leave(true); }catch(e){} running = false; ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin();
+ACC.setOnKick(() => { try{ CO.leave(true); }catch(e){} running = false; ACC.logOut(); devLock(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin();
   $("lerr").textContent = "You logged in from another browser, so you were logged out here. Nothing was saved from this window."; });
 setInterval(() => { if(ACC.accountId()) ACC.checkSession(); }, 20000);
 // each account has its own place in this browser; its save comes from the server when you log in
-async function afterLogin(){ const uid = ACC.accountId(); KEY = "rimfrost2-chars:" + uid; WKEY = "rimfrost2-world:" + uid;
+async function afterLogin(){ const uid = ACC.accountId(); devUnlock(ACC.accountEmail(), ACC.accountName()); KEY = "rimfrost2-chars:" + uid; WKEY = "rimfrost2-world:" + uid;
   const data = await ACC.loadCloud(); await ACC.claimSession();                            // this browser is now the one that plays (any other is logged out)
   if(data){ saveChars(data.chars || []); try{ if(data.world) localStorage.setItem(WKEY, JSON.stringify(data.world)); else localStorage.removeItem(WKEY); }catch(e){} }
   else { let claimed = null; try{ claimed = localStorage.getItem("rimfrost2-claimed"); }catch(e){}           // a new account takes over the characters already in this browser (once)
@@ -571,7 +571,7 @@ function acctBar(){ const old = ACC.needsEmail();
       $("asend").disabled = true; $("amsg").textContent = "Sending…";
       try{ await ACC.addEmail(m); $("amsg").textContent = `A link has been sent to ${m} (check the spam folder too). Click it, then log in with ${m} and your password from now on.`; }
       catch(e){ $("amsg").textContent = e.message; } finally{ $("asend").disabled = false; } }; }
-  $("lout").onclick = async () => { save(); $("lout").disabled = true; await ACC.saveCloud(cloudData()); ACC.logOut(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); }; }
+  $("lout").onclick = async () => { save(); $("lout").disabled = true; await ACC.saveCloud(cloudData()); ACC.logOut(); devLock(); KEY = "rimfrost2-chars"; WKEY = "rimfrost2-world"; $("acct").hidden = true; showLogin(); }; }
 // "Remember my e-mail": the login box is filled in for you next time (only the e-mail, never the password)
 const REMEMBER = "rimfrost2-remember";
 function showLogin(){ running = false; closePanel(); $("chars").hidden = false; $("login").hidden = false; $("clistWrap").hidden = true; $("cform").hidden = true; $("lerr").textContent = "";
@@ -1235,7 +1235,7 @@ $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("ch
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
 G.initEngine(scene, {tankMult: () => tankMult(), startAim, floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
-CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
+CO.initCoop({scene, hud, log, err, save, floatText, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, devApply: (a, v) => devApply(a, v), bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t), zoneVis: (m, l) => zoneVis(m, l), bossSync: (m, f) => bossSync(m, f),
   someoneEnters: () => {}});
@@ -1979,7 +1979,7 @@ const ARENA = (() => { let a = null; return () => { if(a) return a; const s = hu
   for(let k = 0; k < 24 && !a; k++){ const ang = k * 0.26, mx = s.x + Math.cos(ang) * 11, mz = s.z + Math.sin(ang) * 11;
     if(reachable(mx, mz) && !blocked(mx, mz, mx, mz, 0.8) && findPath(s.x, s.z, mx, mz)) a = {x: s.x, z: s.z, mx, mz}; }
   return a || (a = {x: s.x, z: s.z, mx: s.x + 8, mz: s.z}); }; })();
-initDev({update, save, refresh, buildBar, buildHero, hubSpot, log, arena: ARENA,
+initDev({rezAt: (x, z, from) => rezAt(x, z, from), update, save, refresh, buildBar, buildHero, hubSpot, log, arena: ARENA,
   teleport: (x, z) => { if(curDungeon()) exitDungeon(); dismount(); P.x = x; P.z = z; P.target = null; P.path = null; save(); },
   makeMob: (kind, p, lvl) => { const m = makeMob(kind, p, lvl, rng(7)); m.dev = true; return m; },
   removeMob: m => { const i = mobs.indexOf(m); if(i >= 0) mobs.splice(i, 1); scene.remove(m.mesh); const pl = plates.get(m); if(pl){ pl.remove(); plates.delete(m); } if(P.target === m) P.target = null; },

@@ -1,5 +1,15 @@
 # Rimfrost 2 – Release notes
 
+## v0.43.1
+
+### Changed
+- **Dev tools:** Adding ?dev to the address now only opens the dev tools for the developer's account. Other players see no dev tools.
+
+## v0.43.0
+
+### New
+- **Co-op dev tools (host only):** With dev tools open (F8), the host can pick a friend or everyone in the group and set level, give gold, fully heal, teach all abilities, equip a gear set, grant riding and mounts, complete quests, reset cooldowns or talents, remove Resurrection Sickness, resurrect, or summon them to the host.
+
 ## v0.42.2
 
 ### Fixed

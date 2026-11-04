@@ -9,6 +9,7 @@ let sess = null;                                   // {token, refresh, exp, uid,
 export const accountsOn = () => !!(FIREBASE_API_KEY && FIREBASE_PROJECT);
 export const accountName = () => sess ? sess.name : null;
 export const accountId = () => sess ? sess.uid : null;
+export const accountEmail = () => sess ? sess.email : null;
 // Old accounts were made with a name only. Firebase logs in with an e-mail address, so the name was turned into one that is never mailed.
 // Names of only a–z, 0–9, _ and - keep the address they always had. Any other letter (å, ä, ö, é …) is written as
 // "x" + its 4-digit code, a plain x as "xx", and the address ends in ".u", so every name gets its own address.

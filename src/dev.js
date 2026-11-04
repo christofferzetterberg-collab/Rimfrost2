@@ -9,9 +9,18 @@ import * as Q from "./quests.js";
 import * as CO from "./coop.js";
 import {setHour, clockText} from "./clock.js";
 
-export const DEV = {on: /[?&]dev\b/.test(location.search), sim: false, god: false, speed: 1};
-let H = {}, el = null;
-export function initDev(hooks){ H = hooks; if(!DEV.on) return; build(); addEventListener("keydown", e => { if(e.code === "F8"){ e.preventDefault(); toggle(); } }); }
+// Only these accounts (log-in e-mail or old account name) can open the dev tools; on localhost they always work.
+const DEV_ACCOUNTS = ["christoffer.zetterberg@hotmail.com"];
+const WANT = /[?&]dev\b/.test(location.search), LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+export const DEV = {on: false, sim: false, god: false, speed: 1};
+let H = {}, el = null, keys = false;
+const devOk = (email, name) => LOCAL || [email, name].some(v => v && DEV_ACCOUNTS.includes(String(v).trim().toLowerCase()));
+// called after logging in: turns the dev tools on for a dev account that opened the game with ?dev
+export function devUnlock(email, name){ if(!WANT) return; if(!devOk(email, name)){ console.info("Dev tools are not available on this account."); return; }
+  DEV.on = true; if(!el) build(); window.__devBT = {BT, run: () => runBalance()};
+  if(!keys){ keys = true; addEventListener("keydown", e => { if(e.code === "F8" && DEV.on){ e.preventDefault(); toggle(); } }); } }
+export function devLock(){ DEV.on = false; DEV.god = false; if(el) el.hidden = true; delete window.__devBT; }
+export function initDev(hooks){ H = hooks; if(LOCAL) devUnlock(); }
 export const toggle = () => { if(!DEV.on || !el) return; el.hidden = !el.hidden; if(!el.hidden) render(); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 
@@ -30,7 +39,6 @@ function build(){
   el.addEventListener("change", e => { const s = e.target.closest("[data-set]"); if(s){ BT[s.dataset.set] = s.type === "checkbox" ? s.checked : s.value; } });
 }
 const BT = {lvl: "10", q: "2", spec: "0", trials: "3", res: null, busy: false, prog: ""};
-if(DEV.on) window.__devBT = {BT, run: () => runBalance()};
 function render(){
   if(!el || el.hidden) return; const c = S.cur;
   const hubs = Object.entries(HUBS).map(([id, h]) => `<option value="hub:${id}">${esc(h.name)}</option>`).join("") + Object.entries(DG_DOORS).map(([id]) => `<option value="dg:${id}">Door: ${id.replace("d_", "")}</option>`).join("");
@@ -43,6 +51,7 @@ function render(){
     <div class="r"><button data-dev="heal">Full health & mana</button><button data-dev="cds">Reset cooldowns</button><button data-dev="god" class="${DEV.god ? "on" : ""}">God mode</button>
       <button data-dev="speed" class="${DEV.speed > 1 ? "on" : ""}">Speed ×3</button><button data-dev="kill">Kill target</button><button data-dev="die">Die</button></div>
     <div class="r"><button data-dev="quests">Finish active quests</button><button data-dev="talents">Reset talents</button><button data-dev="unsick">Remove Resurrection Sickness</button></div>
+    ${CO.COOP.role === "host" && CO.on() ? coopHTML() : CO.on() ? `<h3>Co-op</h3><div class="m">Only the host can use dev tools on others. Your dev tools work only on yourself; monsters are run by the host.</div>` : ""}
     <h3>Time of day <span class="m">(now ${clockText()}, only on this computer)</span></h3><div class="r">${[["Dawn", 4], ["Noon", 12], ["Dusk", 19], ["Night", 22], ["Midnight", 0]].map(([n, h]) => `<button data-dev="hour" data-v="${h}">${n}</button>`).join("")}</div>
     <h3>Teleport</h3><div class="r"><select id="devtp">${hubs}</select><button data-dev="tp">Go</button></div>` : `<div class="m">Pick a character first.</div>`}
     <h3>Balance test</h3>
@@ -54,8 +63,32 @@ function render(){
     <div class="r"><button data-dev="bt" ${BT.busy || CO.on() ? "disabled" : ""}>${BT.busy ? "Running… " + esc(BT.prog) : "Run balance test"}</button>${BT.res ? `<button data-dev="btcopy">Copy results</button>` : ""}${CO.on() ? `<span class="m">(not in co-op)</span>` : ""}</div>
     ${BT.res ? resultsHTML(BT.res) : ""}`;
 }
+// the host's dev tools on friends in co-op: run on the friend's own computer (they need no ?dev)
+const COOP_ACTS = {setlvl: "set level", gold: "+1000 gold", heal: "full health & mana", learn: "learn all abilities", gear: "a full set of gear", riding: "riding + all mounts", quests: "finish active quests",
+  cds: "reset cooldowns", unsick: "remove Resurrection Sickness", talents: "reset talents", res: "resurrect", tome: "teleport to the host"};
+export function devApply(a, v){ const c = S.cur; if(!c || !COOP_ACTS[a]) return;
+  if(a === "res"){ if(P.dead) H.rezAt(P.x, P.z, "The host"); return; }
+  if(a === "tome"){ const [x, z] = String(v).split(",").map(Number); if(isFinite(x) && isFinite(z)) H.teleport(x, z); }
+  else { if(a === "setlvl" || a === "gear") v = +v; doAct(a, v); }
+  H.log(`The host used a dev tool on you: ${COOP_ACTS[a]}${a === "setlvl" ? " " + v : ""}.`, "#ffb860"); H.save(); H.refresh(); }
+// what an action does to your own character (v: the level or gear quality, when it needs one)
+function doAct(a, v){ const c = S.cur;
+  if(a === "setlvl"){ c.level = v; c.xp = 0; G.recompute(true); H.buildBar(); }
+  else if(a === "gold") c.gold += 1000;
+  else if(a === "learn"){ for(const id of G.allBarIds()) if(AB[id].lvl <= c.level && !AB[id].talent && !c.learned.includes(id)) c.learned.push(id); H.buildBar(); }
+  else if(a === "riding"){ c.riding = true; c.mounts = ["horse", "gray", "ram", "wolf"]; }
+  else if(a === "gear"){ equipSet(c, v, c.level, Math.random() * 1e9 | 0); G.recompute(true); H.buildHero(); }
+  else if(a === "heal"){ P.hp = P.maxHp; P.mana = P.maxMana; P.rage = 100; P.energy = 100; P.focus = 100; }
+  else if(a === "cds"){ P.cds = {}; P.gcd = 0; P.potCd = 0; }
+  else if(a === "quests"){ for(const q of Q.activeQuests()){ const s = c.quests[q.id]; q.obj.forEach((o, i) => { if(o[0] === "collect" || o[0] === "loot") c.qbag[o[1]] = Math.max(c.qbag[o[1]] || 0, o[2]); else if(o[0] === "skill"){ c.prof = c.prof || {}; c.prof[o[1]] = Math.max(c.prof[o[1]] || 1, o[2]); } else s.prog[i] = o[2]; }); } }
+  else if(a === "talents"){ c.talents = {}; G.recompute(false); }
+  else if(a === "unsick"){ delete P.buffs.ressick; } }
 function act(a, v){
   const c = S.cur; if(!c && a !== "bt" && a !== "btcopy") return;
+  if(a === "co"){ const to = document.getElementById("devcoto").value, k = v; if(!to) return;
+    const val = k === "setlvl" ? document.getElementById("devcolvl").value : k === "gear" ? document.getElementById("devcoq").value : k === "tome" ? `${P.x.toFixed(1)},${P.z.toFixed(1)}` : null;
+    CO.devSend(to, k, val); if(to === "all" && k !== "tome" && k !== "res") doAct(k, val == null ? val : +val);
+    H.log(`Dev tools: ${COOP_ACTS[k]}${k === "setlvl" ? " " + val : ""} → ${to === "all" ? "everyone" : (CO.COOP.remotes[to] || {}).name || "friend"}.`, "#ffb860"); H.save(); H.refresh(); render(); return; }
   if(a === "setlvl"){ const l = +document.getElementById("devlvl").value; c.level = l; c.xp = 0; G.recompute(true); H.buildBar(); }
   else if(a === "gold") c.gold += 1000;
   else if(a === "learn"){ for(const id of G.allBarIds()) if(AB[id].lvl <= c.level && !AB[id].talent && !c.learned.includes(id)) c.learned.push(id); H.buildBar(); }
@@ -77,6 +110,13 @@ function act(a, v){
   else if(a === "btcopy"){ copyResults(); return; }
   H.save(); H.refresh(); render();
 }
+// the co-op section: pick a friend (or everyone) and what to do to them
+function coopHTML(){ const rs = Object.values(CO.COOP.remotes), sel = P.ftarget && CO.COOP.remotes[P.ftarget] ? P.ftarget : rs[0] ? rs[0].id : "";
+  return `<h3>Co-op (host)</h3><div class="m">Used on a friend's character, on their computer. Select a friend in the game to pick them here.</div>
+    <div class="r">Who <select id="devcoto">${rs.map(r => `<option value="${esc(r.id)}" ${r.id === sel ? "selected" : ""}>${esc(r.name)} (level ${r.lvl})</option>`).join("")}<option value="all">Everyone (you too)</option></select></div>
+    <div class="r">Level <select id="devcolvl">${Array.from({length: 40}, (_, i) => `<option>${i + 1}</option>`).join("")}</select><button data-dev="co" data-v="setlvl">Set</button>
+      Gear <select id="devcoq">${QUAL.map((q, i) => `<option value="${i}" ${i === 3 ? "selected" : ""}>${q.name}</option>`).join("")}</select><button data-dev="co" data-v="gear">Equip set</button></div>
+    <div class="r">${["gold", "heal", "learn", "riding", "quests", "cds", "unsick", "talents", "res", "tome"].map(k => `<button data-dev="co" data-v="${k}">${COOP_ACTS[k][0].toUpperCase() + COOP_ACTS[k].slice(1)}</button>`).join("")}</div>`; }
 // a full set of gear for a class: one item for every slot, the same every time for the same seed
 function equipSet(c, q, il, seed){ c.eq = {}; for(const slot of SLOT_ORDER){ if(slot === "offhand" && !CLASS_OFF[c.cls].length) continue;
   c.eq[slot] = makeGear({slot, cls: c.cls, q, il, r: mulberry(hashStr(c.cls + slot + seed))}); } }

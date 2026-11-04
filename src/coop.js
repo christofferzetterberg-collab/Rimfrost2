@@ -70,6 +70,8 @@ export function leave(silent){
   if(!silent){ COOP.status = "You left co-op."; refresh(); }
 }
 addEventListener("beforeunload", () => { if(on()) leave(true); });
+// dev tools in co-op: only the host can use them on friends (to: a friend's id, or "all")
+export function devSend(to, a, v){ if(COOP.role !== "host") return; const msg = {t: "dev", to, a, v}; if(to === "all") broadcast(msg); else sendTo(to, msg); }
 function broadcast(msg, except){ for(const c of COOP.conns) if(c !== except && c.open){ try{ c.send(msg); }catch(e){} } }
 function sendTo(id, msg){ const r = COOP.remotes[id]; const c = r && COOP.conns.find(c => c.peer === r.via); if(c && c.open){ try{ c.send(msg); }catch(e){} } }
 function data(c, d){
@@ -89,6 +91,7 @@ function data(c, d){
   if(d.t === "mobs"){ if(COOP.role === "guest") applyMobs(d.m); return; }
   if(d.t === "fx"){ if(d.to === myId()) receiveFx(d); else if(COOP.role === "host") sendTo(d.to, d); return; }
   if(d.t === "trade"){ tradeData(d); return; }
+  if(d.t === "dev"){ if(COOP.role === "guest" && (d.to === myId() || d.to === "all") && H.devApply) H.devApply(d.a, d.v); return; }   // the host's dev tools, used on you
   if(d.t !== "st" || !d.id || (COOP.peer && d.id === COOP.peer.id)) return;
   let r = COOP.remotes[d.id];
   if(!r){ r = COOP.remotes[d.id] = {id: d.id, x: d.x, z: d.z, rot: d.rot, r: 0.4, walk: 0}; H.log(`${d.name} joined the game.`, "#7be08a"); refresh(); }
