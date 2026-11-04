@@ -335,7 +335,7 @@ export function guestUpd(m, dt){
 let CAP = null;                                  // while set, heals / heal over time / shields / buffs are collected and sent to a friend
 export const cap = () => CAP;
 export const setCap = c => { CAP = c; };
-const FRIENDLY = new Set(["heal", "renew", "pws", "palheal", "touch", "rejuv", "bloom", "healwave", "thorns", "powerinf", "painsupp", "guardian"]);
+const FRIENDLY = new Set(["heal", "renew", "pws", "palheal", "touch", "rejuv", "bloom", "healwave", "thorns", "powerinf", "painsupp", "guardian", "swiftmend", "regrowth"]);
 // a companion as a friendly target: the host's own, or (guests) the copy the host sends
 function botView(id){ if(!id) return null;
   if(COOP.role !== "guest"){ const b = (H.bots ? H.bots() : []).find(b => b.id === id); return b ? {id, bot: true, name: b.name, cls: b.cls, lvl: b.lvl, hp: b.hp, mhp: b.maxHp, dead: !!b.dead, x: b.x, z: b.z, mesh: b.mesh, au: H.botAu ? H.botAu(b) : []} : null; }
@@ -352,7 +352,7 @@ function sendFx(r, fx, label){ if(!fx.length) return;
   else { const msg = {t: "fx", to: r.id, from: S.cur.name, label, fx}; if(COOP.role === "host") sendTo(r.id, msg); else broadcast(msg); }
   for(const f of fx) if(f[0] === "heal") H.floatText(r, "+" + f[1], "#7be08a"); }
 // healing makes threat too: half of what was healed, shared by every monster fighting the one you healed (buffs on someone in a fight: a little)
-export const fxThreat = fx => fx.reduce((s, f) => s + (f[0] === "heal" || f[0] === "shield" ? f[1] : f[0] === "hot" ? f[2] : f[0] === "buff" ? 20 : 0), 0);
+export const fxThreat = fx => fx.reduce((s, f) => s + (f[0] === "heal" || f[0] === "shield" ? f[1] : f[0] === "hot" ? f[2] + (f[4] || 0) : f[0] === "buff" ? 20 : 0), 0);
 export function healThreat(amt, tid){ if(!(amt > 0)) return; amt *= 0.5;
   if(COOP.role === "guest") broadcast({t: "hth", from: myId(), amt, to: tid}); else addHealThreat(myId(), amt, tid); }
 function fighting(m, tid){ if(m.dead || m.state !== "chase") return false; if(m.tgtId === tid) return true;
@@ -365,7 +365,10 @@ function addHealThreat(from, amt, tid){ const who = from === myId() ? P : COOP.r
 // on a monster's threat list (in co-op the host keeps the list; guests get a copy)
 export function onList(m, id = myId()){ if(!coopMob(m)) return false; if(COOP.role === "guest") return !!(m.thSync && m.thSync.some(e => e[0] === id && e[1] > 0)); return !!(m.threat && m.threat[id] > 0); }
 // War Cry, Holy Wave and the like also reach friends near you (radius in Rimfrost pixels)
-export function groupFx(radius, fx, label){ if(!on()) return; for(const r of visible()) if(!r.dead && Math.hypot(r.x - P.x, r.z - P.z) * PXU < radius) sendFx(r, fx.map(f => f.slice()), label); }
+export function groupFx(radius, fx, label){
+  for(const r of on() ? visible() : []) if(!r.dead && Math.hypot(r.x - P.x, r.z - P.z) * PXU < radius) sendFx(r, fx.map(f => f.slice()), label);
+  const bs = COOP.role === "guest" ? COOP.gbots : H.bots ? H.bots() : [];                              // companions too
+  for(const b of bs){ const v = botView(b.id); if(v && !v.dead && sameRegion(v, P) && Math.hypot(v.x - P.x, v.z - P.z) * PXU < radius) sendFx(v, fx.map(f => f.slice()), label); } }
 // resurrection: a dead friend comes back at the caster's side
 function rezTarget(){ const r = on() && P.ftarget && COOP.remotes[P.ftarget]; return r && r.dead ? r : null; }
 const corpseOf = r => r.gh && r.cx != null ? {x: r.cx, z: r.cz} : r;          // a friend who released their spirit: the body stays where they died
@@ -376,9 +379,9 @@ function receiveFx(d){ const rz = d.fx.find(f => f[0] === "rez"); if(rz){ if(P.d
   if(P.dead) return;
   for(const f of d.fx){
     if(f[0] === "heal") G.healP(f[1]); else if(f[0] === "healPct") G.healP(P.maxHp * f[1]);
-    else if(f[0] === "hot") G.hot(f[1] + "_" + d.from, f[2], f[3]); else if(f[0] === "shield") G.shieldP(f[1], f[2]); else if(f[0] === "buff") G.buff(f[1], f[2]); }
+    else if(f[0] === "hot") G.hot(f[1] + "_" + d.from, f[2], f[3], f[4] || 0); else if(f[0] === "hotPct") G.hot(f[1] + "_" + d.from, P.maxHp * f[2], f[3]); else if(f[0] === "shield") G.shieldP(f[1], f[2]); else if(f[0] === "buff") G.buff(f[1], f[2]); }
   G.burst(P.px, P.py, "#9cf07a", 8);
-  if(!d.label.startsWith("Holy") && !d.label.endsWith("Totem")) H.log(`${d.from} cast ${d.label} on you.`, "#7be08a"); }
+  if(!/^Holy|Totem$|^Tranquility$|^Wild Growth$/.test(d.label)) H.log(`${d.from} cast ${d.label} on you.`, "#7be08a"); }
 // select a friend as your target (your heals and shields then go to them); toggle: clicking their frame again lets go
 export function select(id, toggle){ const was = P.ftarget; P.ftarget = id && !(toggle && was === id) ? id : null; if(P.ftarget){ P.target = null; P.auto = false; } }
 export const remoteById = id => friendOrBot(id);

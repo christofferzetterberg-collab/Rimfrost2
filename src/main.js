@@ -155,11 +155,12 @@ function dismissBots(quiet){ botMode = "assist"; botStay = null;  if(bots.length
 function botFx(id, fx, from, label){ const b = bots.find(o => o.id === id); if(!b || b.dead) return;
   for(const f of fx){ if(f[0] === "heal"){ const n = Math.round(Math.min(f[1], b.maxHp - b.hp)); b.hp += n; if(n > 0 && from !== S.cur.name) floatText(b, "+" + n, "#7be08a"); }
     else if(f[0] === "healPct") b.hp = Math.min(b.maxHp, b.hp + b.maxHp * f[1]);
-    else if(f[0] === "hot"){ b.hots = (b.hots || []).filter(h => h.key !== f[1] + from); b.hots.push({key: f[1] + from, ab: f[1], per: f[2] / f[3], left: f[3], t: 1}); }
+    else if(f[0] === "hotPct"){ b.hots = (b.hots || []).filter(h => h.key !== f[1] + from); b.hots.push({key: f[1] + from, ab: f[1], per: b.maxHp * f[2] / f[3], left: f[3], t: 1}); }
+    else if(f[0] === "hot"){ b.hots = (b.hots || []).filter(h => h.key !== f[1] + from); b.hots.push({key: f[1] + from, ab: f[1], per: f[2] / f[3], left: f[3], t: 1, bloom: f[4] || 0}); }
     else if(f[0] === "shield"){ b.shield = Math.max(b.shield || 0, f[1]); b.shieldT = f[2]; }
     else if(f[0] === "buff") (b.buffs = b.buffs || {})[f[1]] = f[2]; }
   G.burst(b.x * PXU, b.z * PXU, "#9cf07a", 8); }
-function botAuras(b, dt){ for(const h of b.hots || []){ h.left -= dt; h.t -= dt; if(h.t <= 0){ h.t += 1; const n = Math.round(Math.min(h.per, b.maxHp - b.hp)); b.hp += n; if(n > 0) floatText(b, "+" + n, "#7be08a"); } }
+function botAuras(b, dt){ for(const h of b.hots || []){ h.left -= dt; h.t -= dt; if(h.t <= 0){ h.t += 1; const n = Math.round(Math.min(h.per + (h.left <= 0.01 && h.bloom ? h.bloom : 0), b.maxHp - b.hp)); b.hp += n; if(n > 0) floatText(b, "+" + n, "#7be08a"); } }
   if(b.hots) b.hots = b.hots.filter(h => h.left > 0); if(b.shieldT > 0 && (b.shieldT -= dt) <= 0) b.shield = 0;
   for(const k in b.buffs || {}) if((b.buffs[k] -= dt) <= 0) delete b.buffs[k]; }
 // what the monsters do to them
@@ -805,12 +806,12 @@ function buildPetBar(){ const el = $("petbar"), key = classBarKey(); petBarKind 
 function updPetBar(){ const key = classBarKey(); if(key !== petBarKind) buildPetBar(); if(!key) return;
   const pt = G.getPet();
   for(const p of petSlots){ const x = p.it.x;
-    if(p.it.totem){ p.el.classList.toggle("on", G.totemList().some(t => t.kind === p.it.totem)); const cd = Math.max(P.cds[p.it.form] || 0, P.gcd || 0); p.cd.textContent = cd > 0.05 && P.cds[p.it.form] ? Math.ceil(cd) : ""; continue; }
-    if(p.it.form){ p.el.classList.toggle("on", P.form === p.it.form); const cd = P.cds[p.it.form] || 0; p.cd.textContent = cd > 0 ? Math.ceil(cd) : ""; continue; }
+    if(p.it.totem){ p.el.classList.toggle("on", G.totemList().some(t => t.kind === p.it.totem)); const cd = Math.max(P.cds[p.it.form] || 0, P.gcd || 0); p.cd.textContent = cd > 0.05 && P.cds[p.it.form] ? cdTxt(cd) : ""; continue; }
+    if(p.it.form){ p.el.classList.toggle("on", P.form === p.it.form); const cd = P.cds[p.it.form] || 0; p.cd.textContent = cd > 0 ? cdTxt(cd) : ""; continue; }
     if(!pt) continue;
     if(x === "pa") p.el.classList.toggle("on", pt.mode === "attack" || (pt.mode === "assist" && petBusy(pt)));
     else if(x === "pf") p.el.classList.toggle("on", pt.mode === "follow");
-    else { const on = G.petSkillOn(x); p.el.classList.toggle("off", !on); p.el.classList.toggle("auto", on); const cd = x === "growl" ? pt.growl : x === "maul" ? pt.maulT || 0 : 0; p.cd.textContent = on && cd > 0 && !pt.dead ? Math.ceil(cd) : ""; } } }
+    else { const on = G.petSkillOn(x); p.el.classList.toggle("off", !on); p.el.classList.toggle("auto", on); const cd = x === "growl" ? pt.growl : x === "maul" ? pt.maulT || 0 : 0; p.cd.textContent = on && cd > 0 && !pt.dead ? cdTxt(cd) : ""; } } }
 const petBusy = pt => !pt.dead && G.petFight();
 function tipFor(id){ const a = AB[id], type = a.res || G.resType(), cost = G.costOf(id), bits = [];
   if(cost) bits.push(`${cost} ${RES_NAME[type].toLowerCase()}`); bits.push(a.channel ? `${a.channel} sec channel` : a.cast ? `${a.cast} sec cast` : "Instant"); if(a.cd) bits.push(a.cd >= 60 && a.cd % 60 === 0 ? `${a.cd / 60} min cooldown` : `${a.cd} sec cooldown`);
@@ -878,6 +879,29 @@ function statLines(it, cmp){
 function gearTip(it){ const c = S.cur, cur = c.eq[it.slot], cmp = cur && cur !== it ? cur : null, ok = canWear(it, c.cls);
   return `<h4 style="color:${QUAL[it.q].color}">${it.n}</h4><div class="m">${QUAL[it.q].name} · ${slotName(it.slot, it.wt, S.cur.cls)} · ${gearTypeName(it)}</div>${statLines(it, cmp)}${it.bonus && AB[it.bonus.ab] ? `<div style="color:#7be08a;margin-top:4px">Equip: Increases the ${it.bonus.kind === "heal" ? "healing" : "damage"} of ${AB[it.bonus.ab].name} by ${Math.round(it.bonus.v * 100)}%.</div>` : ""}
     <div class="m" style="margin-top:4px">${ok ? "" : `<span style="color:#ff6b5e">Cannot be used by ${CLASSES[c.cls].name}s. </span>`}<span style="color:${c.level >= it.il ? "" : "#ff6b5e"}">Requires level ${it.il}</span>${cmp ? ` · compared to ${cmp.n}` : ""}</div>`; }
+// the talent window: arrows between talents that depend on each other, and tooltips with this rank and the next
+function talentExtras(b){ const tree = b.querySelector(".taltree"); if(!tree) return; const TL = TALENTS[S.cur.cls];
+  for(const cv of tree.querySelectorAll("canvas[data-tic]")){ const t = TL.find(x => x.id === cv.dataset.tic); if(!t) continue; const [ic, col] = t.ic || (t.grants ? abIcon(t.grants) : ["star", "#8c939a"]); drawIcon(cv, ic, col); }
+  const svg = tree.querySelector(".talarrows"), base = tree.getBoundingClientRect(); let lines = "";
+  for(const el of tree.querySelectorAll("[data-req]")){ const from = tree.querySelector(`[data-tid="${el.dataset.req}"] canvas`), to = el.querySelector("canvas"); if(!from || !to) continue;
+    const a = from.getBoundingClientRect(), z = to.getBoundingClientRect(), x1 = a.left + a.width / 2 - base.left, y1 = a.bottom - base.top + 2, x2 = z.left + z.width / 2 - base.left, y2 = z.top - base.top - 2;
+    const ok = G.reqMet(TL.find(t => t.id === el.dataset.tid)), col = ok ? "#ffd36b" : "#8a3a32", my = x1 === x2 ? null : (y1 + y2) / 2;
+    lines += `<path d="${my == null ? `M${x1} ${y1} L${x2} ${y2 - 7}` : `M${x1} ${y1} L${x1} ${my} L${x2} ${my} L${x2} ${y2 - 7}`}" stroke="${col}" stroke-width="3" fill="none" stroke-linejoin="round"/><path d="M${x2 - 6} ${y2 - 9} L${x2} ${y2} L${x2 + 6} ${y2 - 9} Z" fill="${col}"/>`; }
+  svg.setAttribute("width", tree.scrollWidth); svg.setAttribute("height", tree.scrollHeight); svg.innerHTML = lines; }
+// talent tooltips: this rank, the next one, and what it still needs
+let talTipId = null;
+function talentTip(t){ const r = G.T(t.id), TL = TALENTS[S.cur.cls], q = t.req && TL.find(x => x.id === t.req), need = TIER_NEED[t.tier], tr = G.TREES[S.cur.cls].find(x => x.id === t.tree);
+  let html = `<h4>${t.name}</h4><div class="muted">Rank ${r}/${t.max}</div>`;
+  if(r > 0) html += `<div style="margin-top:5px">${t.d(r)}</div>`;
+  if(r < t.max) html += `<div style="margin-top:5px">${r > 0 ? `<span style="color:#9fd6e8">Next rank:</span><br>` : ""}${t.d(r + 1)}</div>`;
+  if(G.treePoints(t.tree) < need) html += `<div style="color:#ff8a7a;margin-top:5px">Requires ${need} points in ${tr.name}</div>`;
+  if(q && G.T(q.id) < q.max) html += `<div style="color:#ff8a7a;margin-top:5px">Requires ${q.max} points in ${q.name}</div>`;
+  else if(G.canLearnTalent(t)) html += `<div style="color:#9cf07a;margin-top:5px">Click to learn</div>`;
+  return html; }
+$("pbody").addEventListener("mousemove", e => { const el = e.target.closest(".tcell"); const t = el && TALENTS[S.cur.cls].find(x => x.id === el.dataset.tid);
+  if(!t){ if(talTipId){ talTipId = null; hideTip(); } return; }
+  if(talTipId === t.id && !$("tip").hidden) return; talTipId = t.id; const r = el.getBoundingClientRect(), pl = $("panel").getBoundingClientRect().left; showTipAt({clientX: pl - 4, clientY: r.top + 10}, talentTip(t)); });
+$("pbody").addEventListener("mouseleave", () => { if(talTipId){ talTipId = null; hideTip(); } });
 function showTipAt(e, html){ const t = $("tip"); t.innerHTML = html; t.hidden = false; t.style.left = clamp(e.clientX - 300, 8, innerWidth - 290) + "px"; t.style.top = clamp(e.clientY - 20, 8, innerHeight - t.offsetHeight - 8) + "px"; }
 const pct = v => (Math.round(v * 1000) / 10) + "%";
 function renderPanel(){
@@ -953,18 +977,26 @@ function renderPanel(){
     const trees = G.TREES[c.cls]; if(!trees.some(t => t.id === talTree)) talTree = (trees.find(t => G.treePoints(t.id) > 0) || trees[0]).id;
     h += `<div class="tabs vtabs">${trees.map(t => `<button class="${t.id === talTree ? "on" : ""}" data-act="taltree" data-id="${t.id}">${t.name} <span class="muted">${G.treePoints(t.id)}</span></button>`).join("")}</div>`;
     const tr = trees.find(t => t.id === talTree); h += `<div class="muted" style="margin:2px 0 4px">${tr.d}</div>`;
-    for(const tier of [1, 2, 3, 4, 5, 6, 7]){ const need = TIER_NEED[tier], open = G.treePoints(talTree) >= need;
-      h += `<h3${open ? "" : ` style="opacity:.6"`}>Tier ${tier}${need ? ` · ${need} points in ${tr.name}` : ""}</h3><div class="tier">`;
-      for(const t of TALENTS[c.cls].filter(t => t.tier === tier && t.tree === talTree)){ const r = G.T(t.id), can = G.canLearnTalent(t);
-        h += `<button class="tal ${can ? "can" : ""} ${r === t.max ? "max" : ""}" data-act="tal" data-id="${t.id}"><div class="n"><span>${t.name}</span><span class="r">${r}/${t.max}</span></div><div class="d">${t.d(Math.max(1, r))}</div></button>`; }
-      h += `</div>`; }
+    // tiers top to bottom in three columns; an arrow leads from a talent to the one that needs it
+    const TL = TALENTS[c.cls], nameOf = id => (TL.find(x => x.id === id) || {}).name || "";
+    h += `<div class="taltree">`;
+    for(const tier of Object.keys(TIER_NEED).map(Number)){ const list = TL.filter(t => t.tier === tier && t.tree === talTree); if(!list.length) continue;
+      const need = TIER_NEED[tier], open = G.treePoints(talTree) >= need;
+      h += `<div class="trow ${open ? "" : "locked"}"><div class="treq" title="${need} points in ${tr.name}">${open ? need || "" : "&#128274;" + need}</div><div class="tcells">`;
+      list.forEach((t, i) => { const r = G.T(t.id), can = G.canLearnTalent(t), rq = G.reqMet(t), ok = open && rq;
+        const st = [ok ? "open" : "locked", can ? "can" : "", r === t.max ? "max" : r > 0 ? "some" : "", t.grants ? "abil" : ""].join(" ");
+        h += `<div class="tcell ${st}" style="grid-column:${(t.col ?? i) + 1}" data-act="tal" data-id="${t.id}" data-tid="${t.id}"${t.req ? ` data-req="${t.req}"` : ""}>
+          <canvas width="64" height="64" data-tic="${t.id}"></canvas><span class="rk">${r}/${t.max}</span><div class="tn">${t.name}</div>${rq ? "" : `<div class="tq">Requires ${nameOf(t.req)}</div>`}</div>`; });
+      h += `</div></div>`; }
+    h += `<svg class="talarrows"></svg></div>`;
   }
   b.innerHTML = h;
+  if(panelTab === "tal") talentExtras(b);
   b.querySelectorAll("canvas[data-icon]").forEach(cv => drawIcon(cv, ...iconOf(cv.dataset.icon)));
   b.querySelectorAll("[data-drag]").forEach(el => el.ondragstart = e => { hideTip(); e.dataTransfer.setData("text/plain", JSON.stringify({x: el.dataset.drag})); });
 }
 $("pbody").addEventListener("click", e => { const el = e.target.closest("[data-act]"); if(!el || el.disabled) return; const a = el.dataset.act, id = el.dataset.id;
-  if(a === "equip") G.equipGear(id); else if(a === "uneq") G.unequipGear(id); else if(a === "use") G.useItem(id); else if(a === "tal") G.learnTalent(id);
+  if(a === "equip") G.equipGear(id); else if(a === "uneq") G.unequipGear(id); else if(a === "use") G.useItem(id); else if(a === "tal"){ G.learnTalent(id); talTipId = null; }
   else if(a === "close"){ closePanel(); return; }
   else if(a === "coophost"){ CO.host(); return; } else if(a === "coopleave"){ CO.leave(); renderPanel(); return; }
   else if(a === "coopjoin"){ CO.join(($("coopcode") || {}).value); return; }
@@ -989,7 +1021,7 @@ $("pbody").addEventListener("click", e => { const el = e.target.closest("[data-a
   else if(a === "buyrespec"){ if(sureId === "buyrespec"){ sureId = null; Q.buyRespec(); } else { sureId = "buyrespec"; renderPanel(); } return; }
   else if(a === "destroy"){ if(sureId === id){ sureId = null; G.destroyGear(id); } else { sureId = id; renderPanel(); } return; }
   sureId = null; hideTip(); renderPanel(); });
-$("pbody").addEventListener("mousemove", e => { const ab = e.target.closest("[data-tipab]"); if(ab) return showTipAt(e, slotTip(ab.dataset.tipab)); const el = e.target.closest("[data-tip]"); if(!el) return hideTip(); const [kind, id] = el.dataset.tip.split(":");
+$("pbody").addEventListener("mousemove", e => { const ab = e.target.closest("[data-tipab]"); if(ab) return showTipAt(e, slotTip(ab.dataset.tipab)); const el = e.target.closest("[data-tip]"); if(!el){ if(!e.target.closest(".tcell")) hideTip(); return; } const [kind, id] = el.dataset.tip.split(":");
   const it = kind === "pick" ? (S.cur.pick && S.cur.pick.items[+id]) : kind === "eq" ? S.cur.eq[id] : kind === "shop" ? shopStock.find(x => x.id === id) : kind === "trade" ? CO.TR.theirs.gear.find(x => x.id === id) : S.cur.gear.find(x => x.id === id); if(it) showTipAt(e, gearTip(it)); });
 $("pbody").addEventListener("mouseleave", hideTip);
 
@@ -1670,11 +1702,11 @@ const AURA = {   // buff key → ability whose icon it uses
   // talents
   presence: "presence", arcanepower: "arcanepower", combust: "combustion", clearcast: "sparkrain", archmage: "presence", sweep: "sweeping", sudden: "execute", enrage: "heroic", flurry: "whirlwind",
   reckless: "recklessness", laststand: "laststand", shieldwall: "shieldwall", steadyaim: "aimed", rapidfire: "rapidfire", counter: "counter", innerfocus: "innerfocus", powerinf: "powerinf",
-  painsupp: "painsupp", guardian: "guardian", surge: "smite", borrowed: "pws", owlkin: "starfire", lunar: "starfire", solar: "wrath", berserk: "berserk", nswift: "nswift", vengeance: "palstrike",
+  painsupp: "painsupp", guardian: "guardian", celestial: "celestial", survival: "survival", shooting: "starfire", swarm: "swarm", surge: "smite", borrowed: "pws", owlkin: "starfire", lunar: "starfire", solar: "wrath", berserk: "berserk", nswift: "nswift", vengeance: "palstrike",
   artofwar: "palheal", surecrit: "crusader", bladeflurry: "bladeflurry", shadowdance: "shadowdance", efocus: "lightning", maelstrom: "lightning", emastery: "elemmastery", ancswift: "ancswift", manatide: "manatide"};
 const AURA_NAME = {hotstreak: "Hot Streak", nightfall: "Nightfall", backlash: "Backlash", clearcast: "Clearcasting", archmage: "Archmage", sudden: "Sudden Death", enrage: "Enrage", flurry: "Flurry",
   steadyaim: "Improved Steady Shot", counter: "Counterattack ready", surge: "Surge of Light", borrowed: "Borrowed Time", owlkin: "Owlkin Frenzy", lunar: "Lunar Eclipse", solar: "Solar Eclipse",
-  vengeance: "Vengeance", artofwar: "The Art of War", surecrit: "Guaranteed critical strike", efocus: "Elemental Focus", maelstrom: "Maelstrom Weapon"};
+  vengeance: "Vengeance", artofwar: "The Art of War", shooting: "Shooting Stars", surecrit: "Guaranteed critical strike", efocus: "Elemental Focus", maelstrom: "Maelstrom Weapon"};
 const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir of Ironskin", "#a8b0bc"], keen: ["Elixir of Keenness", "#ff9a4a"], sage: ["Elixir of Wisdom", "#9fd6e8"]};
 // what an aura does (tooltip): a talent proc uses its talent's text, anything else the ability's
 const procTalent = nm => { for(const c in TALENTS) for(const t of TALENTS[c]) if(t.name === nm) return t; return null; };
@@ -1730,7 +1762,12 @@ addEventListener("mouseover", e => { const s = e.target.closest && e.target.clos
 // right-click a totem under your portrait to cancel it
 $("pbuffs").addEventListener("contextmenu", e => { e.preventDefault(); const a = e.target.closest("[data-cancel]"); if(!a) return; const [k, id] = a.dataset.cancel.split(":"); if(k === "totem") G.cancelTotem(id); });
 const BUFF_NAMES = {shout: "War Cry", bark: "Barkskin", avenging: "Righteous Wrath", bubble: "Divine Shield", dash: "Dash"};
+// cooldowns on the bars: minutes while more than one is left, then seconds
+const cdTxt = s => s > 60 ? Math.ceil(s / 60) + "m" : Math.ceil(s);
 function updHUD(dt){
+  { const pn = $("panel"), rb = $("rbars"), was = document.body.classList.contains("panelopen");   // the right bars move left of an open window that would cover them
+    let cover = false; if(!pn.hidden && (!$("bar3").hidden || !$("bar4").hidden)){ const pr = pn.getBoundingClientRect(), h = rb.offsetHeight; cover = pr.bottom > innerHeight - 64 - h; }
+    if(was !== cover) document.body.classList.toggle("panelopen", cover); }
   for(const f of floats){ f.t += dt; const s = toScreen(f.x, f.y + f.t * 1.2, f.z); f.el.style.left = s.x + "px"; f.el.style.top = s.y + "px"; f.el.style.opacity = Math.min(1, 2.2 - f.t * 2); if(f.t > 1.1) f.el.remove(); }
   for(let i = floats.length - 1; i >= 0; i--) if(floats[i].t > 1.1) floats.splice(i, 1);
   if(bannerT > 0){ bannerT -= dt; if(bannerT <= 0) $("banner").style.opacity = 0; }
@@ -1783,17 +1820,17 @@ function updHUD(dt){
   const procIds = procAbilities();
   for(const s of slots){ const x = s.x; if(!x) continue; s.el.classList.toggle("proc", procIds.has(x));
     if(SPECIALS[x]){
-      if(x === "pothp" || x === "potmana"){ const n = potN(x === "pothp" ? ["potHp", "potHp2", "potHp3"] : ["potMana", "potMana2"]); s.n.textContent = n; s.el.classList.toggle("nores", !n); s.cd.textContent = P.potCd > 0 ? Math.ceil(P.potCd) : ""; }
+      if(x === "pothp" || x === "potmana"){ const n = potN(x === "pothp" ? ["potHp", "potHp2", "potHp3"] : ["potMana", "potMana2"]); s.n.textContent = n; s.el.classList.toggle("nores", !n); s.cd.textContent = P.potCd > 0 ? cdTxt(P.potCd) : ""; }
       s.el.classList.toggle("on", (x === "attack" && !!P.auto) || (x === "rest" && !!P.sitting) || (x === "mount" && (!!P.mount || P.casting?.kind === "mount"))); continue; }
     const a = AB[x], own = P.cds[x] || 0, gcd = a.offGcd ? 0 : P.gcd;
-    s.cd.textContent = own > 0 ? Math.ceil(own) : gcd > 0 ? " " : "";
+    s.cd.textContent = own > 0 ? cdTxt(own) : gcd > 0 ? " " : "";
     const type = a.res || G.resType(); s.el.classList.toggle("nores", !a.form && P[type] < G.costOf(x));
     { const dd = t && !t.dead ? (distU(P, t) - t.r) * PXU : 0; s.el.classList.toggle("oor", !!(a.tgt === "enemy" && t && !t.dead && (dd > a.range || (a.minRange && dd < a.minRange)))); }   // red: too far, or too close for a bow
     s.el.classList.toggle("on", !!(a.form && P.form === x) || P.casting?.id === x); }
   // names and quest marks over the people
   for(const n of npcs){ const p = npcPlate(n), s = distU(P, n) < (P.ghost ? GHOST_SIGHT : 30) ? toScreen(n.x, height(n.x, n.z) + n.mesh.userData.height + 0.3, n.z) : {on: false};
     if(!s.on){ p.style.display = "none"; continue; } p.style.display = ""; p.style.left = s.x + "px"; p.style.top = s.y + "px";
-    const mk = Q.npcMarker(n.id); p.firstChild.textContent = mk === "…" ? "?" : mk || ""; p.firstChild.className = "mk" + (mk === "…" ? " gray" : ""); }
+    const mk = Q.npcMarker(n.id); p.firstChild.textContent = mk === "…" ? "?" : mk === "low" ? "!" : mk || ""; p.firstChild.className = "mk" + (mk === "…" || mk === "low" ? " gray" : ""); }
   // names over sign posts (Rimhaven's districts and the places quests send you to)
   for(const sg of SIGNS){ let p = signPlates.get(sg); const near = distU(P, sg) < 24 && !inCrypt();
     if(!p){ if(!near) continue; p = document.createElement("div"); p.className = "plate sign"; p.innerHTML = `<span>${sg.name}</span>`; hud.appendChild(p); signPlates.set(sg, p); }
@@ -1845,7 +1882,7 @@ function drawMinimap(){
   for(const r of CO.visible()) dot(r.x, r.z, 3, "#7fc4ff");
   mm.font = "800 14px 'Alegreya Sans', sans-serif"; mm.textAlign = "center";
   for(const n of npcs){ const mk = Q.npcMarker(n.id), [px, py] = to(n.x, n.z); if(Math.hypot(px - c, py - c) > c - 6 || !seen(n.x, n.z)) continue;
-    if(mk && mk !== "…"){ mm.fillStyle = "#000"; mm.fillText(mk, px + 1, py + 6); mm.fillStyle = "#ffd84a"; mm.fillText(mk, px, py + 5); } else dot(n.x, n.z, 2, "#e8e0a0"); }
+    if(mk && mk !== "…"){ const s = mk === "low" ? "!" : mk; mm.fillStyle = "#000"; mm.fillText(s, px + 1, py + 6); mm.fillStyle = mk === "low" ? "#9aa0a6" : "#ffd84a"; mm.fillText(s, px, py + 5); } else dot(n.x, n.z, 2, "#e8e0a0"); }
   // N, E, S and W round the edge, turning with the camera (north is up on the world map)
   mm.font = "800 12px 'Alegreya Sans', sans-serif"; mm.textBaseline = "middle"; mm.lineWidth = 3; mm.strokeStyle = "rgba(0,0,0,.85)";
   for(const [t, x, z] of [["N", 0, -1], ["E", 1, 0], ["S", 0, 1], ["W", -1, 0]]){ const r = c - 9, px = c + r * (x * cy - z * sy), py = c + r * (x * sy + z * cy);
@@ -1925,7 +1962,7 @@ function drawBigMap(){
     for(const f of flightMasters){ const [px, py] = to(f.x, f.z), on = kf.has(f.hub); g.lineWidth = 2; g.strokeStyle = "#000"; g.fillStyle = on ? "#7fe0c8" : "#5a6a66";
       g.beginPath(); g.moveTo(px, py - 6); g.lineTo(px + 7, py + 3); g.lineTo(px, py); g.lineTo(px - 7, py + 3); g.closePath(); g.stroke(); g.fill(); } }
   if(!dg && !P.ghost){ g.font = "800 18px 'Alegreya Sans', sans-serif";
-    for(const n of npcs){ const mk = Q.npcMarker(n.id), [px, py] = to(n.x, n.z); if(mk && mk !== "…"){ g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText(mk, px, py + 6); g.fillStyle = "#ffd84a"; g.fillText(mk, px, py + 6); } } }
+    for(const n of npcs){ const mk = Q.npcMarker(n.id), [px, py] = to(n.x, n.z); if(mk && mk !== "…"){ const s = mk === "low" ? "!" : mk; g.lineWidth = 3; g.strokeStyle = "#000"; g.strokeText(s, px, py + 6); g.fillStyle = mk === "low" ? "#9aa0a6" : "#ffd84a"; g.fillText(s, px, py + 6); } } }
   for(const r of CO.visible()) dot(r.x, r.z, 4.5, "#7fc4ff", "#000");
   if(P.ghost && !dg){ for(const gy of graveyards) dot(gy.x, gy.z, 4, "#9fd6ff", "#000"); }
   const cm2 = P.ghost ? corpseMark2() : null;

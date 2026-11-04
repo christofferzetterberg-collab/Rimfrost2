@@ -288,7 +288,7 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] 81. Drake wings flap while flying and moving
 - [x] 82. The world map can be dragged when zoomed in
 - [x] 83. Elite, rare and boss portraits have their own frames
-- [ ] 84. Boar snouts look odd when they walk
+- [x] 84. Boar snouts look odd when they walk
 - [x] 85. Arriving by ship: something blocks the way from the pier into town
 
 ### To fix – list 10
@@ -326,11 +326,14 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [ ] Phase 5: the raid
 
 ### Next
-- [ ] Sound effects (CC0 sounds from Rimfrost 1)
+- [ ] Sound effects: a new sound set made for Rimfrost 2 (no Rimfrost 1 sounds; details to come)
 - [x] Dungeon group scaling: tougher dungeon monsters, +70% health and +10% damage per extra player, one gear drop per elite/boss with Need / Greed / Pass rolls
-- [ ] Rimfrost 1's dungeon puzzles (levers, runes and gates)
-- [ ] A raid for level 30 only (3–5 players): a new, bigger dungeon with bosses that have mechanics, and better rewards
+- [ ] Dungeon puzzles (levers, runes, gates and the like; new designs, not copies of Rimfrost 1)
 - [ ] The smith's weapon upgrades and other crafting (on hold)
+- [ ] Enhanced talent trees: more choices per tier, ability-changing talents, a capstone at 25 points, and a new talent window
+    - [x] New talent window and Druid (pilot)
+    - [ ] Mage, Warrior, Hunter, Priest, Paladin, Warlock, Rogue, Shaman
+    - Talent texts: tooltip style only, no design terms (e.g. never "capstone")
 
 ### Art
 - [ ] Replace the shape-built characters and monsters with free CC0 low-poly models with animations: KayKit Adventurers and KayKit Character Animations (CC0, Kay Lousberg)

@@ -23,7 +23,7 @@ const KINDS = {
   petWolf:  {file: "wolf2", len: 2.2, col: {Main: 0x7a6650, Main_Light: 0xb8a68a}},
   wolfForm: {file: "wolf2", len: 2.5, col: {Main: 0x4c5662, Main_Light: 0x8e99a4}, race: {elf: {Main: 0xc9cfd8, Main_Light: 0xf2f4f7}}},
   bearForm: {file: "bear", len: 2.7, run: true}, petBear: {file: "bear", len: 2.4, run: true},
-  leopard:  {file: "cat", len: 2.6, col: {Grey: 0xc99a3c, White: 0xefe0b8, Pink: 0x4a3226}, race: {elf: {Grey: 0xdedad0, White: 0xf6f3ec, Pink: 0x5a5660}}},
+  leopard:  {file: "stag", len: 2.8},                                   // Travel Form: a stag
 };
 const matCache = new Map();
 const matFor = (base, hex, flat) => { if(hex == null) return base; const k = base.uuid + hex + (flat ? "f" : ""); if(!matCache.has(k)){ const m = base.clone(); m.color.setHex(hex); if(flat){ m.map = null; m.needsUpdate = true; } matCache.set(k, m); } return matCache.get(k); };

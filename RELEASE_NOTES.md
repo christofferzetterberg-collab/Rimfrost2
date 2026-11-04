@@ -1,5 +1,77 @@
 # Rimfrost 2 – Release notes
 
+## v0.51.1
+
+### Fixed
+- Right bars 1 and 2 now move beside an open window (bag, character, spellbook and others), so you can drag abilities onto them.
+
+## v0.51.0
+
+### New
+- **Verdant Surge (Druid, level 12):** Heals the target instantly and again over 9 sec. Learn it from your trainer.
+
+### Changed
+- **Lifebloom (Druid):** Now a heal over time that blooms for an extra heal when it ends. No cooldown.
+- **Improved Lifebloom:** Now increases the final bloom of Lifebloom by 25% per rank.
+- **Ability icons:** Abilities of the same class that shared an icon now have their own (all classes).
+
+## v0.50.1
+
+### Changed
+- **Cooldowns on the action bars:** Cooldowns longer than 1 minute now show in minutes (e.g. "3m") and switch to seconds for the last minute.
+
+## v0.50.0
+
+### New
+- **Dev tools – Healing test:** Simulates each healer keeping a Protection warrior alive against a dungeon boss for 3 minutes, at the chosen level and gear. Shows how much each heal restores, whether the tank survives, when the healer runs out of mana and how much healing is wasted.
+
+### Changed
+- **Healing rebalanced (all healers):** Direct heals, heals over time and shields restore about 30% less. For example, Nature's Touch and Healing Light now heal 24% of the target's maximum health before bonuses (was 35%).
+- **Tranquility (Druid):** Now a channeled spell that heals you and group members within 10 m, including companions, for 6% of their maximum health every second for 8 sec.
+- **Intensity (Druid):** Now increases mana regeneration in combat by up to 100% (was 150%).
+- **Wild Growth:** Now benefits from your healing bonuses on group members as well.
+
+## v0.49.0
+
+### Changed
+- **Talent window redesign:**
+  - Talents are shown as icons with their rank, arranged in tiers.
+  - The points a tier needs are shown next to it, and locked tiers are dimmed.
+  - Arrows show which talent unlocks another, and a red line under a talent names the talent it needs.
+  - Hover over a talent to see its current and next rank.
+- **Druid talents:** Most talents that grow with each point now have 5 ranks. Druids get their talent points back.
+
+### Fixed
+- Talent tooltips now appear on hover instead of only after clicking.
+
+## v0.48.3
+
+### Changed
+- **Talent window:** Cleaner tier headers.
+
+## v0.48.2
+
+### Changed
+- **Quest markers:** A quest giver whose quests are 6 or more levels below you now shows a gray "!" over their head and on the maps.
+
+## v0.48.1
+
+### Changed
+- **Travel Form:** Druids now take the shape of a stag.
+
+## v0.48.0
+
+### New
+- **New talent window:** Each tier is a row of up to three talents. Arrows show which talents need another first. Locked tiers are marked. Hover over a talent to see its current and next rank.
+- **Druid talent trees reworked:** Each tree now has more choices per tier, talents that change how core abilities work, and a final talent at 25 points:
+  - **Balance:** Lingering Moonlight, Brambles, Lunar Guidance, Gale Winds, Insect Swarm, Shooting Stars and Balance of Power. Final talent: **Celestial Alignment**.
+  - **Feral:** Sharpened Claws, Feral Swiftness, Brutal Impact, Shredding Attacks, Mangle, Savage Fury and Survival of the Fittest. Final talent: **Survival Instincts**.
+  - **Restoration:** Furor, Nurturing Touch, Tranquil Spirit, Empowered Lifebud, Swiftmend, Nature's Bounty and Gift of the Earthmother. Final talent: **Wild Growth**, which also heals friends and companions.
+- Druids get all their talent points back.
+
+### Changed
+- Group heals and buffs such as War Cry and Holy Wave now also reach companions.
+
 ## v0.47.0
 
 ### New

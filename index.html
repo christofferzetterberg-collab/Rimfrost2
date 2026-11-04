@@ -142,6 +142,20 @@
   .tal{text-align:left;font:13px 'Alegreya Sans';padding:6px 7px;border-radius:6px;border:1px solid var(--line);background:#0f151a;color:var(--mute);cursor:default}
   .tal .n{display:flex;justify-content:space-between;font-weight:800;color:var(--text)} .tal .d{font-size:11.5px;margin-top:2px;line-height:1.25}
   .tal.can{cursor:pointer;border-color:#7a9a4a} .tal.can:hover{background:#18221a} .tal.max{border-color:#ffd36b} .tal.max .r{color:#ffd36b}
+  .taltree{position:relative;background:radial-gradient(ellipse at 50% 0,#17222a,#0b1014 70%);border:1px solid var(--line);border-radius:8px;padding:12px 6px 4px}
+  .talarrows{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
+  .trow{display:flex;align-items:flex-start;gap:4px;margin-bottom:12px} .treq{width:30px;flex:none;font:800 12px 'Alegreya Sans';color:#7f8f97;text-align:center;padding-top:15px}
+  .trow.locked .treq{color:#c8706a}
+  .tcells{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;justify-items:center}
+  .tcell{position:relative;width:96px;text-align:center;cursor:default;padding:2px 0}
+  #pbody .tcell canvas{width:48px;height:48px;border-radius:9px;border:2px solid #3a464e;display:block;margin:0 auto;box-sizing:border-box}
+  .tcell.locked canvas{filter:grayscale(1) brightness(.55)} .tcell.locked .tn{color:#6d7a82}
+  .tcell.can{cursor:pointer} .tcell.can canvas{border-color:#7ad04a;box-shadow:0 0 9px rgba(122,208,74,.5)} .tcell.can:hover canvas{transform:scale(1.06)}
+  .tcell.some canvas{border-color:#9fbf5a} .tcell.max canvas{border-color:#ffd36b;box-shadow:0 0 10px rgba(255,211,107,.45)}
+  .tcell .rk{position:absolute;top:36px;left:50%;margin-left:12px;background:#0b0f12;border:1px solid #3a464e;border-radius:4px;font:800 11px 'Alegreya Sans';padding:0 4px;color:#b8c4ca}
+  .tcell.can .rk,.tcell.some .rk{color:#9cf07a;border-color:#5a8a3a} .tcell.max .rk{color:#ffd36b;border-color:#8a7030}
+  .tcell .tn{font:700 12px 'Alegreya Sans';color:var(--text);margin-top:5px;line-height:1.15} .tcell.abil .tn{color:#9fd6ff}
+  .tcell .tq{font:600 10.5px 'Alegreya Sans';color:#ff8a7a;line-height:1.1;margin-top:1px}
   .plate.npc{color:#7be08a} .plate.npc small{display:block;font-size:11px;color:#b8d8c0} .plate .mk{font:800 28px 'Alegreya Sans';color:#ffd84a;line-height:1;text-shadow:0 2px 4px #000} .plate .mk.gray{color:#a8b0b4}
   .qc{border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:6px;background:#0f151a} .qt{font-size:13.5px;line-height:1.4;margin:4px 0;color:#d8e2e6} .qo{font-size:12.5px;margin:4px 0 6px;color:#ffd36b}
   .sbtn.pri{background:#9fd6e8;color:#0b1013;border-color:#9fd6e8}
@@ -151,6 +165,7 @@
   #barwrap #cast{position:relative;bottom:auto;left:auto;transform:none;width:280px;height:18px;margin-bottom:6px}
   .abar{display:flex;gap:4px;pointer-events:auto;background:rgba(10,14,17,.55);padding:3px;border-radius:8px}
   .abar .slot{width:48px;height:48px}
+  body.panelopen #rbars{right:calc(min(500px,94vw) + 24px);bottom:150px}
   #rbars{position:absolute;right:8px;bottom:64px;display:flex;gap:4px;pointer-events:none;z-index:2} .vbar{flex-direction:column} .vbar .slot{width:38px;height:38px} .abar[hidden]{display:none} .slot.empty{background:rgba(20,28,34,.6);border-style:dashed;border-color:#34444e;cursor:default}
   .slot.drop{box-shadow:0 0 0 2px #9fd6e8 inset} .slot .n{position:absolute;right:3px;bottom:1px;z-index:2;font-size:12px;text-shadow:0 1px 2px #000}
   .book{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:5px}
@@ -193,7 +208,7 @@
   #loadtxt{font:15px 'Alegreya Sans',sans-serif;color:var(--mute)}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261117g", "./src/dungeon.js": "./src/dungeon.js?v=20261117g", "./src/dev.js": "./src/dev.js?v=20261117g", "./src/clock.js": "./src/clock.js?v=20261117g", "./src/coop.js": "./src/coop.js?v=20261117g", "./src/content.js": "./src/content.js?v=20261117g", "./src/engine.js": "./src/engine.js?v=20261117g", "./src/items.js": "./src/items.js?v=20261117g", "./src/keys.js": "./src/keys.js?v=20261117g", "./src/main.js": "./src/main.js?v=20261117g", "./src/models.js": "./src/models.js?v=20261117g", "./src/nav.js": "./src/nav.js?v=20261117g", "./src/quests.js": "./src/quests.js?v=20261117g", "./src/rimdata.js": "./src/rimdata.js?v=20261117g", "./src/state.js": "./src/state.js?v=20261117g", "./src/util.js": "./src/util.js?v=20261117g", "./src/world.js": "./src/world.js?v=20261117g", "./src/worlddata.js": "./src/worlddata.js?v=20261117g", "./src/mobs.js": "./src/mobs.js?v=20261117g", "./src/dgmech.js": "./src/dgmech.js?v=20261117g", "./src/avatar.js": "./src/avatar.js?v=20261117g", "./src/glb.js": "./src/glb.js?v=20261117g", "./src/beasts.js": "./src/beasts.js?v=20261117g", "./src/nature.js": "./src/nature.js?v=20261117g", "./src/buildings.js": "./src/buildings.js?v=20261117g", "./src/dgkit.js": "./src/dgkit.js?v=20261117g", "./src/account.js": "./src/account.js?v=20261117g" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261117r", "./src/dungeon.js": "./src/dungeon.js?v=20261117r", "./src/dev.js": "./src/dev.js?v=20261117r", "./src/clock.js": "./src/clock.js?v=20261117r", "./src/coop.js": "./src/coop.js?v=20261117r", "./src/content.js": "./src/content.js?v=20261117r", "./src/engine.js": "./src/engine.js?v=20261117r", "./src/items.js": "./src/items.js?v=20261117r", "./src/keys.js": "./src/keys.js?v=20261117r", "./src/main.js": "./src/main.js?v=20261117r", "./src/models.js": "./src/models.js?v=20261117r", "./src/nav.js": "./src/nav.js?v=20261117r", "./src/quests.js": "./src/quests.js?v=20261117r", "./src/rimdata.js": "./src/rimdata.js?v=20261117r", "./src/state.js": "./src/state.js?v=20261117r", "./src/util.js": "./src/util.js?v=20261117r", "./src/world.js": "./src/world.js?v=20261117r", "./src/worlddata.js": "./src/worlddata.js?v=20261117r", "./src/mobs.js": "./src/mobs.js?v=20261117r", "./src/dgmech.js": "./src/dgmech.js?v=20261117r", "./src/avatar.js": "./src/avatar.js?v=20261117r", "./src/glb.js": "./src/glb.js?v=20261117r", "./src/beasts.js": "./src/beasts.js?v=20261117r", "./src/nature.js": "./src/nature.js?v=20261117r", "./src/buildings.js": "./src/buildings.js?v=20261117r", "./src/dgkit.js": "./src/dgkit.js?v=20261117r", "./src/account.js": "./src/account.js?v=20261117r" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -241,6 +256,6 @@
 <div id="petcast" hidden><i></i></div>
 <div id="rezask" hidden><span></span><button id="rezyes">Accept</button><button id="rezno" class="no">Decline</button></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261117g"></script>
+<script type="module" src="./src/main.js?v=20261117r"></script>
 </body>
 </html>

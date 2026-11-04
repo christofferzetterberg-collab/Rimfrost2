@@ -17,7 +17,7 @@ let H = {}, el = null, keys = false;
 const devOk = (email, name) => LOCAL || [email, name].some(v => v && DEV_ACCOUNTS.includes(String(v).trim().toLowerCase()));
 // called after logging in: turns the dev tools on for a dev account that opened the game with ?dev
 export function devUnlock(email, name){ if(!WANT) return; if(!devOk(email, name)){ console.info("Dev tools are not available on this account."); return; }
-  DEV.on = true; if(!el) build(); window.__devBT = {BT, run: () => runBalance()};
+  DEV.on = true; if(!el) build(); window.__devBT = {BT, run: () => runBalance(), heal: () => runHealTest()};
   if(!keys){ keys = true; addEventListener("keydown", e => { if(e.code === "F8" && DEV.on){ e.preventDefault(); toggle(); } }); } }
 export function devLock(){ DEV.on = false; DEV.god = false; if(el) el.hidden = true; delete window.__devBT; }
 export function initDev(hooks){ H = hooks; if(LOCAL) devUnlock(); }
@@ -61,7 +61,11 @@ function render(){
       Talents <select data-set="spec"><option value="0" ${BT.spec === "0" ? "selected" : ""}>none</option>${[1, 2, 3].map(i => `<option value="${i}" ${BT.spec === String(i) ? "selected" : ""}>tree ${i}</option>`).join("")}</select>
       Runs <select data-set="trials">${[1, 3, 5].map(n => `<option ${String(n) === BT.trials ? "selected" : ""}>${n}</option>`).join("")}</select></div>
     <div class="r"><button data-dev="bt" ${BT.busy || CO.on() ? "disabled" : ""}>${BT.busy ? "Running… " + esc(BT.prog) : "Run balance test"}</button>${BT.res ? `<button data-dev="btcopy">Copy results</button>` : ""}${CO.on() ? `<span class="m">(not in co-op)</span>` : ""}</div>
-    ${BT.res ? resultsHTML(BT.res) : ""}`;
+    ${BT.res ? resultsHTML(BT.res) : ""}
+    <h3>Healing test</h3>
+    <div class="m">Each healer (talents in its healing tree) keeps a Protection warrior alive against a dungeon boss for 3 min. Uses the level and gear above.</div>
+    <div class="r"><button data-dev="ht" ${BT.busy || CO.on() ? "disabled" : ""}>${BT.busy ? "Running… " + esc(BT.prog) : "Run healing test"}</button></div>
+    ${BT.heal ? healHTML(BT.heal) : ""}`;
 }
 // the host's dev tools on friends in co-op: run on the friend's own computer (they need no ?dev)
 const COOP_ACTS = {setlvl: "set level", gold: "+1000 gold", heal: "full health & mana", learn: "learn all abilities", gear: "a full set of gear", riding: "riding + all mounts", quests: "finish active quests",
@@ -107,6 +111,7 @@ function act(a, v){
   else if(a === "tp"){ const [k, id] = document.getElementById("devtp").value.split(":"); if(k === "hub"){ const s = H.hubSpot(HUBS[id]); H.teleport(s.x, s.z); } else { const d = DG_DOORS[id]; H.teleport(d.x + 3, d.z + 3); } }
   else if(a === "hour") setHour(+v);
   else if(a === "bt"){ runBalance(); return; }
+  else if(a === "ht"){ runHealTest(); return; }
   else if(a === "btcopy"){ copyResults(); return; }
   H.save(); H.refresh(); render();
 }
@@ -204,6 +209,71 @@ async function runBalance(){
   DEV.sim = false; BT.busy = false; BT.res = {lvl, q, spec, trials, rows: out}; P.x = home.x; P.z = home.z;   // (so you come back where you were)
   H.restore(orig); P.god = DEV.god; P.devSpeed = DEV.speed; render();
 }
+// ---------------------------------------------------------------- healing test: each healer keeps a tank alive against a dungeon boss (worked out, not played)
+const HEALERS = [["priest", "Priest (Holy)", 2], ["druid", "Druid (Restoration)", 3], ["paladin", "Paladin (Holy)", 1], ["shaman", "Shaman (Restoration)", 3]];
+function simChar(cls, lvl, q, spec, seed){
+  const c = {id: "__sim", name: "Test", race: "human", cls, level: lvl, xp: 0, gold: 0, learned: G.allBarIdsFor(cls).filter(id => AB[id].lvl <= lvl && !AB[id].talent), bag: {}, gear: [], eq: {}, world: 2, talents: {}, talVer: TALENT_VERSION, quests: {}, qbag: {}};
+  equipSet(c, q, lvl, seed);
+  if(spec && lvl >= 10){ const tree = TREES[cls][spec - 1].id; let pts = lvl - 9; const list = TALENTS[cls].filter(t => t.tree === tree).sort((a, b) => a.tier - b.tier);
+    for(let pass = 0; pass < 4 && pts > 0; pass++) for(const t of list){ while(pts > 0 && (c.talents[t.id] || 0) < t.max){ S.cur = c; if(!G.canLearnTalent(t)) break; c.talents[t.id] = (c.talents[t.id] || 0) + 1; pts--; } } }
+  for(const t of TALENTS[cls]) if(c.talents[t.id] && t.grants && !c.learned.includes(t.grants)) c.learned.push(t.grants);
+  S.cur = c; const A = H.arena(); G.resetPlayer(A.x, A.z); G.petStash(); return c; }
+// one heal: how much of the target's health it restores (heals scale with the target's health), what it costs and how long it takes
+function healInfo(id){ const a = AB[id], cap = {scale: 1, fx: []}; CO.setCap(cap);
+  try{ if(a.channel && a.tick){ for(let i = 0; i < a.channel; i++) a.tick(null); } else a.run(P.target || P); }catch(e){} finally{ CO.setCap(null); }
+  let now = 0, hot = 0, dur = 0, shield = 0;
+  for(const f of cap.fx){ if(f[0] === "heal") now += f[1]; else if(f[0] === "healPct") now += f[1] * P.maxHp; else if(f[0] === "shield") shield += f[1];
+    else if(f[0] === "hot"){ hot += f[2]; dur = f[3]; } else if(f[0] === "hotPct"){ hot += f[2] * P.maxHp; dur = f[3]; } }
+  const k = G.healMult() / P.maxHp;
+  return {id, name: a.name, now: now * k, hot: hot * k, dur, shield: shield * k, cost: G.costOf(id), cast: a.channel || G.castTime(id), cd: G.cdOf(id), channel: !!a.channel}; }
+function healFight(heals, tank, boss, mana0, regen){
+  let t = 0, hp = 1, mana = mana0, gcd = 0, cast = null, swing = 1, healed = 0, over = 0, oom = null, died = null, lowest = 1; const cds = {}, hots = [], DT = 0.1, END = 180; let shield = 0;
+  const cheapest = Math.min(...heals.map(h => h.cost));
+  while(t < END){ t += DT;
+    if((swing -= DT) <= 0){ swing = 2; if(Math.random() >= tank.avoid){ let d = boss * (0.9 + Math.random() * 0.2) * tank.taken / tank.hp; const ab = Math.min(shield, d); shield -= ab; hp -= d - ab; } }
+    for(const h of hots){ h.left -= DT; const g = h.per * DT; healed += g; const add = Math.min(g, 1 - hp); over += g - add; hp += add; }
+    for(let i = hots.length - 1; i >= 0; i--) if(hots[i].left <= 0) hots.splice(i, 1);
+    lowest = Math.min(lowest, hp); if(hp <= 0){ died = t; break; }
+    mana = Math.min(mana0, mana + regen * DT); for(const k in cds) cds[k] -= DT; gcd -= DT;
+    if(cast){ if((cast.left -= DT) <= 0){ const h = cast.h; cast = null; const g = h.now; healed += g; const add = Math.min(g, 1 - hp); over += g - add; hp += add; if(h.shield) shield = Math.max(shield, h.shield); if(h.hot) hots.push({id: h.id, per: h.hot / h.dur, left: h.dur}); } continue; }
+    if(gcd > 0) continue;
+    const miss = 1 - hp, ok = h => mana >= h.cost && !(cds[h.id] > 0);
+    // like a healer: keep heals over time up while the tank is hurt, a shield when it is ready, then a heal that fits what is missing (cheapest per health first)
+    let pick = null;
+    if(miss > 0.1) pick = heals.find(h => h.hot && !h.now && ok(h) && !hots.some(o => o.id === h.id));
+    if(!pick && miss > 0.15) pick = heals.find(h => h.shield && ok(h) && shield <= 0);
+    if(!pick && miss > 0.2){ const fit = heals.filter(h => (h.now || h.hot) && ok(h) && (h.now + h.hot) <= miss * 1.15).sort((a, b) => b.now / Math.max(0.5, b.cast) - a.now / Math.max(0.5, a.cast));
+      pick = fit[0] || heals.filter(h => h.now && ok(h)).sort((a, b) => b.now - a.now)[0]; }
+    if(!pick) continue;
+    mana -= pick.cost; if(pick.cd) cds[pick.id] = pick.cd; gcd = 1.5; cast = {h: pick, left: Math.max(pick.cast, 0.01)};
+    if(oom == null && mana < cheapest) oom = t; }
+  return {died, oom, hps: healed / t, over: healed ? over / healed : 0, lowest, t}; }
+async function runHealTest(){
+  if(BT.busy || CO.on()) return; const orig = S.cur; if(!orig) return; H.save(); const home = {x: P.x, z: P.z};
+  BT.busy = true; BT.heal = null; DEV.sim = true; render();
+  const lvl = +BT.lvl, q = +BT.q, rows = [];
+  try{
+    // the tank: a Protection warrior of the same level and gear
+    simChar("warrior", lvl, q, 3, 7); const av = G.avoidChances(), tank = {hp: P.maxHp, taken: G.takenMult(), avoid: Math.min(0.6, 0.05 + av.dodge + av.parry)};
+    // the boss: a dungeon boss of that level, made for a group of three
+    const A = H.arena(), m = H.makeMob("djuptjur", {x: A.mx, z: A.mz}, lvl), boss = m.dmg * (1 + 0.15 * 2); H.removeMob(m);
+    for(const [cls, name, spec] of HEALERS){ simChar(cls, lvl, q, spec, 11);
+      const ids = S.cur.learned.filter(id => (HEAL_AB.has(id) || id === "tranquility") && AB[id]), heals = ids.map(healInfo).filter(h => h.now || h.hot || h.shield);
+      const t7 = S.cur.talents, regen = P.maxMana * 0.005 * (1 + 0.5 * (t7.m_medit || 0) + 0.2 * (t7.d_intensity || 0)) / 3;
+      const runs = []; for(let i = 0; i < 5; i++) runs.push(healFight(heals, tank, boss, P.maxMana, regen));
+      const avg = f => runs.reduce((a, r) => a + f(r), 0) / runs.length;
+      rows.push({name, heals, alive: runs.filter(r => r.died == null).length, n: runs.length, died: avg(r => r.died || 180), oom: runs.filter(r => r.oom != null).length ? avg(r => r.oom == null ? 180 : r.oom) : null, hps: avg(r => r.hps), over: avg(r => r.over), lowest: avg(r => Math.max(0, r.lowest)), mana: P.maxMana});
+      BT.prog = rows.length + "/" + HEALERS.length; render(); await new Promise(r => setTimeout(r, 0)); }
+    BT.heal = {lvl, q, tank, boss, dtps: boss * tank.taken * (1 - tank.avoid) / 2 / tank.hp, rows};
+  } catch(e){ console.error(e); H.log("Healing test failed: " + e.message, "#ff6b5e"); }
+  DEV.sim = false; BT.busy = false; P.x = home.x; P.z = home.z; H.restore(orig); P.god = DEV.god; P.devSpeed = DEV.speed; render(); }
+const pc = v => Math.round(v * 100) + "%";
+function healHTML(R){
+  return `<div class="m" style="margin-top:6px">Level ${R.lvl} · ${QUAL[R.q].name} gear. Tank: Protection warrior, ${Math.round(R.tank.hp)} health, ${pc(R.tank.avoid)} avoidance. Boss (group of 3): ${Math.round(R.boss)} per hit every 2 sec = <b>${(R.dtps * 100).toFixed(1)}% of the tank's health per sec</b> on average. Heals are shown as a share of the target's health. 5 runs of 3 min each.</div>
+    <table><tr><th>Healer</th><th>Result</th><th>Heals (share of target health · cast · mana)</th></tr>
+    ${R.rows.map(r => `<tr><td><b>${esc(r.name)}</b><br><span class="m">${r.mana} mana</span></td>
+      <td class="${r.alive === r.n ? "w" : r.alive ? "d" : "l"}">Tank alive ${r.alive}/${r.n}${r.alive < r.n ? ` (dies after ${Math.round(r.died)}s)` : ""}<br>${r.oom == null ? "never out of mana" : `out of mana after ${Math.round(r.oom)}s`}<br>${(r.hps * 100).toFixed(1)}% of tank health/sec · overheal ${pc(r.over)} · lowest ${pc(r.lowest)}</td>
+      <td>${r.heals.map(h => `${esc(h.name)}: ${h.now ? pc(h.now) : ""}${h.hot ? `${h.now ? " + " : ""}${pc(h.hot)} over ${h.dur}s` : ""}${h.shield ? `${pc(h.shield)} shield` : ""} · ${h.channel ? `channel ${h.cast}s` : h.cast ? h.cast.toFixed(1) + "s" : "instant"} · ${h.cost}${h.cd ? ` · ${h.cd}s cd` : ""}`).join("<br>")}</td></tr>`).join("")}</table>`; }
 const manaTxt = c => c.mana == null ? "" : ` · ${Math.round(c.mana * 100)}% mana${c.dry > 0.05 ? ` (out of mana ${Math.round(c.dry * 100)}% of the fight)` : ""}`;
 const cellTxt = c => `${c.wins}/${c.n} won${c.to ? ` (${c.to} too slow)` : ""} · ${Math.round(c.t)}s · ${Math.round(c.hp * 100)}% hp · ${Math.round(c.dps)} dps${manaTxt(c)}`;
 function resultsHTML(R){

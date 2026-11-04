@@ -31,11 +31,13 @@ export function questGearQ(q){ if(q.n || q.pick) return -1; const num = +q.id.re
 export const objName = o => o[0] === "skill" ? PROF[o[1]] + " skill" : o[0] === "explore" ? "Find " + EXPLORE[o[1]].name : o[0] === "kill" ? H.mobName(o[1]) : QITEMS[o[1]].name;
 export const activeQuests = () => QUESTS.filter(qActive);
 
-// what floats over a person's head: "!" a quest to give, "?" a quest to hand in, "…" a quest in progress, "soon" (gray !) one for later
+// what floats over a person's head: "!" a quest to give, "?" a quest to hand in, "…" a quest in progress, "low" (gray !) only quests far below your level
+export const qLow = q => C().level - q.lvl >= 6;
 export function npcMarker(npcId){
   if(QUESTS.some(q => qTurnInNpc(q) === npcId && qReady(q))) return "?";
-  if(QUESTS.some(q => q.npc === npcId && qAvailable(q))) return "!";
+  if(QUESTS.some(q => q.npc === npcId && qAvailable(q) && !qLow(q))) return "!";
   if(QUESTS.some(q => qTurnInNpc(q) === npcId && qActive(q))) return "…";
+  if(QUESTS.some(q => q.npc === npcId && qAvailable(q))) return "low";
   return null;
 }
 
