@@ -227,7 +227,7 @@ export function resetPlayer(x, z){
 export const aggroRange = m => clamp(9 + (m.lvl - C().level) * 1.2, 5, 13);
 export function aggro(m){ if(m.state !== "chase"){ m.state = "chase"; m.path = null; } m.lastHit = H.now(); }
 export function engage(m){ if(CO.guestMob(m)){ P.combatT = 6; return; } if(m && !m.dead && m.state === "idle"){ aggro(m); social(m); } if(CO.isMe()) P.combatT = 6; }
-export function social(m){ if(m.K && (m.K.passive || m.boss) || m.neutral) return; for(const o of mobs) if(o !== m && !(o.K && o.K.passive) && !o.neutral && !o.dead && o.state === "idle" && (o.kind === m.kind || (m.dg && o.dg && !o.boss)) && distU(o, m) < 7) aggro(o); }   // (in dungeons a whole pack joins in, whatever its kinds)
+export function social(m){ if(m.K && (m.K.passive || m.boss) || m.neutral) return; for(const o of mobs) if(o !== m && !(o.K && o.K.passive) && !o.neutral && !o.dead && o.state === "idle" && (o.kind === m.kind || (m.dg && o.dg && !o.boss)) && distU(o, m) < 7){ aggro(o); if(m.threat) o.threat = Object.fromEntries(Object.keys(m.threat).map(k => [k, 1])); if(m.botTh) o.botTh = Object.fromEntries(Object.keys(m.botTh).map(k => [k, 1])); } }   // (in dungeons a whole pack joins in, whatever its kinds)
 const lvlPenalty = m => { const d = m.lvl - C().level; return d > 0 ? Math.max(0.5, 1 - 0.06 * d) : 1; };
 // tank abilities that draw extra attention (threat × this)
 const THREAT_AB = {maul: 2, swipe: 1.5, heroic: 1.8, shieldbash: 2, quake: 1.5, holyshield: 2, consecrate: 1.5, avengershield: 2, hammer: 1.5};
@@ -342,10 +342,10 @@ export function polymorph(m, dur){ if(!m || m.dead || m.boss) return; if(CO.gues
 export function aoe(x, y, r, fn){ const cx = x / PXU, cz = y / PXU, rr = r / PXU, cy = height(cx, cz) + 1.2;
   mobs.filter(m => !m.dead && m.state !== "return" && Math.hypot(m.x - cx, m.z - cz) < rr + m.r && los(cx, cy, cz, m.x, height(m.x, m.z) + 1, m.z)).forEach(fn); }
 export function buff(name, dur){ if(CO.cap()) return CO.cap().fx.push(["buff", name, dur]); P.buffs[name] = dur; }
-export function shieldP(amt, dur){ if(HEALING) amt *= healMult(); if(CO.cap()) return CO.cap().fx.push(["shield", Math.round(amt * CO.cap().scale), dur]); P.shield = Math.max(P.shield || 0, amt); P.shieldT = dur; }
-export function healP(n){ if(HEALING) n *= healMult(); if(CO.cap()) return CO.cap().fx.push(["heal", Math.round(n * CO.cap().scale)]); n = Math.round(n); const before = P.hp; P.hp = Math.min(P.maxHp, P.hp + n); const got = Math.round(P.hp - before); if(got > 0) H.floatText(P, "+" + got, "#7be08a"); }
-export function hot(key, total, dur){ if(HEALING) total *= healMult(); if(CO.cap()) return CO.cap().fx.push(["hot", key, total * CO.cap().scale, dur]); P.hots = P.hots.filter(h => h.key !== key); P.hots.push({key, per: total / dur, left: dur, tick: 1}); }
-// combo points belong to one target and only last while you are in combat (each enemy keeps its own)
+export function shieldP(amt, dur){ if(HEALING) amt *= healMult(); if(CO.cap()) return CO.cap().fx.push(["shield", Math.round(amt * CO.cap().scale), dur]); P.shield = Math.max(P.shield || 0, amt); P.shieldT = dur; if(HEALING) CO.healThreat(amt, CO.myId()); }
+export function healP(n){ if(HEALING) n *= healMult(); if(CO.cap()) return CO.cap().fx.push(["heal", Math.round(n * CO.cap().scale)]); n = Math.round(n); const before = P.hp; P.hp = Math.min(P.maxHp, P.hp + n); const got = Math.round(P.hp - before); if(got > 0){ H.floatText(P, "+" + got, "#7be08a"); if(HEALING) CO.healThreat(got, CO.myId()); } }
+export function hot(key, total, dur){ if(HEALING) total *= healMult(); if(CO.cap()) return CO.cap().fx.push(["hot", key, total * CO.cap().scale, dur]); P.hots = P.hots.filter(h => h.key !== key); P.hots.push({key, per: total / dur, left: dur, tick: 1}); if(HEALING) CO.healThreat(total, CO.myId()); }
+// combo points belong to one target (each enemy keeps its own) and last until it dies or resets
 export function addCP(t){ if(t && t !== P.target) return; P.cp = Math.min(5, P.cp + 1); }
 export function finisher(t){ const cp = P.cp; P.cp = 0; if(T("r_relentless")) addRes("energy", 20); if(cp > 0 && chance(0.2*T("r_ruth"))) P.cp = 1; return cp; }
 export function clearCP(){ if(P.cpMap) P.cpMap.clear(); }
@@ -547,7 +547,7 @@ export function updPlayer(dt, moving){
     if(c.kind === "gather" || c.kind === "mount"){ P.casting = null; P.castDone = {label: c.label, t: 0.3}; if(c.kind === "gather") H.finishGather(c.node); else H.finishMount(c.mount); } else completeCast(); } }
   P.pose = P.mount ? "sit" : P.casting ? (P.casting.kind === "gather" || P.casting.kind === "mount" ? "cast" : C().cls === "hunter" ? "bow" : "cast") : null;
   autoAttack(dt);
-  if(P.combatT > 0 && !mobs.some(m => m.state === "chase" && !m.dead && CO.targetsMe(m))) P.combatT = Math.min(P.combatT, 0.25);   // nothing is after you: combat ends
+  if(P.combatT > 0 && !mobs.some(m => m.state === "chase" && !m.dead && (CO.targetsMe(m) || CO.onList(m)))) P.combatT = Math.min(P.combatT, 0.25);   // (on a monster's threat list: still in the fight)   // nothing is after you: combat ends
   P.combatT -= dt; const inC = P.combatT > 0, rg = C().race === "undead" ? 1.5 : 1;
   if(P.sitting && (moving || P.casting || P.auto || P.dash || P.leap || inC)) standUp();
   if(P.sitting && P.hp >= P.maxHp && P.mana >= P.maxMana && !P.sitFull){ P.sitFull = true; H.log("You are fully rested.", "#7be08a"); }
@@ -558,7 +558,7 @@ export function updPlayer(dt, moving){
     if(!inC && (P.combatT < -1 || sit)) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * (sit ? 0.07 : 0.01) * rg * REGEN_TICK); }
   P.focus = Math.min(100, P.focus + (inC ? 4 : 9) * dt);
   P.energy = Math.min(100, P.energy + 12 * (P.buffs.adren ? 2 : 1) * dt);
-  if(!inC && P.cpMap && P.cpMap.size) clearCP();
+  if(P.cpMap && P.cpMap.size) for(const m of P.cpMap.keys()) if(!m || m.dead || m.state !== "chase") P.cpMap.delete(m);   // combo points stay on their target until it dies or resets
   updTotems(dt);
   if(!inC) P.rage = Math.max(0, P.rage - 3 * dt);
   for(const h of P.hots){ h.tick -= dt; if(h.tick <= 0){ h.tick += 1; h.left -= 1; healP(h.per); } }
@@ -776,7 +776,7 @@ function petHealTarget(id){ return PET_HEALS.has(id) && petSelected() ? pet : nu
 function castOnPet(a, t){ const cap = {scale: pet.maxHp / P.maxHp, fx: []}; CO.setCap(cap); try{ a.run(t); } finally{ CO.setCap(null); }
   for(const f of cap.fx){ if(f[0] === "heal"){ const n = Math.round(f[1]); pet.hp = Math.min(pet.maxHp, pet.hp + n); H.floatText(pet, "+" + n, "#7be08a"); }
     else if(f[0] === "hot"){ pet.hots = pet.hots.filter(h => h.key !== f[1]); pet.hots.push({key: f[1], per: f[2] / f[3], left: f[3], tick: 1}); } else if(f[0] === "shield"){ pet.shield = Math.max(pet.shield || 0, f[1]); pet.shieldT = f[2]; } }
-  burst(pet.px, pet.py, SCHOOL_COLOR[a.school] || "#fff", 12); }
+  CO.healThreat(CO.fxThreat(cap.fx), CO.on() ? CO.myId() + ":pet" : "pet"); burst(pet.px, pet.py, SCHOOL_COLOR[a.school] || "#fff", 12); }
 // what is on your pet right now (for its frame)
 export function petAuras(){ if(!pet || pet.dead) return []; const L = [];
   if(pet.wrathT > 0) L.push({id: C().cls === "warlock" ? "demonfrenzy" : "bestialwrath", left: pet.wrathT});

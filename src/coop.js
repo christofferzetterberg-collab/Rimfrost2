@@ -91,6 +91,8 @@ function data(c, d){
   if(d.t === "mobs"){ if(COOP.role === "guest") applyMobs(d.m); return; }
   if(d.t === "fx"){ if(d.to === myId()) receiveFx(d); else if(COOP.role === "host") sendTo(d.to, d); return; }
   if(d.t === "trade"){ tradeData(d); return; }
+  if(d.t === "bfx"){ if(COOP.role === "host" && H.botFx) H.botFx(d.to, d.fx, d.from, d.label); return; }
+  if(d.t === "hth"){ if(COOP.role === "host") addHealThreat(d.from, d.amt, d.to); return; }
   if(d.t === "bots"){ if(COOP.role === "guest"){ COOP.gbots = d.b; if(H.guestBots) H.guestBots(d.b); } return; }
   if(d.t === "dev"){ if(COOP.role === "guest" && (d.to === myId() || d.to === "all") && H.devApply) H.devApply(d.a, d.v); return; }   // the host's dev tools, used on you
   if(d.t !== "st" || !d.id || (COOP.peer && d.id === COOP.peer.id)) return;
@@ -102,6 +104,7 @@ function data(c, d){
   if(COOP.role === "host" && reg(r.tx) > 0 && reg(r.tx) !== wasReg) H.someoneEnters(reg(r.tx));
   syncPet(r);
 }
+export const corpse = r => corpseOf(r);
 export const myId = () => (COOP.peer && COOP.peer.id) || "me";
 // spells and arrows: what you cast is drawn for your friends too (only the picture – damage goes through the host as before)
 export function sendVfx(v){ if(!on() || !S.cur) return; broadcast({t: "vfx", id: myId(), ...v}); }
@@ -118,7 +121,7 @@ function lookKey(){ const eq = S.cur.eq || {}, o = {}; for(const k of ["head", "
 function state(){
   const pet = G.getPet();
   return {t: "st", id: COOP.peer.id, name: S.cur.name, race: S.cur.race, cls: S.cur.cls, lvl: S.cur.level, x: +P.x.toFixed(2), z: +P.z.toFixed(2), rot: +P.rot.toFixed(2), mv: !!P.moving,
-    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!P.buffs.meld, st: !!P.buffs.stealth, mt: P.flying ? (P.flying.ship ? "ship" : "drake") : P.mount || null, fy: P.flying ? +P.fy.toFixed(2) : null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, jy: P.jumpY > 0 ? +P.jumpY.toFixed(2) : 0, tk: H.tankMult && H.tankMult() > 1 ? 1 : 0, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
+    hp: Math.round(P.hp), mhp: P.maxHp, form: P.form || null, dead: !!P.dead, gh: !!P.ghost, meld: !!P.buffs.meld, st: !!P.buffs.stealth, mt: P.flying ? (P.flying.ship ? "ship" : "drake") : P.mount || null, fy: P.flying ? +P.fy.toFixed(2) : null, rt: G.resType(), rv: Math.round(P[G.resType()] || 0), rm: G.maxRes(G.resType()), sit: !!P.sitting, cx: P.ghost && P.corpse ? +P.corpse.x.toFixed(2) : null, cz: P.ghost && P.corpse ? +P.corpse.z.toFixed(2) : null, jy: P.jumpY > 0 ? +P.jumpY.toFixed(2) : 0, tk: H.tankMult && H.tankMult() > 1 ? 1 : 0, atk: +(P.attackAnim || 0).toFixed(2), ak: P.attackKind || null, pose: P.pose || null, eq: lookKey(),
     pet: pet && !P.flying ? {k: pet.kind, x: +pet.x.toFixed(2), z: +pet.z.toFixed(2), rot: +pet.rot.toFixed(2), hp: Math.round(pet.hp), mhp: pet.maxHp, dead: !!pet.dead, mv: !!pet.moving, atk: +(pet.attackAnim || 0).toFixed(2), res: Math.round(pet.res || 0)} : null};
 }
 function sendState(){ if(!on() || !COOP.peer || !S.cur) return; broadcast(state()); }
@@ -153,17 +156,17 @@ export function render(){
     if(!r.mesh || r.lk !== looks(r)){ if(r.mesh) H.scene.remove(r.mesh); r.lk = looks(r);
       r.mesh = r.form === "bear" ? makeBearForm() : r.form === "cat" ? makeWolfForm(r.race) : r.form === "leopard" ? makeLeopardForm(r.race) : makeHero(r.race, r.cls, RACES, r.eq || {});
       r.mesh.traverse(m => { if(m.isMesh) m.userData.remote = r; }); H.scene.add(r.mesh); }
-    const vis = sameRegion(r, P) && !r.gh; r.mesh.visible = vis;                     // (a friend's spirit is not seen by the living)
+    const body = r.gh && r.cx != null, vis = body ? reg(r.cx) === reg(P.x) : sameRegion(r, P) && !r.gh; r.mesh.visible = vis;   // (a friend's spirit is not seen by the living – their body is)
     { const fade = !!(r.meld || r.st); if(fade !== !!r.mesh.userData.faded){ r.mesh.userData.faded = fade;   // a friend in Stealth or Shadowmeld looks faded
       r.mesh.traverse(o => { if(!o.isMesh) return; if(fade){ o.userData.m0 = o.material; o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.4; o.material.depthWrite = false; } else if(o.userData.m0){ o.material = o.userData.m0; o.userData.m0 = null; } }); } }
     if((r.mt || null) !== (r.mtShown || null)){ if(r.mtMesh) H.scene.remove(r.mtMesh); r.mtMesh = r.mt && H.mountMesh ? H.mountMesh(r.mt) : null; if(r.mtMesh) H.scene.add(r.mtMesh); r.mtShown = r.mt || null; }
     r.jyS = (r.jyS || 0) + ((r.jy || 0) - (r.jyS || 0)) * 0.45;                     // a friend jumping
     r.mesh.userData.animate(r.walk, r.mv, r.ak === "cast" ? 0 : r.atk || 0, r.sit || (r.mt && r.mt !== "ship") ? "sit" : r.jyS > 0.05 && !r.mt ? "jump" : r.pose || null);
     const gy = r.fy != null ? (r.fyS = r.fyS == null ? r.fy : r.fyS + (r.fy - r.fyS) * 0.25) : (r.fyS = null, height(r.x, r.z));   // a friend on a flight is up in the air
-    r.mesh.position.set(r.x, gy + (r.dead ? 0.3 : 0) + (r.fy == null ? r.jyS : 0), r.z); r.mesh.rotation.set(r.dead ? -1.4 : 0, r.rot, 0);
+    if(body) r.mesh.position.set(r.cx, height(r.cx, r.cz) + 0.3, r.cz); else r.mesh.position.set(r.x, gy + (r.dead ? 0.3 : 0) + (r.fy == null ? r.jyS : 0), r.z); r.mesh.rotation.set(r.dead ? -1.4 : 0, r.rot, 0);
     if(r.mtMesh){ r.mtMesh.visible = vis; r.mtMesh.position.set(r.x, gy + (r.fy == null ? r.jyS : 0), r.z); r.mtMesh.rotation.y = r.rot; r.mtMesh.userData.animate(r.walk * 0.75, r.mv, 0); if(r.mt !== "ship") r.mesh.position.y += r.mtMesh.userData.saddle - 0.38; }
     if(!r.plate){ r.plate = document.createElement("div"); r.plate.className = "plate friend"; r.plate.innerHTML = `<span></span><div class="hb"><i></i></div>`; H.hud.appendChild(r.plate); }
-    const s = vis ? H.toScreen(r.x, gy + r.mesh.userData.height + 0.35 + (r.mtMesh ? r.mtMesh.userData.saddle : 0), r.z) : {on: false};
+    const s = !vis ? {on: false} : body ? H.toScreen(r.cx, height(r.cx, r.cz) + 0.9, r.cz) : H.toScreen(r.x, gy + r.mesh.userData.height + 0.35 + (r.mtMesh ? r.mtMesh.userData.saddle : 0), r.z);
     if(!s.on){ r.plate.style.display = "none"; } else { r.plate.style.display = ""; r.plate.style.left = s.x + "px"; r.plate.style.top = s.y + "px";
       r.plate.firstChild.textContent = `${r.name} (${r.lvl})`; r.plate.lastChild.firstChild.style.width = Math.max(0, Math.min(100, r.hp / (r.mhp || 1) * 100)) + "%"; r.plate.classList.toggle("sel", P.ftarget === r.id); }
     const po = r.petObj;
@@ -224,8 +227,12 @@ function botPick(m, L){ const co = coopMob(m);
   let best = null, bv = 0; for(const c of L){ const v = th(c); if(v > bv){ bv = v; best = c; } }
   const cur = L.find(c => c.id === m.tgtId), need = best && Math.hypot(m.x - best.e.x, m.z - best.e.z) < 5 ? 1.1 : 1.3;   // to pull it away: 110% of the current target's threat in melee, 130% from range
   if(cur && th(cur) > 0 && bv < th(cur) * need) return cur;
-  if(best) return best; let bd = 1e9; for(const c of L){ const d = Math.hypot(m.x - c.e.x, m.z - c.e.z); if(d < bd){ bd = d; best = c; } } return best; }
+  if(best) return best; if(hasList(m)) return null; let bd = 1e9; for(const c of L){ const d = Math.hypot(m.x - c.e.x, m.z - c.e.z); if(d < bd){ bd = d; best = c; } } return best; }
+// in co-op a monster in a fight only goes after those on its threat list (attacked it, healed or buffed someone it fights, or came close); nobody left: it resets
+const hasList = m => coopMob(m) && !!((m.threat && Object.keys(m.threat).length) || (m.botTh && Object.keys(m.botTh).length));
 export function mobTarget(m){
+  if(m.threat){ if(P.dead) delete m.threat[myId()]; for(const r of Object.values(COOP.remotes)) if(r.dead) delete m.threat[r.id]; }   // dying wipes your threat
+  else if(P.dead) m.thMe = 0;
   const L = cands(m); if(!L.length) return null;
   // Shadowmeld: the one it was fighting faded away and nobody else has fought it – it gives up instead of running to someone new
   if(m.threat && !L.some(c => (m.threat[c.id] || 0) > 0)){ const melded = id => id === myId() ? !!P.buffs.meld : !!(COOP.remotes[id] && COOP.remotes[id].meld);
@@ -235,7 +242,10 @@ export function mobTarget(m){
   if(!coopMob(m)){ const e = G.mobTarget(m); return L.find(c => c.e === e) || L[0]; }      // alone: you and your pet (old rules)
   if(m.tauntT > 0 && m.tauntId){ const c = L.find(c => c.id === m.tauntId); if(c) return c; }
   if(m.threat){ let best = null, bv = 0; for(const c of L){ const v = m.threat[c.id] || 0; if(v > bv && Math.hypot(m.x - c.e.x, m.z - c.e.z) < 30){ bv = v; best = c; } } if(best) return best; }
+  if(hasList(m)) return null;
   let best = null, bd = 1e9; for(const c of L){ const d = Math.hypot(m.x - c.e.x, m.z - c.e.z); if(d < bd){ bd = d; best = c; } } return best; }
+// coming close to a monster in a fight puts you on its threat list
+export function nearList(m){ if(!coopMob(m) || COOP.role === "guest") return; for(const c of cands(m)) if(!c.pet && !c.bot && Math.hypot(m.x - c.e.x, m.z - c.e.z) < 5 && !((m.threat || {})[c.id] > 0)){ m.threat = m.threat || {}; m.threat[c.id] = 1; } }
 export function mobAttack(m, c, dmg, kind){
   if(c.bot) return H.botHurt(c.e, dmg, m);
   if(c.pet && c.owner) sendTo(c.owner, {t: "phit", to: c.owner, nid: m.nid, dmg});
@@ -318,21 +328,41 @@ let CAP = null;                                  // while set, heals / heal over
 export const cap = () => CAP;
 export const setCap = c => { CAP = c; };
 const FRIENDLY = new Set(["heal", "renew", "pws", "palheal", "touch", "rejuv", "bloom", "healwave", "thorns", "powerinf", "painsupp", "guardian"]);
-function friendSel(){ const r = on() && P.ftarget && COOP.remotes[P.ftarget]; return r && !r.dead && sameRegion(r, P) ? r : null; }
+// a companion as a friendly target: the host's own, or (guests) the copy the host sends
+function botView(id){ if(!id) return null;
+  if(COOP.role !== "guest"){ const b = (H.bots ? H.bots() : []).find(b => b.id === id); return b ? {id, bot: true, name: b.name, cls: b.cls, lvl: b.lvl, hp: b.hp, mhp: b.maxHp, dead: !!b.dead, x: b.x, z: b.z, mesh: b.mesh} : null; }
+  const g = COOP.gbots.find(b => b.id === id); if(!g) return null; const p = H.gbotPos ? H.gbotPos(id) : null; return {...g, bot: true, ...(p || {})}; }
+const friendOrBot = id => (on() && COOP.remotes[id]) || botView(id);
+function friendSel(){ const r = P.ftarget && friendOrBot(P.ftarget); return r && !r.dead && sameRegion(r, P) ? r : null; }
 export const friendTarget = id => FRIENDLY.has(id) ? friendSel() : null;
 export function friendRange(id){ const r = friendTarget(id); return !r ? null : Math.hypot(r.x - P.x, r.z - P.z) > 17 ? `${r.name} is too far away`
   : !los(P.x, height(P.x, P.z) + 1.4, P.z, r.x, height(r.x, r.z) + 1.2, r.z) ? `${r.name} is not in line of sight` : null; }
-export function castOn(r, a, t){ CAP = {scale: (r.mhp || P.maxHp) / P.maxHp, fx: []}; try{ a.run(t); } finally{ const c = CAP; CAP = null; sendFx(r, c.fx, a.name); }
+export function castOn(r, a, t){ CAP = {scale: (r.mhp || P.maxHp) / P.maxHp, fx: []}; try{ a.run(t); } finally{ const c = CAP; CAP = null; sendFx(r, c.fx, a.name); healThreat(fxThreat(c.fx), r.id); }
   G.burst(r.x * PXU, r.z * PXU, SCHOOL_COLOR[a.school] || "#fff", 12); }
-function sendFx(r, fx, label){ if(!fx.length) return; const msg = {t: "fx", to: r.id, from: S.cur.name, label, fx};
-  if(COOP.role === "host") sendTo(r.id, msg); else broadcast(msg);
+function sendFx(r, fx, label){ if(!fx.length) return;
+  if(r.bot){ if(COOP.role === "guest") broadcast({t: "bfx", to: r.id, from: S.cur.name, label, fx}); else if(H.botFx) H.botFx(r.id, fx, S.cur.name, label); }   // a companion (the host runs it)
+  else { const msg = {t: "fx", to: r.id, from: S.cur.name, label, fx}; if(COOP.role === "host") sendTo(r.id, msg); else broadcast(msg); }
   for(const f of fx) if(f[0] === "heal") H.floatText(r, "+" + f[1], "#7be08a"); }
+// healing makes threat too: half of what was healed, shared by every monster fighting the one you healed (buffs on someone in a fight: a little)
+export const fxThreat = fx => fx.reduce((s, f) => s + (f[0] === "heal" || f[0] === "shield" ? f[1] : f[0] === "hot" ? f[2] : f[0] === "buff" ? 20 : 0), 0);
+export function healThreat(amt, tid){ if(!(amt > 0)) return; amt *= 0.5;
+  if(COOP.role === "guest") broadcast({t: "hth", from: myId(), amt, to: tid}); else addHealThreat(myId(), amt, tid); }
+function fighting(m, tid){ if(m.dead || m.state !== "chase") return false; if(m.tgtId === tid) return true;
+  if(coopMob(m)) return (m.threat && m.threat[tid] > 0) || (m.botTh && m.botTh[tid] > 0);
+  return tid === myId() ? (m.thMe > 0 || targetsMe(m)) : tid === "pet" || tid === myId() + ":pet" ? m.thPet > 0 : !!(m.botTh && m.botTh[tid] > 0); }
+function addHealThreat(from, amt, tid){ const who = from === myId() ? P : COOP.remotes[from]; if(!who) return;
+  const ms = mobs.filter(m => reg(m.x) === reg(who.x) && Math.hypot(m.x - who.x, m.z - who.z) < 60 && fighting(m, tid)); if(!ms.length) return;
+  const share = amt / ms.length;
+  for(const m of ms){ if(coopMob(m)){ m.threat = m.threat || {}; m.threat[from] = (m.threat[from] || 0) + share; } else if(from === myId()) m.thMe = (m.thMe || 0) + share; } }
+// on a monster's threat list (in co-op the host keeps the list; guests get a copy)
+export function onList(m, id = myId()){ if(!coopMob(m)) return false; if(COOP.role === "guest") return !!(m.thSync && m.thSync.some(e => e[0] === id && e[1] > 0)); return !!(m.threat && m.threat[id] > 0); }
 // War Cry, Holy Wave and the like also reach friends near you (radius in Rimfrost pixels)
 export function groupFx(radius, fx, label){ if(!on()) return; for(const r of visible()) if(!r.dead && Math.hypot(r.x - P.x, r.z - P.z) * PXU < radius) sendFx(r, fx.map(f => f.slice()), label); }
 // resurrection: a dead friend comes back at the caster's side
 function rezTarget(){ const r = on() && P.ftarget && COOP.remotes[P.ftarget]; return r && r.dead ? r : null; }
+const corpseOf = r => r.gh && r.cx != null ? {x: r.cx, z: r.cz} : r;          // a friend who released their spirit: the body stays where they died
 export function rezCheck(){ if(!on()) return "There is no one to resurrect"; const r = rezTarget(); if(!r) return "Select a dead friend first";
-  if(P.combatT > 0) return "You cannot do that in combat"; if(!r.gh && Math.hypot(r.x - P.x, r.z - P.z) > 30) return `${r.name} is too far away`; return true; }
+  if(P.combatT > 0) return "You cannot do that in combat"; const cp = corpseOf(r); if(reg(cp.x) !== reg(P.x) || Math.hypot(cp.x - P.x, cp.z - P.z) > 30) return `${r.name} is too far away`; return true; }
 export function rezSend(label){ const r = rezTarget(); if(!r) return; sendFx(r, [["rez", +P.x.toFixed(2), +P.z.toFixed(2)]], label); H.log(`You offer to resurrect ${r.name}.`, "#7be08a"); }
 function receiveFx(d){ const rz = d.fx.find(f => f[0] === "rez"); if(rz){ if(P.dead && H.rezAt) H.rezAt(rz[1], rz[2], d.from); return; }
   if(P.dead) return;
@@ -343,7 +373,7 @@ function receiveFx(d){ const rz = d.fx.find(f => f[0] === "rez"); if(rz){ if(P.d
   if(!d.label.startsWith("Holy") && !d.label.endsWith("Totem")) H.log(`${d.from} cast ${d.label} on you.`, "#7be08a"); }
 // select a friend as your target (your heals and shields then go to them); toggle: clicking their frame again lets go
 export function select(id, toggle){ const was = P.ftarget; P.ftarget = id && !(toggle && was === id) ? id : null; if(P.ftarget){ P.target = null; P.auto = false; } }
-export const remoteById = id => COOP.remotes[id];
+export const remoteById = id => friendOrBot(id);
 
 // ---------------------------------------------------------------- party frames under yours, and the co-op window
 // a friend's pet: a small health bar and its rage (bear) or energy (wolf)
@@ -352,7 +382,7 @@ function petLine(p){ if(!p) return ""; const hp = Math.max(0, Math.min(1, p.hp /
 export function partyHUD(){
   const el = document.getElementById("party");
   if(!on()){ el.innerHTML = ""; return; }
-  if(P.ftarget && !COOP.remotes[P.ftarget]) P.ftarget = null;
+  if(P.ftarget && !friendOrBot(P.ftarget)) P.ftarget = null;
   const rs = Object.values(COOP.remotes), key = rs.map(r => [r.id, r.name, r.lvl, Math.round(r.hp), r.mhp, r.dead, reg(r.x), P.ftarget === r.id, r.pet ? [r.pet.k, Math.round(r.pet.hp / (r.pet.mhp || 1) * 50), Math.round((r.pet.res || 0) / 10), r.pet.dead].join(":") : "", r.rt, Math.round((r.rv || 0) / (r.rm || 100) * 50), r.gh].join(",")).join("|");
   if(el.dataset.k === key) return; el.dataset.k = key;
   el.innerHTML = rs.map(r => { const pct = Math.max(0, Math.min(1, r.hp / (r.mhp || 1)));

@@ -151,9 +151,23 @@ function hireBots(roles){ dismissBots(true); const d = curDungeon(); if(!d) retu
   log(`${bots.map(b => `${b.name} (${ROLE_NAME[b.role]}, ${CLASSES[b.cls].name})`).join(" and ")} ${bots.length > 1 ? "join" : "joins"} your group.`, "#7be08a"); }
 function dismissBots(quiet){ botMode = "assist"; botStay = null;  if(bots.length && !quiet) log("Your companions leave the group.", "#93a4ad");
   for(const b of bots){ scene.remove(b.mesh); if(b.pet) scene.remove(b.pet.mesh); b.plate.remove(); } bots = []; updBotBar(); for(const m of mobs) if(m.botTh) m.botTh = null; $("botparty").innerHTML = ""; }
+// heals, shields and buffs a player puts on a companion (in co-op guests' arrive through the host)
+function botFx(id, fx, from, label){ const b = bots.find(o => o.id === id); if(!b || b.dead) return;
+  for(const f of fx){ if(f[0] === "heal"){ const n = Math.round(Math.min(f[1], b.maxHp - b.hp)); b.hp += n; if(n > 0 && from !== S.cur.name) floatText(b, "+" + n, "#7be08a"); }
+    else if(f[0] === "healPct") b.hp = Math.min(b.maxHp, b.hp + b.maxHp * f[1]);
+    else if(f[0] === "hot"){ b.hots = (b.hots || []).filter(h => h.key !== f[1] + from); b.hots.push({key: f[1] + from, per: f[2] / f[3], left: f[3], t: 1}); }
+    else if(f[0] === "shield"){ b.shield = Math.max(b.shield || 0, f[1]); b.shieldT = f[2]; }
+    else if(f[0] === "buff") (b.buffs = b.buffs || {})[f[1]] = f[2]; }
+  G.burst(b.x * PXU, b.z * PXU, "#9cf07a", 8); }
+function botAuras(b, dt){ for(const h of b.hots || []){ h.left -= dt; h.t -= dt; if(h.t <= 0){ h.t += 1; const n = Math.round(Math.min(h.per, b.maxHp - b.hp)); b.hp += n; if(n > 0) floatText(b, "+" + n, "#7be08a"); } }
+  if(b.hots) b.hots = b.hots.filter(h => h.left > 0); if(b.shieldT > 0 && (b.shieldT -= dt) <= 0) b.shield = 0;
+  for(const k in b.buffs || {}) if((b.buffs[k] -= dt) <= 0) delete b.buffs[k]; }
 // what the monsters do to them
 function botHurt(b, dmg, m){ if(b.dead) return; if(Math.random() < (b.role === "tank" ? 0.12 : 0.05)){ floatText(b, "Dodge", "#cfd8dc"); return; }
-  const amt = Math.max(1, Math.round(dmg * (b.role === "tank" ? 0.6 : BOT_ARMOR[b.cls] || 1) * (0.92 + Math.random() * 0.16))); b.hp -= amt; floatText(b, "-" + amt, "#ff7a6a");
+  let amt = Math.max(1, Math.round(dmg * (b.role === "tank" ? 0.6 : BOT_ARMOR[b.cls] || 1) * (0.92 + Math.random() * 0.16) * (b.buffs && b.buffs.painsupp ? 0.6 : 1)));
+  if(b.shield > 0){ const ab = Math.min(b.shield, amt); b.shield -= ab; amt -= ab; if(!amt){ floatText(b, "Absorb", "#cfe0e6"); return; } }
+  b.hp -= amt; floatText(b, "-" + amt, "#ff7a6a");
+  if(b.hp <= 0 && b.buffs && b.buffs.guardian){ delete b.buffs.guardian; b.hp = b.maxHp * 0.4; floatText(b, "Guardian Spirit", "#fff2b0"); return; }
   if(b.hp <= 0){ b.hp = 0; b.dead = true; b.deadT = 0; b.cast = null; log(`${b.name} has died.`, "#ff8a7a"); } }
 function botHeal(t, amt, b, label){ if(isFriend(t)){ if(t.dead) return; CO.botHealFriend(t, amt, label || "Heal"); }
   else if(t === P){ if(P.dead) return; P.hp = Math.min(P.maxHp, P.hp + amt); }
@@ -188,6 +202,7 @@ function updBots(dt){ const el = $("botparty");
   const inCombat = bots.some(b => !b.dead && engaged(b).length) || (!P.dead && P.combatT > 0);
   for(const b of bots){ b.walk = b.moving ? b.walk + dt * 9 : b.walk * 0.85; b.moving = false; b.attackAnim = Math.max(0, b.attackAnim - dt * 3); b.tauntCd -= dt;
     if((b.statT = (b.statT || 0) - dt) <= 0){ b.statT = 2; botStats(b); }
+    if(!b.dead) botAuras(b, dt); else { b.hots = []; b.shield = 0; b.buffs = {}; }
     if(b.dead){ b.deadT += dt; if(!inCombat && b.deadT > 4){ b.dead = false; b.hp = b.maxHp * 0.6; b.mana = 60; log(`${b.name} gets back up.`, "#7be08a"); G.burst(b.x * PXU, b.z * PXU, "#fff2b0", 14); } continue; }
     for(const d of b.dots || []){ d.left -= dt; d.t -= dt; if(d.t <= 0 && !d.m.dead){ d.t += 3; G.botDamageMob(d.m, Math.max(1, Math.round(d.per)), false, "magic", b); } }
     if(b.dots) b.dots = b.dots.filter(d => d.left > 0 && !d.m.dead); for(const k in b.cds || {}) b.cds[k] -= dt;
@@ -212,10 +227,10 @@ function updBots(dt){ const el = $("botparty");
         if(d > 8){ botMoveTo(b, P.x, P.z, dt); continue; }
         if(!rezOffer && (b.rezT = (b.rezT || 0) + dt) > 2){ b.rezT = 0; b.cast = null; b.attackAnim = 1; G.burst(P.x * PXU, P.z * PXU, "#fff2b0", 16); rezAt(P.x, P.z, b.name); } continue; }
       // a dead friend (still at their body): resurrects them too
-      const fd = !inCombat && friendsHere().find(r => r.dead && !r.gh && !(now - ((b.rezSent || {})[r.id] || -99) < 20));
-      if(fd){ const d = Math.hypot(fd.x - b.x, fd.z - b.z);
-        if(d > 8){ botMoveTo(b, fd.x, fd.z, dt); continue; }
-        if((b.rezT = (b.rezT || 0) + dt) > 2){ b.rezT = 0; b.attackAnim = 1; (b.rezSent = b.rezSent || {})[fd.id] = now; G.burst(fd.x * PXU, fd.z * PXU, "#fff2b0", 16); CO.botRezFriend(fd, b); log(`${b.name} resurrects ${fd.name}.`, "#7be08a"); } continue; }
+      const fd = !inCombat && Object.values(CO.COOP.remotes).find(r => r.dead && regionOf(CO.corpse(r).x) === botRegion() && !(now - ((b.rezSent || {})[r.id] || -99) < 20));
+      if(fd){ const cp = CO.corpse(fd), d = Math.hypot(cp.x - b.x, cp.z - b.z);
+        if(d > 8){ botMoveTo(b, cp.x, cp.z, dt); continue; }
+        if((b.rezT = (b.rezT || 0) + dt) > 2){ b.rezT = 0; b.attackAnim = 1; (b.rezSent = b.rezSent || {})[fd.id] = now; G.burst(cp.x * PXU, cp.z * PXU, "#fff2b0", 16); CO.botRezFriend(fd, b); log(`${b.name} resurrects ${fd.name}.`, "#7be08a"); } continue; }
     }
     // like a real player: with a tank in the group, a damage dealer that pulls a monster stops attacking and runs to the tank until the tank takes it back
     if(b.role === "dps" && inCombat){ const tk = groupTank(), mine = tk && tk !== b && engaged(b).find(m => m.tgtId === b.id);
@@ -253,7 +268,7 @@ function updBots(dt){ const el = $("botparty");
       b.plate.children[1].firstChild.style.width = Math.max(0, b.hp / b.maxHp * 100) + "%";
       const cb = b.plate.children[2], c = !b.dead && b.cast; cb.style.display = c ? "" : "none"; if(c){ cb.firstChild.style.width = Math.min(100, (1 - c.t / c.total) * 100) + "%"; if(cb.lastChild.textContent !== c.name) cb.lastChild.textContent = c.name; } } }
   updBotBar();
-  const html = bots.map(b => `<div class="pmem"><div class="n"><b style="color:${CLASSES[b.cls].color}">${b.name}</b><span>${b.dead ? "Dead" : b.drinking ? "Drinking" : ROLE_NAME[b.role]}</span></div>
+  const html = bots.map(b => `<div class="pmem ${P.ftarget === b.id ? "sel" : ""}" data-bid="${b.id}"><div class="n"><b style="color:${CLASSES[b.cls].color}">${b.name}</b><span>${b.dead ? "Dead" : b.drinking ? "Drinking" : ROLE_NAME[b.role]}</span></div>
     <div class="bar"><i style="width:${Math.max(0, b.hp / b.maxHp * 100)}%;background:${b.dead ? "#555" : "#3fbf5a"}"></i></div>${usesMana(b) ? `<div class="bar rs"><i style="width:${Math.round(b.mana)}%;background:var(--mana)"></i></div>` : ""}</div>`).join("");
   if(el.innerHTML !== html) el.innerHTML = html;
   { const pa = $("party"), top = pa.offsetTop + pa.offsetHeight + (pa.innerHTML ? 6 : 0) + "px"; if(el.style.top !== top) el.style.top = top; } }
@@ -279,7 +294,7 @@ function updGuestBots(dt){ if(!gBots.size) return; const k = Math.min(1, dt * 10
     b.plate.children[1].firstChild.style.width = Math.max(0, b.hp / (b.mhp || 1) * 100) + "%";
     const cb = b.plate.children[2]; cb.style.display = b.cast ? "" : "none"; if(b.cast){ cb.firstChild.style.width = Math.min(100, b.cast[1] * 100) + "%"; if(cb.lastChild.textContent !== b.cast[0]) cb.lastChild.textContent = b.cast[0]; } }
   const el = $("botparty"), list = [...gBots.values()].filter(here);
-  const html = list.map(b => `<div class="pmem"><div class="n"><b style="color:${CLASSES[b.cls].color}">${b.name}</b><span>${b.dead ? "Dead" : b.dr ? "Drinking" : ROLE_NAME[b.role]}</span></div>
+  const html = list.map(b => `<div class="pmem ${P.ftarget === b.id ? "sel" : ""}" data-bid="${b.id}"><div class="n"><b style="color:${CLASSES[b.cls].color}">${b.name}</b><span>${b.dead ? "Dead" : b.dr ? "Drinking" : ROLE_NAME[b.role]}</span></div>
     <div class="bar"><i style="width:${Math.max(0, b.hp / (b.mhp || 1) * 100)}%;background:${b.dead ? "#555" : "#3fbf5a"}"></i></div>${b.role !== "tank" && BOT_KIT[b.cls] ? `<div class="bar rs"><i style="width:${Math.round(b.mana)}%;background:var(--mana)"></i></div>` : ""}</div>`).join("");
   if(el.innerHTML !== html) el.innerHTML = html;
   { const pa = $("party"), top = pa.offsetTop + pa.offsetHeight + (pa.innerHTML ? 6 : 0) + "px"; if(el.style.top !== top) el.style.top = top; } }
@@ -715,6 +730,7 @@ function selectPet(){ P.target = null; P.auto = false; CO.select(null); P.selfT 
 $("ppet").addEventListener("click", e => { e.stopPropagation(); if(running && G.getPet()) selectPet(); });
 $("pframe").addEventListener("click", () => { if(!running) return; P.target = null; P.auto = false; CO.select(null); P.selfT = true; });   // click your own portrait: target yourself
 $("party").addEventListener("click", e => { const b = e.target.closest("[data-pid]"); if(b) CO.select(b.dataset.pid, true); });
+$("botparty").addEventListener("click", e => { const b = e.target.closest("[data-bid]"); if(b){ CO.select(b.dataset.bid, true); P.selfT = false; } });     // a companion: your heals and buffs go to it
 $("cname").addEventListener("keydown", e => { e.stopPropagation(); if(e.key === "Enter") $("ccreate").click(); });
 addEventListener("beforeunload", save);
 
@@ -1276,7 +1292,7 @@ $("chatin").addEventListener("blur", () => { if(!$("chatin").value.trim()) $("ch
 function chatLine(name, cls, text){ const d = document.createElement("div"); d.className = "chat"; const b = document.createElement("b"); b.textContent = `[${name}]: `; b.style.color = (CLASSES[cls] || {}).color || "#7fc4ff";
   d.append(b, document.createTextNode(text)); const l = $("log"); l.appendChild(d); while(l.children.length > 8) l.firstChild.remove(); }
 G.initEngine(scene, {tankMult: () => tankMult(), startAim, floatText, log, err, banner, now: () => now, onForm: buildHero, onDeath, buildBar, save, refresh, onKill: k => Q.questKill(k), finishGather, finishMount, dismount, willOfTheDead, evade: m => evade(m)});
-CO.initCoop({scene, hud, log, err, save, floatText, guestBots: list => guestBotsIn(list), rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, devApply: (a, v) => devApply(a, v), bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
+CO.initCoop({scene, hud, log, err, save, floatText, guestBots: list => guestBotsIn(list), botFx: (...a) => botFx(...a), gbotPos: id => { const b = gBots.get(id); return b ? {x: b.x, z: b.z, mesh: b.mesh} : null; }, rezAt: (x, z, from) => rezAt(x, z, from), chat: chatLine, rollShow, rollHide, explored: (place, by) => Q.friendExplored(place, by), mountMesh: k => MOUNTS[k] || k === "drake" || k === "ship" ? mountModel(k) : null, devApply: (a, v) => devApply(a, v), bots: () => bots, botHurt: (b, dmg, m) => botHurt(b, dmg, m), tankMult: () => tankMult(), toScreen: (...a) => toScreen(...a), refresh: () => { if(panelTab === "coop" || panelTab === "trade") renderPanel(); }, running: () => running,
   openTrade: () => { if(panelTab !== "trade"){ panelTab = "trade"; $("panel").hidden = false; } renderPanel(); }, gearImg: it => gearImg(it), itemImg: k => itemImg(k),
   leaveCrypt: () => exitDungeon(), respawnVis, novaVis: (m, t) => novaVis(m, t), zoneVis: (m, l) => zoneVis(m, l), bossSync: (m, f) => bossSync(m, f),
   someoneEnters: () => {}});
@@ -1350,7 +1366,9 @@ function pick(e){ mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerH
     if(R.intersectSphere(pickSphere, pickHit)){ const d = pickHit.distanceTo(R.origin); if(d < bd){ bd = d; best = res; } } };
   for(const m of mobs) if(!m.dead && m.inScene && near(m)) test(m, m.mesh.userData.height || 2, (m.r || 0.5) + 0.25, {mob: m});
   if(!P.ghost){ for(const n of npcs) if(n.mesh.visible && near(n)) test(n, n.mesh.userData.height || 2.2, 0.6, {use: n}); }
-  for(const r of Object.values(CO.COOP.remotes)) if(r.mesh && r.mesh.visible && near(r)) test(r, r.mesh.userData.height || 2.2, 0.6, {friend: r});
+  for(const r of Object.values(CO.COOP.remotes)) if(r.mesh && r.mesh.visible){ const at = CO.corpse(r); if(near(at)) test(at, r.gh ? 0.8 : r.mesh.userData.height || 2.2, 0.6, {friend: r}); }
+  for(const b of bots) if(near(b)) test(b, b.mesh.userData.height || 2.2, 0.6, {friend: {id: b.id, bot: true}});                // companions
+  for(const b of gBots.values()) if(b.mesh.visible && near(b)) test(b, b.mesh.userData.height || 2.2, 0.6, {friend: {id: b.id, bot: true}});
   { const pt = G.getPet(); if(pt && !pt.dead) test(pt, pt.mesh.userData.height || 1.5, (pt.r || 0.5) + 0.2, {pet: pt}); }
   const meshes = []; for(const n of nodes) if(n.active && n.mesh.visible && near(n)) n.mesh.traverse(o => { if(o.isMesh) meshes.push(o); });
   for(const p of portals) meshes.push(p.mesh);
@@ -1445,7 +1463,7 @@ renderer.domElement.addEventListener("pointerup", e => {
   if(e.button !== 2 || !rmb.down) return; rmb.down = false; renderer.domElement.style.cursor = "";
   if(rmb.moved > 4 || (P.dead && !P.ghost) || !running || P.flying) return;                                   // (a spirit can still right-click the Spirit Guide)                                                     // it was a camera turn, not a click
   const h = pick(e); if(!h) return;
-  if(h.mob) startAttack(h.mob); else if(h.use) useThing(h.use); else if(h.friend) CO.tradeRequest(h.friend.id);   // right-click a friend: ask to trade
+  if(h.mob) startAttack(h.mob); else if(h.use) useThing(h.use); else if(h.friend && !h.friend.bot) CO.tradeRequest(h.friend.id);   // right-click a friend: ask to trade
 });
 
 // ---------------------------------------------------------------- monster AI
@@ -1473,7 +1491,7 @@ function updMob(m, dt){
     m.wanderT -= dt; if(m.wanderT <= 0){ m.wanderT = 3 + Math.random() * 5; const a = Math.random() * 6.28, d = Math.random() * 5; m.wx = m.hx + Math.cos(a) * d; m.wz = m.hz + Math.sin(a) * d; }
     if(m.wx != null){ const dx = m.wx - m.x, dz = m.wz - m.z, d = Math.hypot(dx, dz); if(d < 0.3) m.wx = null; else { if(tryMove(m, dx / d * 1.6 * dt, dz / d * 1.6 * dt)) m.moving = true; else m.wx = null; turnTo(m, dx, dz, dt, 6); } }
   } else if(m.state === "chase"){
-    const c = CO.mobTarget(m); if(!c){ evade(m); return; }                                   // nobody left to fight
+    CO.nearList(m); const c = CO.mobTarget(m); if(!c){ evade(m); return; }                                   // nobody left to fight
     const tg = c.e, toPet = !!c.pet; m.tgtPet = toPet; m.tgtId = c.id;                        // you, a friend, or a pet – whoever holds the monster's attention
     if(c.me || c.mine) P.combatT = Math.max(P.combatT, 2);
     if(!(m.fearT > 0) && (Math.hypot(m.x - m.hx, m.z - m.hz) > 40 || (now - m.lastHit > 10 && distU(m, tg) > 30))){ evade(m); if(c.me) log(`${m.name} is evading.`, "#93a4ad"); return; }

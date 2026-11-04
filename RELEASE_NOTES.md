@@ -1,5 +1,16 @@
 # Rimfrost 2 – Release notes
 
+## v0.45.0
+
+### New
+- **Heal and buff companions:** Click a companion's party frame or model to target it. Heals, shields and buffs work on companions for every group member.
+- **Resurrect released friends:** After a friend releases their spirit, their body stays where they died and can still be resurrected. Companion healers resurrect them too.
+
+### Changed
+- **Threat in co-op:** Monsters only attack players on their threat list. You join the list by attacking the monster, by healing or buffing someone it is fighting, or by coming close. A player who dies is removed from the list. If no one is left on the list, the monster resets.
+- **Healing threat:** Healing now causes threat equal to half the amount healed, split across the monsters in the fight.
+- **Combo points:** Combo points stay on their target until it dies or resets, even when another player holds its attention.
+
 ## v0.44.0
 
 ### New
