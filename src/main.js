@@ -16,7 +16,7 @@ import {preloadBeasts, makeMountModel, makeAnimal} from "./beasts.js";
 import {makeHero, makeHumanoid, makeBearForm, makeWolfForm, makeLeopardForm, makeMount, makeSheep, makeWolf} from "./models.js";
 import {buildNav, steer, findPath, reachable, setReachFrom} from "./nav.js";
 import {P, S, mobs, PXU} from "./state.js";
-import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, SCHOOL_COLOR, abIcon, drawIcon} from "./rimdata.js";
+import {RACES, RACE_CLASSES, CLASSES, AB, BARS, RACIAL, RES_NAME, TALENTS, TIER_NEED, SCHOOL_COLOR, BUFF_FX, abIcon, drawIcon} from "./rimdata.js";
 import {ITEMS, QUAL, SLOTS, slotName, SLOT_ORDER, STAT_NAME, GEAR_MAX, CLASS_MAIN, canWear, gearTypeName, upgradeGear} from "./items.js";
 import * as G from "./engine.js";
 import * as Q from "./quests.js";
@@ -880,22 +880,31 @@ function gearTip(it){ const c = S.cur, cur = c.eq[it.slot], cmp = cur && cur !==
   return `<h4 style="color:${QUAL[it.q].color}">${it.n}</h4><div class="m">${QUAL[it.q].name} · ${slotName(it.slot, it.wt, S.cur.cls)} · ${gearTypeName(it)}</div>${statLines(it, cmp)}${it.bonus && AB[it.bonus.ab] ? `<div style="color:#7be08a;margin-top:4px">Equip: Increases the ${it.bonus.kind === "heal" ? "healing" : "damage"} of ${AB[it.bonus.ab].name} by ${Math.round(it.bonus.v * 100)}%.</div>` : ""}
     <div class="m" style="margin-top:4px">${ok ? "" : `<span style="color:#ff6b5e">Cannot be used by ${CLASSES[c.cls].name}s. </span>`}<span style="color:${c.level >= it.il ? "" : "#ff6b5e"}">Requires level ${it.il}</span>${cmp ? ` · compared to ${cmp.n}` : ""}</div>`; }
 // the talent window: arrows between talents that depend on each other, and tooltips with this rank and the next
+// a talent's picture: its own, the ability it teaches or changes, or one for what it improves
+const EFF_IC = {crit: ["burst", "#ffd36b"], def: ["shield", "#a8b0bc"], hp: ["heart", "#d84a42"], mana: ["drop", "#7fb2ff"], regen: ["drop", "#9fd6ff"], dodge: ["leap", "#9cb0c0"], parry: ["sword", "#c8c8c8"],
+  heal: ["plus", "#9cf07a"], dmg: ["fist", "#e0b050"], threat: ["roar", "#ffd36b"], petdmg: ["paw", "#d9b48a"], pethp: ["heart", "#c89a68"], form: ["claw", "#d9b48a"],
+  fire: ["flame", "#ff7a3a"], frost: ["snowflake", "#8fd8ff"], nature: ["leaf", "#7fdc5a"], arcane: ["orb", "#d38cff"], holy: ["sun", "#ffe08a"], shadow: ["void", "#9a5ae0"], phys: ["sword", "#e0e0e0"]};
+function talentIcon(t){ if(t.ic) return t.ic; if(t.grants && AB[t.grants]) return abIcon(t.grants);
+  for(const k of ["abDmg", "abHeal", "abCd", "abCast", "abCrit", "abCost"]) if(t[k]){ const id = Object.keys(t[k]).find(x => x !== "*" && AB[x]); if(id) return abIcon(id); }
+  if(t.eff){ const k = Object.keys(t.eff)[0]; if(EFF_IC[k]) return EFF_IC[k]; }
+  let txt = ""; try{ txt = t.d(1); }catch(e){} const bar = BARS[S.cur.cls] || []; const hit = bar.filter(id => AB[id] && txt.includes(AB[id].name)).sort((a, b) => txt.indexOf(AB[a].name) - txt.indexOf(AB[b].name))[0];
+  return hit ? abIcon(hit) : ["star", "#8c939a"]; }
 function talentExtras(b){ const tree = b.querySelector(".taltree"); if(!tree) return; const TL = TALENTS[S.cur.cls];
-  for(const cv of tree.querySelectorAll("canvas[data-tic]")){ const t = TL.find(x => x.id === cv.dataset.tic); if(!t) continue; const [ic, col] = t.ic || (t.grants ? abIcon(t.grants) : ["star", "#8c939a"]); drawIcon(cv, ic, col); }
+  for(const cv of tree.querySelectorAll("canvas[data-tic]")){ const t = TL.find(x => x.id === cv.dataset.tic); if(!t) continue; const [ic, col] = talentIcon(t); drawIcon(cv, ic, col); }
   const svg = tree.querySelector(".talarrows"), base = tree.getBoundingClientRect(); let lines = "";
-  for(const el of tree.querySelectorAll("[data-req]")){ const from = tree.querySelector(`[data-tid="${el.dataset.req}"] canvas`), to = el.querySelector("canvas"); if(!from || !to) continue;
-    const a = from.getBoundingClientRect(), z = to.getBoundingClientRect(), x1 = a.left + a.width / 2 - base.left, y1 = a.bottom - base.top + 2, x2 = z.left + z.width / 2 - base.left, y2 = z.top - base.top - 2;
+  for(const el of tree.querySelectorAll("[data-req]")){ const fromCell = tree.querySelector(`[data-tid="${el.dataset.req}"]`), from = fromCell && fromCell.querySelector("canvas"), to = el.querySelector("canvas"); if(!from || !to) continue;
+    const a = from.getBoundingClientRect(), z = to.getBoundingClientRect(), x1 = a.left + a.width / 2 - base.left, y1 = fromCell.getBoundingClientRect().bottom - base.top + 1, x2 = z.left + z.width / 2 - base.left, y2 = z.top - base.top - 2;
     const ok = G.reqMet(TL.find(t => t.id === el.dataset.tid)), col = ok ? "#ffd36b" : "#8a3a32", my = x1 === x2 ? null : (y1 + y2) / 2;
     lines += `<path d="${my == null ? `M${x1} ${y1} L${x2} ${y2 - 7}` : `M${x1} ${y1} L${x1} ${my} L${x2} ${my} L${x2} ${y2 - 7}`}" stroke="${col}" stroke-width="3" fill="none" stroke-linejoin="round"/><path d="M${x2 - 6} ${y2 - 9} L${x2} ${y2} L${x2 + 6} ${y2 - 9} Z" fill="${col}"/>`; }
   svg.setAttribute("width", tree.scrollWidth); svg.setAttribute("height", tree.scrollHeight); svg.innerHTML = lines; }
 // talent tooltips: this rank, the next one, and what it still needs
 let talTipId = null;
-function talentTip(t){ const r = G.T(t.id), TL = TALENTS[S.cur.cls], q = t.req && TL.find(x => x.id === t.req), need = TIER_NEED[t.tier], tr = G.TREES[S.cur.cls].find(x => x.id === t.tree);
+function talentTip(t){ const r = G.rank(t.id), TL = TALENTS[S.cur.cls], q = t.req && TL.find(x => x.id === t.req), need = TIER_NEED[t.tier], tr = G.TREES[S.cur.cls].find(x => x.id === t.tree);
   let html = `<h4>${t.name}</h4><div class="muted">Rank ${r}/${t.max}</div>`;
   if(r > 0) html += `<div style="margin-top:5px">${t.d(r)}</div>`;
   if(r < t.max) html += `<div style="margin-top:5px">${r > 0 ? `<span style="color:#9fd6e8">Next rank:</span><br>` : ""}${t.d(r + 1)}</div>`;
   if(G.treePoints(t.tree) < need) html += `<div style="color:#ff8a7a;margin-top:5px">Requires ${need} points in ${tr.name}</div>`;
-  if(q && G.T(q.id) < q.max) html += `<div style="color:#ff8a7a;margin-top:5px">Requires ${q.max} points in ${q.name}</div>`;
+  if(q && G.rank(q.id) < q.max) html += `<div style="color:#ff8a7a;margin-top:5px">Requires ${q.max} points in ${q.name}</div>`;
   else if(G.canLearnTalent(t)) html += `<div style="color:#9cf07a;margin-top:5px">Click to learn</div>`;
   return html; }
 $("pbody").addEventListener("mousemove", e => { const el = e.target.closest(".tcell"); const t = el && TALENTS[S.cur.cls].find(x => x.id === el.dataset.tid);
@@ -983,9 +992,9 @@ function renderPanel(){
     for(const tier of Object.keys(TIER_NEED).map(Number)){ const list = TL.filter(t => t.tier === tier && t.tree === talTree); if(!list.length) continue;
       const need = TIER_NEED[tier], open = G.treePoints(talTree) >= need;
       h += `<div class="trow ${open ? "" : "locked"}"><div class="treq" title="${need} points in ${tr.name}">${open ? need || "" : "&#128274;" + need}</div><div class="tcells">`;
-      list.forEach((t, i) => { const r = G.T(t.id), can = G.canLearnTalent(t), rq = G.reqMet(t), ok = open && rq;
+      list.forEach((t, i) => { const r = G.rank(t.id), can = G.canLearnTalent(t), rq = G.reqMet(t), ok = open && rq;
         const st = [ok ? "open" : "locked", can ? "can" : "", r === t.max ? "max" : r > 0 ? "some" : "", t.grants ? "abil" : ""].join(" ");
-        h += `<div class="tcell ${st}" style="grid-column:${(t.col ?? i) + 1}" data-act="tal" data-id="${t.id}" data-tid="${t.id}"${t.req ? ` data-req="${t.req}"` : ""}>
+        h += `<div class="tcell ${st}" style="grid-column:${(t.col ?? i) + 1};grid-row:1" data-act="tal" data-id="${t.id}" data-tid="${t.id}"${t.req ? ` data-req="${t.req}"` : ""}>
           <canvas width="64" height="64" data-tic="${t.id}"></canvas><span class="rk">${r}/${t.max}</span><div class="tn">${t.name}</div>${rq ? "" : `<div class="tq">Requires ${nameOf(t.req)}</div>`}</div>`; });
       h += `</div></div>`; }
     h += `<svg class="talarrows"></svg></div>`;
@@ -1704,13 +1713,14 @@ const AURA = {   // buff key → ability whose icon it uses
   reckless: "recklessness", laststand: "laststand", shieldwall: "shieldwall", steadyaim: "aimed", rapidfire: "rapidfire", counter: "counter", innerfocus: "innerfocus", powerinf: "powerinf",
   painsupp: "painsupp", guardian: "guardian", celestial: "celestial", survival: "survival", shooting: "starfire", swarm: "swarm", surge: "smite", borrowed: "pws", owlkin: "starfire", lunar: "starfire", solar: "wrath", berserk: "berserk", nswift: "nswift", vengeance: "palstrike",
   artofwar: "palheal", surecrit: "crusader", bladeflurry: "bladeflurry", shadowdance: "shadowdance", efocus: "lightning", maelstrom: "lightning", emastery: "elemmastery", ancswift: "ancswift", manatide: "manatide"};
+for(const k in BUFF_FX) AURA[k] = k;                      // the buffs the last talent of each tree teaches
 const AURA_NAME = {hotstreak: "Hot Streak", nightfall: "Nightfall", backlash: "Backlash", clearcast: "Clearcasting", archmage: "Archmage", sudden: "Sudden Death", enrage: "Enrage", flurry: "Flurry",
   steadyaim: "Improved Steady Shot", counter: "Counterattack ready", surge: "Surge of Light", borrowed: "Borrowed Time", owlkin: "Owlkin Frenzy", lunar: "Lunar Eclipse", solar: "Solar Eclipse",
   vengeance: "Vengeance", artofwar: "The Art of War", shooting: "Shooting Stars", surecrit: "Guaranteed critical strike", efocus: "Elemental Focus", maelstrom: "Maelstrom Weapon"};
 const ITEM_BUFF = {elixir: ["Elixir of Strength", "#e0b84a"], ironskin: ["Elixir of Ironskin", "#a8b0bc"], keen: ["Elixir of Keenness", "#ff9a4a"], sage: ["Elixir of Wisdom", "#9fd6e8"]};
 // what an aura does (tooltip): a talent proc uses its talent's text, anything else the ability's
 const procTalent = nm => { for(const c in TALENTS) for(const t of TALENTS[c]) if(t.name === nm) return t; return null; };
-function auraDesc(id, name){ const tl = name && procTalent(name); if(tl) return tl.d(Math.max(1, G.T(tl.id)));
+function auraDesc(id, name){ const tl = name && procTalent(name); if(tl) return tl.d(Math.max(1, G.rank(tl.id)));
   try{ return AB[id] && AB[id].desc ? AB[id].desc() : ""; }catch(e){ return ""; } }
 const ITEM_DESC = {elixir: "Strength increased.", ironskin: "Armor increased.", keen: "Critical strike chance increased.", sage: "Spell power increased by 20%."};
 function abAura(id, left, good, name){ const [ic, col] = abIcon(id); return {url: iconURL(ic, col), name: name || AB[id].name, left, good, desc: auraDesc(id, name)}; }

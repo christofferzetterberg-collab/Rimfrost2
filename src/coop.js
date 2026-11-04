@@ -335,7 +335,7 @@ export function guestUpd(m, dt){
 let CAP = null;                                  // while set, heals / heal over time / shields / buffs are collected and sent to a friend
 export const cap = () => CAP;
 export const setCap = c => { CAP = c; };
-const FRIENDLY = new Set(["heal", "renew", "pws", "palheal", "touch", "rejuv", "bloom", "healwave", "thorns", "powerinf", "painsupp", "guardian", "swiftmend", "regrowth"]);
+const FRIENDLY = new Set(["heal", "renew", "pws", "palheal", "touch", "rejuv", "bloom", "healwave", "thorns", "powerinf", "painsupp", "guardian", "swiftmend", "regrowth", "chainheal"]);
 // a companion as a friendly target: the host's own, or (guests) the copy the host sends
 function botView(id){ if(!id) return null;
   if(COOP.role !== "guest"){ const b = (H.bots ? H.bots() : []).find(b => b.id === id); return b ? {id, bot: true, name: b.name, cls: b.cls, lvl: b.lvl, hp: b.hp, mhp: b.maxHp, dead: !!b.dead, x: b.x, z: b.z, mesh: b.mesh, au: H.botAu ? H.botAu(b) : []} : null; }
@@ -381,7 +381,7 @@ function receiveFx(d){ const rz = d.fx.find(f => f[0] === "rez"); if(rz){ if(P.d
     if(f[0] === "heal") G.healP(f[1]); else if(f[0] === "healPct") G.healP(P.maxHp * f[1]);
     else if(f[0] === "hot") G.hot(f[1] + "_" + d.from, f[2], f[3], f[4] || 0); else if(f[0] === "hotPct") G.hot(f[1] + "_" + d.from, P.maxHp * f[2], f[3]); else if(f[0] === "shield") G.shieldP(f[1], f[2]); else if(f[0] === "buff") G.buff(f[1], f[2]); }
   G.burst(P.px, P.py, "#9cf07a", 8);
-  if(!/^Holy|Totem$|^Tranquility$|^Wild Growth$/.test(d.label)) H.log(`${d.from} cast ${d.label} on you.`, "#7be08a"); }
+  if(!/^Holy|Totem$|^Tranquility$|^Wild Growth$|^Circle of Healing$|^Divine Hymn$|^Chain Heal$/.test(d.label)) H.log(`${d.from} cast ${d.label} on you.`, "#7be08a"); }
 // select a friend as your target (your heals and shields then go to them); toggle: clicking their frame again lets go
 export function select(id, toggle){ const was = P.ftarget; P.ftarget = id && !(toggle && was === id) ? id : null; if(P.ftarget){ P.target = null; P.auto = false; } }
 export const remoteById = id => friendOrBot(id);

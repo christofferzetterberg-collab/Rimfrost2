@@ -1,5 +1,34 @@
 # Rimfrost 2 – Release notes
 
+## v0.52.0
+
+### New
+- **Talent trees reworked for all classes:** Mage, Warrior, Hunter, Priest, Paladin, Warlock, Rogue and Shaman now have the same talent layout as Druid:
+  - 2–3 choices on every tier.
+  - Most talents that grow with each point have 5 ranks.
+  - New talents that improve or shorten the cooldown of specific abilities.
+  - A final talent at 25 points that teaches a powerful ability:
+
+| Class | Final talents |
+|---|---|
+| Mage | Arcane Surge, Phoenix Flames, Icy Veins |
+| Warrior | Avatar of War, Death Wish, Last Bastion |
+| Hunter | The Beast Within, Trueshot, Apex Predator |
+| Priest | Archangel, Divine Hymn, Voidform |
+| Paladin | Aura of Light, Guardian of Kings, Zealotry |
+| Warlock | Dark Soul, Metamorphosis, Infernal Power |
+| Rogue | Vendetta, Killing Spree, Shadow Blades |
+| Shaman | Ascendance, Feral Spirit, Ancestral Guidance |
+
+- **New group heals:**
+  - **Circle of Healing** (Priest): instantly heals you and nearby group members.
+  - **Divine Hymn** (Priest): a channeled heal for you and nearby group members.
+  - **Chain Heal** (Shaman): heals the target and group members near you.
+- All classes get their talent points back.
+
+### Changed
+- **Talent window:** Talents with icons are chosen to match what they improve. Arrows now start below the talent name, and tiers have more space between them.
+
 ## v0.51.1
 
 ### Fixed

@@ -330,9 +330,9 @@ Numbered so we can refer to them. Tick them off as they get done.
 - [x] Dungeon group scaling: tougher dungeon monsters, +70% health and +10% damage per extra player, one gear drop per elite/boss with Need / Greed / Pass rolls
 - [ ] Dungeon puzzles (levers, runes, gates and the like; new designs, not copies of Rimfrost 1)
 - [ ] The smith's weapon upgrades and other crafting (on hold)
-- [ ] Enhanced talent trees: more choices per tier, ability-changing talents, a capstone at 25 points, and a new talent window
+- [x] Enhanced talent trees: more choices per tier, ability-changing talents, a capstone at 25 points, and a new talent window
     - [x] New talent window and Druid (pilot)
-    - [ ] Mage, Warrior, Hunter, Priest, Paladin, Warlock, Rogue, Shaman
+    - [x] Mage, Warrior, Hunter, Priest, Paladin, Warlock, Rogue, Shaman
     - Talent texts: tooltip style only, no design terms (e.g. never "capstone")
 
 ### Art

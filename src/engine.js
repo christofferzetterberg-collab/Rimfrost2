@@ -2,7 +2,7 @@
 // Rimfrost 1 measured everything in pixels; here 1 world unit = PXU pixels, so the ability data can be reused unchanged.
 import * as THREE from "three";
 import {P, S, E, mobs, PXU} from "./state.js";
-import {AB, BARS, CLASSES, HUNTER_MIN, CLASS_DMG, PLAYER_DMG, MANA_COST_MULT, RES_NAME, SCHOOL_COLOR, TALENTS, TIER_NEED, TREES, TALENT_VERSION, TALENT_CLASS_VER, HEAL_AB} from "./rimdata.js";
+import {AB, BARS, CLASSES, HUNTER_MIN, CLASS_DMG, PLAYER_DMG, MANA_COST_MULT, RES_NAME, SCHOOL_COLOR, TALENTS, TIER_NEED, TREES, TALENT_VERSION, TALENT_CLASS_VER, HEAL_AB, BUFF_FX} from "./rimdata.js";
 import {ITEMS, LOOT, BEASTS, QUAL, GEAR_MAX, makeGear, rollQuality, canWear, gearTypeName} from "./items.js";
 import {makeBearForm, makeWolf, makeImp, makeVoidwalker, makeTotem} from "./models.js";
 import {steer} from "./nav.js";
@@ -17,8 +17,15 @@ const C = () => S.cur;
 export const MAX_LVL = 40;
 export const rand = (a, b) => a + Math.random() * (b - a);
 export const fmt = n => Math.round(n);
-export const T = id => (C() && C().talents && C().talents[id]) || 0;       // talent rank
-export const teff = k => { let v = 0; for(const t of TALENTS[C().cls]) if(t.eff && t.eff[k]) v += t.eff[k] * T(t.id); return v; };
+export const rank = id => (C() && C().talents && C().talents[id]) || 0;    // points in a talent
+// a talent's strength: its rank, scaled where a talent was spread over more ranks (k: 3 ranks became 5 → each counts 0.6)
+const KMAP = {}; const kOf = id => { const cls = C().cls; if(!KMAP[cls]){ KMAP[cls] = {}; for(const t of TALENTS[cls] || []) if(t.k) KMAP[cls][t.id] = t.k; } return KMAP[cls][id] || 1; };
+export const T = id => { const r = rank(id); return r ? r * kOf(id) : 0; };
+export const teff = k => { let v = 0; for(const t of TALENTS[C().cls]) if(t.eff && t.eff[k]) v += t.eff[k] * rank(t.id); return v; };
+// talents that change one ability: abDmg / abHeal / abCost / abCrit (share per rank), abCd / abCast (seconds per rank); "*" = every ability
+export const tAb = (kind, id) => { if(!id || !C()) return 0; let v = 0; for(const t of TALENTS[C().cls]){ const o = t[kind]; if(!o) continue; const x = o[id] ?? o["*"]; if(x) v += x * rank(t.id); } return v; };
+// the buffs the last talent of each tree teaches (see BUFF_FX in rimdata.js)
+const bfx = k => { let v = 0; for(const b in BUFF_FX) if(P.buffs && P.buffs[b] > 0 && BUFF_FX[b][k]) v += BUFF_FX[b][k]; return v; };
 export const talentPoints = () => Math.max(0, C().level - 9);
 export const talentsSpent = () => Object.values(C().talents || {}).reduce((a, b) => a + b, 0);
 export function gearStat(k){ let v = 0; for(const it of Object.values(C().eq || {})) if(it && it.st[k]) v += it.st[k]; return v; }
@@ -74,7 +81,7 @@ export const pow = () => 6 + C().level * 2.6 + gearStat("pow") + strAP() + agiAP
 export const spow = () => (6 + C().level * 2.6 + gearStat("sp") + intSP() + (HEALING ? 0 : gearStat("sd"))) * (P.buffs.sage ? 1.2 : 1);
 // how much stronger your heals are: spell healing and spell power on gear, Intellect, and healing talents
 export const healMult = () => sickM() * (1 + teff("heal") + (gearStat("sh") + gearStat("sp") * 0.5 + intSP()) / (40 + 8 * C().level))
-  * (P.buffs && P.buffs.powerinf ? 1.2 : 1) * ((CUR_AB === "heal" || CUR_AB === "renew") ? 1 + 0.05*T("p_empower") : 1) * (1 + relicBonus(CUR_AB));   // Power Infusion, Empowered Healing
+  * (P.buffs && P.buffs.powerinf ? 1.2 : 1) * ((CUR_AB === "heal" || CUR_AB === "renew") ? 1 + 0.05*T("p_empower") : 1) * (1 + relicBonus(CUR_AB)) * (1 + tAb("abHeal", CUR_AB) + bfx("heal"));   // Power Infusion, Empowered Healing, talents
 let CUR_AB = null;                           // the ability being used right now
 // an idol, relic or totem in the ranged slot that makes this ability stronger
 export function relicBonus(ab){ const r = ab && C() && C().eq && C().eq.ranged; return r && r.bonus && r.bonus.ab === ab ? r.bonus.v : 0; }
@@ -82,10 +89,10 @@ function genMult(){ let m = (1 + teff("dmg")) * (CLASS_DMG[C().cls] || 1) * PLAY
   if(P.buffs.avenging) m *= 1.2; if(P.buffs.heroism) m *= 1.2; if(P.buffs.earthstr) m *= 1.1; 
   if(T("wl_master") && pet && !pet.dead && pet.kind === "imp") m *= 1 + 0.03*T("wl_master");   // Master Demonologist with the Imp
   if(P.buffs.enrage) m *= 1 + 0.05*T("w_enrage"); if(P.buffs.vengeance) m *= 1 + 0.03*T("pal_veng");   // Enrage, Vengeance
-  if(P.buffs.arcanepower) m *= 1.3; if(P.buffs.powerinf) m *= 1.2;
+  if(P.buffs.arcanepower) m *= 1.3; if(P.buffs.powerinf) m *= 1.2; m *= 1 + bfx("dmg");
   return m * sickM(); }
 export function tmul(ab, school){
-  let m = 1; const cls = C().cls;
+  let m = 1 + tAb("abDmg", ab); const cls = C().cls;
   if(cls === "mage"){ if(school === "fire") m *= 1 + 0.08*T("impFire"); if(school === "frost") m *= 1 + 0.08*T("iceShards"); }
   if(cls === "warrior"){ if(ab === "heroic") m *= 1 + 0.1*T("impHS"); }
   if(cls === "hunter"){ if(ab === "firearrow") m *= 1 + 0.15*T("fireArrows"); }
@@ -103,14 +110,14 @@ export function tmul(ab, school){
 export function critChance(m, school){
   let c = 0.05 + gearStat("crit") / 100 + (P.buffs.keen ? 0.05 : 0) + (P.buffs.airgrace ? 0.03 : 0);
   c += (school === "phys" || !school ? attr("agi") : attr("int")) / 3000;             // 30 Agility = +1% attack crit, 30 Intellect = +1% spell crit
-  c += 0.03*T("cruelty") + 0.02*T("lethal") + teff("crit"); if(P.buffs.reckless) c += 0.3; if(P.form === "bear" || P.form === "cat") c += 0.01*T("f_sharp");
+  c += 0.03*T("cruelty") + 0.02*T("lethal") + teff("crit") + bfx("crit"); if(P.buffs.reckless) c += 0.3; if(P.form === "bear" || P.form === "cat") c += 0.01*T("f_sharp");
   if(school === "holy") c += 0.03*T("holySpec");
   if(C().cls === "mage" && m && m.freezeT > 0) c += 0.12*T("shatter");
   return c;
 }
 export function takenMult(){ let m = CLASSES[C().cls].armor; if(P.buffs.stskin) m *= 0.9; if(T("wl_master") && pet && !pet.dead && pet.kind === "voidwalker") m *= 1 - 0.03*T("wl_master"); if(P.form === "bear") m = 0.7 * (1 - 0.05*T("thickHide")); if(P.form === "cat") m = 0.9; if(T("shadowform")) m *= 0.85;
   if(P.buffs.bark) m *= 0.75; m *= 1 - teff("def"); m *= 1 - Math.min(0.25, gearStat("def") / 100); if(P.buffs.ironskin) m *= 0.85; if(P.buffs.stoneform) m *= 0.8;
-  if(P.buffs.shieldwall || P.buffs.survival) m *= 0.5; if(P.buffs.painsupp) m *= 0.6; if(T("pal_ardent") && P.hp < P.maxHp * 0.35) m *= 0.7;   // Shield Wall, Pain Suppression, Ardent Defender
+  if(P.buffs.shieldwall || P.buffs.survival) m *= 0.5; m *= 1 - bfx("taken"); if(P.buffs.painsupp) m *= 0.6; if(T("pal_ardent") && P.hp < P.maxHp * 0.35) m *= 0.7;   // Shield Wall, Pain Suppression, Ardent Defender
   return m; }
 const DESTRO = new Set(["shadowbolt", "immolate", "soulfire", "rainfire", "shadowburn", "conflagrate"]);   // Cataclysm
 const manaScale = () => (100 + C().level * 22) / 122 * MANA_COST_MULT;
@@ -119,7 +126,7 @@ export function costOf(id){ const a = AB[id]; let c = a.cost || 0;
   if(mana && c > 0){ if(freeBuff(id)) return 0; if(P.buffs.arcanepower) c *= 1.3; if(!a.cast) c *= 1 - 0.04*T("p_agility"); if(P.efocusN > 0) c *= 1 - 0.15*T("s_efocus"); }
   if(P.buffs.berserk && (a.res === "rage" || a.res === "energy")) c *= 0.7;
   if(id === "claw" || id === "rake") c -= 5*T("f_shred"); if(id === "maul") c -= 2*T("f_shred"); if(mana && (id === "touch" || id === "tranquility")) c *= 1 - 0.03*T("r_tranq");
-  if(mana && a.school === "frost") c *= 1 - 0.05*T("m_frostchan"); if(C().cls === "hunter") c *= 1 - 0.1*T("efficiency"); if(id === "sinister") c -= 3*T("r_impss"); if(DESTRO.has(id)) c *= 1 - 0.03*T("wl_cata"); if((a.res || CLASSES[C().cls].res) === "mana") c *= manaScale(); return Math.round(c); }
+  if(mana && a.school === "frost") c *= 1 - 0.05*T("m_frostchan"); if(C().cls === "hunter") c *= 1 - 0.1*T("efficiency"); if(id === "sinister") c -= 3*T("r_impss"); if(DESTRO.has(id)) c *= 1 - 0.03*T("wl_cata"); c *= 1 - tAb("abCost", id); if((a.res || CLASSES[C().cls].res) === "mana") c *= manaScale(); return Math.round(Math.max(0, c)); }
 export function castTime(id){ let c = AB[id].cast || 0; if(!c) return 0;
   if(["fireball", "frostbolt", "pyroblast"].includes(id)) c -= 0.25*T("quickCast");
   if(["wrath", "starfire"].includes(id)){ c -= 0.1*T("naturesGrace"); if(P.buffs.celestial) c *= 0.5; }
@@ -130,9 +137,10 @@ export function castTime(id){ let c = AB[id].cast || 0; if(!c) return 0;
   if((id === "summonimp" || id === "summonvoid") && T("wl_dom")) c -= 1.5*T("wl_dom");
   if(id === "heal") c -= 0.1*T("p_empower");
   if(P.buffs.borrowed) c *= 1 - 0.1*T("p_borrowed"); if(P.buffs.powerinf) c *= 0.8;
+  c -= tAb("abCast", id); c *= 1 - bfx("haste");
   if(instantBuff(id)) c = 0;                                                      // Hot Streak, Nightfall, Presence of Mind …
   return Math.max(0, c); }
-export function cdOf(id){ let c = AB[id].cd || 0;
+export function cdOf(id){ let c = (AB[id].cd || 0) - tAb("abCd", id);
   if(id === "disengage") c -= 5*T("h_idis"); if(id === "vanish" || id === "evasion") c -= 30*T("r_elusive"); if(id === "bloom") c -= 5*T("d_ilb"); if(id === "hurricane") c -= 3*T("b_gale"); if(id === "bash") c -= 5*T("f_brutal"); if(id === "shieldbash") c -= 3*T("w_bash");
   return Math.max(0, c); }
 // ---------------------------------------------------------------- talent procs: "your next X is instant", "your next spell is free"
@@ -240,7 +248,7 @@ export function hit(m, base, school, ab){
   const ld = m.lvl - C().level;
   if(ld > 0 && Math.random() < Math.min(0.35, 0.06 * ld)){ H.floatText(m, "Miss", "#cfd8dc"); engage(m); return null; }
   let amt = base * genMult() * tmul(ab, school) * rand(0.92, 1.08) * lvlPenalty(m);
-  let cc = critChance(m, school); const real = ab && ab !== "auto" && AB[ab] && !EXTRA;
+  let cc = critChance(m, school) + tAb("abCrit", ab); const real = ab && ab !== "auto" && AB[ab] && !EXTRA;
   if(real && P.ifCrit){ cc += 0.25; P.ifCrit = false; }                                   // Inner Focus
   let crit = Math.random() < cc;
   if(real && P.buffs.surecrit){ crit = true; delete P.buffs.surecrit; }                   // Cold Blood, Divine Favor, Elemental Mastery
@@ -248,7 +256,7 @@ export function hit(m, base, school, ab){
   if(crit) amt *= 2 * (1 + 0.1*(T("r_lethal") + T("wl_ruin")));
   if(crit && pet && !pet.dead && T("h_throat")) pet.res = Math.min(100, pet.res + 10 * T("h_throat"));   // Go for the Throat
   amt = Math.max(1, Math.round(amt));
-  { const k = THREAT_AB[ab] || 1, prev = TH_MULT; TH_MULT = prev * k; try{ damageMob(m, amt, crit, school); } finally{ TH_MULT = prev; } }
+  { const k = (THREAT_AB[ab] || 1) * (1 + teff("threat")), prev = TH_MULT; TH_MULT = prev * k; try{ damageMob(m, amt, crit, school); } finally{ TH_MULT = prev; } }
   afterHit(m, base, amt, crit, school, ab);
   if(crit){
     if(school === "holy" && T("lightbringer")) healP(amt * 0.3);
@@ -559,7 +567,7 @@ export function updPlayer(dt, moving){
   // health and mana come in a tick every 3 sec: out of combat slowly (about 1.5 min from empty to full); sitting down (Rest) fills you up in about 15 sec
   const sit = P.sitting, REGEN_TICK = 3, tick = (P.regenT = (P.regenT || 0) + dt) >= REGEN_TICK;
   if(tick){ P.regenT -= REGEN_TICK;
-    P.mana = Math.min(P.maxMana, P.mana + P.maxMana * (inC ? 0.005 * (1 + 0.5*T("m_medit") + 0.2*T("d_intensity")) : (sit ? 0.07 : 0.012) * rg) * REGEN_TICK);   // in combat: 1.5% per tick (more with Arcane Meditation / Intensity)
+    P.mana = Math.min(P.maxMana, P.mana + P.maxMana * (inC ? 0.005 * (1 + 0.5*T("m_medit") + 0.2*T("d_intensity") + teff("regen")) : (sit ? 0.07 : 0.012) * rg) * REGEN_TICK);   // in combat: 1.5% per tick (more with Arcane Meditation / Intensity)
     if(!inC && (P.combatT < -1 || sit)) P.hp = Math.min(P.maxHp, P.hp + P.maxHp * (sit ? 0.07 : 0.01) * rg * REGEN_TICK); }
   P.focus = Math.min(100, P.focus + (inC ? 4 : 9) * dt);
   P.energy = Math.min(100, P.energy + 12 * (P.buffs.adren ? 2 : 1) * dt);
@@ -656,15 +664,15 @@ export function clearFx(){ for(const o of fx) kill(o); fx.length = 0; for(const 
 
 // ---------------------------------------------------------------- talents
 // points spent in one specialization tree; a talent's tier opens when enough points are in ITS tree
-export const treePoints = tree => TALENTS[C().cls].filter(t => t.tree === tree).reduce((a, t) => a + T(t.id), 0);
-export function canLearnTalent(t){ const r = T(t.id), left = talentPoints() - talentsSpent(); return C().level >= 10 && left > 0 && r < t.max && treePoints(t.tree) >= TIER_NEED[t.tier] && reqMet(t); }
+export const treePoints = tree => TALENTS[C().cls].filter(t => t.tree === tree).reduce((a, t) => a + rank(t.id), 0);
+export function canLearnTalent(t){ const r = rank(t.id), left = talentPoints() - talentsSpent(); return C().level >= 10 && left > 0 && r < t.max && treePoints(t.tree) >= TIER_NEED[t.tier] && reqMet(t); }
 // a talent under an arrow needs the one above it at full rank first
-export function reqMet(t){ if(!t.req) return true; const q = TALENTS[C().cls].find(x => x.id === t.req); return !q || T(q.id) >= q.max; }
+export function reqMet(t){ if(!t.req) return true; const q = TALENTS[C().cls].find(x => x.id === t.req); return !q || rank(q.id) >= q.max; }
 // talents were redesigned into specializations: older characters get their points back once
 export function migrateTalents(){ const c = C(), v = TALENT_CLASS_VER[c.cls] || TALENT_VERSION; if(c.talVer === v) return false; const had = talentsSpent(); c.talents = {}; if(c.learned) dropTalentAbilities(); c.talVer = v; return had > 0; }
 export {TREES};
 export function learnTalent(id){ const t = TALENTS[C().cls].find(x => x.id === id); if(!t || !canLearnTalent(t)) return;
-  C().talents[id] = T(id) + 1; if(t.grants && !C().learned.includes(t.grants)){ C().learned.push(t.grants); H.log(`You have learned ${AB[t.grants].name}.`, "#9fd6e8"); H.buildBar(); } recompute(false); H.log(`Talent: ${t.name} ${C().talents[id]}/${t.max}`, "#e6bd5c"); H.save(); H.refresh(); }
+  C().talents[id] = rank(id) + 1; if(t.grants && !C().learned.includes(t.grants)){ C().learned.push(t.grants); H.log(`You have learned ${AB[t.grants].name}.`, "#9fd6e8"); H.buildBar(); } recompute(false); H.log(`Talent: ${t.name} ${C().talents[id]}/${t.max}`, "#e6bd5c"); H.save(); H.refresh(); }
 const dropTalentAbilities = () => { C().learned = C().learned.filter(id => !AB[id] || !AB[id].talent); };
 export function resetTalents(){ if(!talentsSpent()) return; C().talents = {}; dropTalentAbilities(); H.buildBar(); recompute(false); burst(P.px, P.py, "#ffd36b", 16); H.log("Your talents have been reset.", "#e6bd5c"); H.save(); H.refresh(); }
 

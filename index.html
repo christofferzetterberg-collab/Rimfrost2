@@ -144,7 +144,7 @@
   .tal.can{cursor:pointer;border-color:#7a9a4a} .tal.can:hover{background:#18221a} .tal.max{border-color:#ffd36b} .tal.max .r{color:#ffd36b}
   .taltree{position:relative;background:radial-gradient(ellipse at 50% 0,#17222a,#0b1014 70%);border:1px solid var(--line);border-radius:8px;padding:12px 6px 4px}
   .talarrows{position:absolute;left:0;top:0;pointer-events:none;overflow:visible}
-  .trow{display:flex;align-items:flex-start;gap:4px;margin-bottom:12px} .treq{width:30px;flex:none;font:800 12px 'Alegreya Sans';color:#7f8f97;text-align:center;padding-top:15px}
+  .trow{display:flex;align-items:flex-start;gap:4px;margin-bottom:22px} .treq{width:30px;flex:none;font:800 12px 'Alegreya Sans';color:#7f8f97;text-align:center;padding-top:15px}
   .trow.locked .treq{color:#c8706a}
   .tcells{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;justify-items:center}
   .tcell{position:relative;width:96px;text-align:center;cursor:default;padding:2px 0}
@@ -208,7 +208,7 @@
   #loadtxt{font:15px 'Alegreya Sans',sans-serif;color:var(--mute)}
 </style>
 <!-- VERSION: bump the ?v= numbers when the game changes, so browsers always load the newest files -->
-<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261117r", "./src/dungeon.js": "./src/dungeon.js?v=20261117r", "./src/dev.js": "./src/dev.js?v=20261117r", "./src/clock.js": "./src/clock.js?v=20261117r", "./src/coop.js": "./src/coop.js?v=20261117r", "./src/content.js": "./src/content.js?v=20261117r", "./src/engine.js": "./src/engine.js?v=20261117r", "./src/items.js": "./src/items.js?v=20261117r", "./src/keys.js": "./src/keys.js?v=20261117r", "./src/main.js": "./src/main.js?v=20261117r", "./src/models.js": "./src/models.js?v=20261117r", "./src/nav.js": "./src/nav.js?v=20261117r", "./src/quests.js": "./src/quests.js?v=20261117r", "./src/rimdata.js": "./src/rimdata.js?v=20261117r", "./src/state.js": "./src/state.js?v=20261117r", "./src/util.js": "./src/util.js?v=20261117r", "./src/world.js": "./src/world.js?v=20261117r", "./src/worlddata.js": "./src/worlddata.js?v=20261117r", "./src/mobs.js": "./src/mobs.js?v=20261117r", "./src/dgmech.js": "./src/dgmech.js?v=20261117r", "./src/avatar.js": "./src/avatar.js?v=20261117r", "./src/glb.js": "./src/glb.js?v=20261117r", "./src/beasts.js": "./src/beasts.js?v=20261117r", "./src/nature.js": "./src/nature.js?v=20261117r", "./src/buildings.js": "./src/buildings.js?v=20261117r", "./src/dgkit.js": "./src/dgkit.js?v=20261117r", "./src/account.js": "./src/account.js?v=20261117r" } }</script>
+<script type="importmap">{ "imports": { "three": "./lib/three.module.min.js?v=20261117t", "./src/dungeon.js": "./src/dungeon.js?v=20261117t", "./src/dev.js": "./src/dev.js?v=20261117t", "./src/clock.js": "./src/clock.js?v=20261117t", "./src/coop.js": "./src/coop.js?v=20261117t", "./src/content.js": "./src/content.js?v=20261117t", "./src/engine.js": "./src/engine.js?v=20261117t", "./src/items.js": "./src/items.js?v=20261117t", "./src/keys.js": "./src/keys.js?v=20261117t", "./src/main.js": "./src/main.js?v=20261117t", "./src/models.js": "./src/models.js?v=20261117t", "./src/nav.js": "./src/nav.js?v=20261117t", "./src/quests.js": "./src/quests.js?v=20261117t", "./src/rimdata.js": "./src/rimdata.js?v=20261117t", "./src/state.js": "./src/state.js?v=20261117t", "./src/util.js": "./src/util.js?v=20261117t", "./src/world.js": "./src/world.js?v=20261117t", "./src/worlddata.js": "./src/worlddata.js?v=20261117t", "./src/mobs.js": "./src/mobs.js?v=20261117t", "./src/dgmech.js": "./src/dgmech.js?v=20261117t", "./src/avatar.js": "./src/avatar.js?v=20261117t", "./src/glb.js": "./src/glb.js?v=20261117t", "./src/beasts.js": "./src/beasts.js?v=20261117t", "./src/nature.js": "./src/nature.js?v=20261117t", "./src/buildings.js": "./src/buildings.js?v=20261117t", "./src/dgkit.js": "./src/dgkit.js?v=20261117t", "./src/account.js": "./src/account.js?v=20261117t" } }</script>
 <script>
   // if something goes wrong while the game starts, show the error instead of a stuck loading screen
   addEventListener("error", e => { const l = document.getElementById("load"); if(l && !l.hidden) l.innerHTML = `<div style="font:15px sans-serif;color:#ff8a7a;max-width:640px;text-align:center">Rimfrost 2 could not start:<br><br>${e.message}<br><small>${(e.filename || "").split("/").pop()} line ${e.lineno}</small><br><br>Try reloading with Ctrl+F5 (Cmd+Shift+R on a Mac).</div>`; });
@@ -256,6 +256,6 @@
 <div id="petcast" hidden><i></i></div>
 <div id="rezask" hidden><span></span><button id="rezyes">Accept</button><button id="rezno" class="no">Decline</button></div>
 <div id="dead" hidden><div class="box"><h2>You are dead</h2><button id="revive">Release Spirit</button> <button id="wotd" hidden>Will of the Dead</button></div></div>
-<script type="module" src="./src/main.js?v=20261117r"></script>
+<script type="module" src="./src/main.js?v=20261117t"></script>
 </body>
 </html>
